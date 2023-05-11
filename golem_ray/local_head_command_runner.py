@@ -154,30 +154,66 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
     def run(
             self,
             cmd: Optional[str] = None,
-            timeout: int = 120,  #  TODO Potrzebne
-            exit_on_fail: bool = False,  # TODO Do sprawdzenia
+            timeout: int = 120,  #  TODO Potrzebne - Pytanie: Zaimplementowałbym to przy użyciu AsyncIO - dobry pomysł?
+            exit_on_fail: bool = False,  # Ogarnięte
             port_forward: List[Tuple[int, int]] = None,  #  Ogarnięty
             with_output: bool = False,  # TODO Potrzebne
             environment_variables: Optional[Dict[str, object]] = None,  # Do sprawdzneia / Potrzebne
-            run_env: str = "auto",  # TODO Do wywalenia
+            run_env: str = "auto",  # Ogarnięte
             ssh_options_override_ssh_key: str = "",  # Ogarnięte
             shutdown_after_run: bool = False,  # Ogarnięte
     ) -> str:
-        if shutdown_after_run:
-            raise InvalidLocalHeadArg('shutdown_after_run', shutdown_after_run)
         if port_forward is not None:
             raise InvalidLocalHeadArg('port_forward',
                                       port_forward)  # TODO Z tego co wiem, to nie jest ważne z perspektywy pythona, czy kożystam z "", czy z ''. Co to jednak oznacza z perspektywy konwencji?
+        if run_env != 'auto':
+            raise InvalidLocalHeadArg('run_env', run_env)
         if ssh_options_override_ssh_key:
             raise InvalidLocalHeadArg('ssh_options_override_ssh_key', ssh_options_override_ssh_key)
+        if shutdown_after_run:
+            raise InvalidLocalHeadArg('shutdown_after_run', shutdown_after_run)
 
         if cmd:
             if environment_variables:
                 cmd = _with_environment_variables(cmd=cmd, environment_variables=environment_variables)
 
-        bytes_output = self.process_runner.check_output(cmd, shell=True)
+        # bytes_output = self.process_runner.check_output(cmd, shell=True)
+        # return bytes_output.decode()
+
+        try:
+            bytes_output = self.process_runner.check_output(cmd, shell=True)
+        except subprocess.CalledProcessError as e:
+            joined_cmd = " ".join(cmd)
+            if not is_using_login_shells():
+                raise ProcessRunnerError(
+                    "Command failed",
+                    "ssh_command_failed",
+                    code=e.returncode,
+                    command=joined_cmd,
+                )
+
+            if exit_on_fail:
+                raise click.ClickException(
+                    "Command failed:\n\n  {}\n".format(joined_cmd)
+                ) from None
+            else:
+                fail_msg = "SSH command failed."
+                if is_output_redirected():
+                    fail_msg += " See above for the output from the failure."
+                raise click.ClickException(fail_msg) from None
+        finally:
+            # Do our best to flush output to terminal.
+            # See https://github.com/ray-project/ray/pull/19473.
+            sys.stdout.flush()
+            sys.stderr.flush()
+
         return bytes_output.decode()
 
+        # return self._run_helper(
+        #     final_cmd=cmd,
+        #     with_output=with_output,
+        #     exit_on_fail=exit_on_fail
+        # )
 
 
     # TODO
@@ -186,3 +222,8 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
     #       exit_on_fail
     #       with_output
     #       run_env
+    #
+    #   Z tego co zrozumiałem "use_login_shells" dotyczy interaktywnych shelli - tj. pip install django
+    #   Patrz: _run_helper() -> run_cmd_redirected() -> _run_and_process_output()
+    #
+    #
