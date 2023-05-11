@@ -24,6 +24,7 @@ def test_run(cmd, output, kwargs):
     {'port_forward': [(7878, 7979)]},
     {'ssh_options_override_ssh_key': 'FooBar'},
     {'run_env': 'FooBar'},
+    {'timeout': 121},
 ))
 def test_invalid_kwargs(kwargs):
     runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)

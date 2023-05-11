@@ -53,6 +53,8 @@ def set_using_login_shells(val: bool):
         val: If true, login shells will be used to run all commands.
     """
     _config["use_login_shells"] = val
+
+
 class InvalidLocalHeadArg(Exception):
     def __init__(self, arg, val):
         msg = f"LocalHeadCommandRunner doesn't work with {arg} = {val}"
@@ -93,7 +95,7 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         self.process_runner = process_runner
 
     def _run_helper(
-        self, final_cmd, with_output=False, exit_on_fail=False, silent=False
+            self, final_cmd, with_output=False, exit_on_fail=False, silent=False
     ):
         """Run a command that was already setup with SSH and `bash` settings.
 
@@ -148,24 +150,25 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         finally:
             # Do our best to flush output to terminal.
             # See https://github.com/ray-project/ray/pull/19473.
-            sys.stdout.flush() # TODO Czy to ma
+            sys.stdout.flush()  # TODO Czy to ma
             sys.stderr.flush()
 
     def run(
             self,
             cmd: Optional[str] = None,
-            timeout: int = 120,  #  TODO Potrzebne - Pytanie: Zaimplementowałbym to przy użyciu AsyncIO - dobry pomysł?
+            timeout: int = 120,  # Ogarnięte
             exit_on_fail: bool = False,  # Ogarnięte
-            port_forward: List[Tuple[int, int]] = None,  #  Ogarnięty
+            port_forward: List[Tuple[int, int]] = None,  # Ogarnięty
             with_output: bool = False,  # TODO Potrzebne
             environment_variables: Optional[Dict[str, object]] = None,  # Do sprawdzneia / Potrzebne
             run_env: str = "auto",  # Ogarnięte
             ssh_options_override_ssh_key: str = "",  # Ogarnięte
             shutdown_after_run: bool = False,  # Ogarnięte
     ) -> str:
+        if timeout != 120:
+            raise InvalidLocalHeadArg('timeout', timeout)
         if port_forward is not None:
-            raise InvalidLocalHeadArg('port_forward',
-                                      port_forward)  # TODO Z tego co wiem, to nie jest ważne z perspektywy pythona, czy kożystam z "", czy z ''. Co to jednak oznacza z perspektywy konwencji?
+            raise InvalidLocalHeadArg('port_forward', port_forward)
         if run_env != 'auto':
             raise InvalidLocalHeadArg('run_env', run_env)
         if ssh_options_override_ssh_key:
@@ -215,13 +218,10 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         #     exit_on_fail=exit_on_fail
         # )
 
-
     # TODO
     #   Zaimplementuj:
     #       timeout -> Czy powinien mieć jakiś konkretny zakres?
-    #       exit_on_fail
     #       with_output
-    #       run_env
     #
     #   Z tego co zrozumiałem "use_login_shells" dotyczy interaktywnych shelli - tj. pip install django
     #   Patrz: _run_helper() -> run_cmd_redirected() -> _run_and_process_output()
