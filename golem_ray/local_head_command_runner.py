@@ -160,7 +160,7 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
             exit_on_fail: bool = False,  # Ogarnięte
             port_forward: List[Tuple[int, int]] = None,  # Ogarnięty
             with_output: bool = False,  # TODO Potrzebne
-            environment_variables: Optional[Dict[str, object]] = None,  # Do sprawdzneia / Potrzebne
+            environment_variables: Optional[Dict[str, object]] = None,  # Ogarnięte
             run_env: str = "auto",  # Ogarnięte
             ssh_options_override_ssh_key: str = "",  # Ogarnięte
             shutdown_after_run: bool = False,  # Ogarnięte
@@ -184,7 +184,15 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         # return bytes_output.decode()
 
         try:
-            bytes_output = self.process_runner.check_output(cmd, shell=True)
+            if not with_output:
+                return run_cmd_redirected(
+                    cmd,
+                    process_runner=self.process_runner,
+                    silent=True,
+                    use_login_shells=is_using_login_shells(),
+                )
+            else:
+                bytes_output = self.process_runner.check_output(cmd, shell=True)
         except subprocess.CalledProcessError as e:
             joined_cmd = " ".join(cmd)
             if not is_using_login_shells():

@@ -7,11 +7,12 @@ from local_head_command_runner import LocalHeadCommandRunner, InvalidLocalHeadAr
 
 #   Command, expected output, additional arguments
 test_cases_test_run = [
-    ('whoami', getuser() + '\n', {}),
-    ('echo foo', 'foo\n', {}),
-    ('echo "$USER"', getuser() + '\n', {}),
-    ('echo "$BAR"', '\n', {}),
-    ('echo "$BAR"', 'baz\n', {'environment_variables': {'BAR': 'baz'}}),
+    ('whoami', getuser() + '\n', {'with_output': True}),
+    ('echo foo', 'foo\n', {'with_output': True}),
+    ('echo "$USER"', getuser() + '\n', {'with_output': True}),
+    ('echo "$BAR"', '\n', {'with_output': True}),
+    ('echo "$BAR"', 'baz\n', {'environment_variables': {'BAR': 'baz'}, 'with_output': True}),
+    ('whoami', '\n', {'with_output': False}),
 ]
 
 @pytest.mark.parametrize('cmd, output, kwargs', test_cases_test_run)
@@ -20,11 +21,11 @@ def test_run(cmd, output, kwargs):
     assert runner.run(cmd, **kwargs) == output
 
 @pytest.mark.parametrize('kwargs', (
-    {'shutdown_after_run': True},
-    {'port_forward': [(7878, 7979)]},
-    {'ssh_options_override_ssh_key': 'FooBar'},
-    {'run_env': 'FooBar'},
-    {'timeout': 121},
+    {'shutdown_after_run': True, 'with_output': True},
+    {'port_forward': [(7878, 7979)], 'with_output': True},
+    {'ssh_options_override_ssh_key': 'FooBar', 'with_output': True},
+    {'run_env': 'FooBar', 'with_output': True},
+    {'timeout': 121, 'with_output': True},
 ))
 def test_invalid_kwargs(kwargs):
     runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
@@ -33,7 +34,7 @@ def test_invalid_kwargs(kwargs):
 
 
 test_cases_test_failing_command = [
-    ('FooBar', {'exit_on_fail': True}),
+    ('FooBar', {'exit_on_fail': True, 'with_output': True}),
 ]
 @pytest.mark.parametrize('cmd, kwargs', test_cases_test_failing_command)
 def test_failing_command(cmd, kwargs):
