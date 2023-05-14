@@ -180,8 +180,6 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
             if environment_variables:
                 cmd = _with_environment_variables(cmd=cmd, environment_variables=environment_variables)
 
-        # bytes_output = self.process_runner.check_output(cmd, shell=True)
-        # return bytes_output.decode()
 
         try:
             if not with_output:
@@ -220,18 +218,3 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
 
         return bytes_output.decode()
 
-        # return self._run_helper(
-        #     final_cmd=cmd,
-        #     with_output=with_output,
-        #     exit_on_fail=exit_on_fail
-        # )
-
-    # TODO
-    #   Zaimplementuj:
-    #       timeout -> Czy powinien mieć jakiś konkretny zakres?
-    #       with_output
-    #
-    #   Z tego co zrozumiałem "use_login_shells" dotyczy interaktywnych shelli - tj. pip install django
-    #   Patrz: _run_helper() -> run_cmd_redirected() -> _run_and_process_output()
-    #
-    #
