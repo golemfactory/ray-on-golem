@@ -12,7 +12,7 @@ test_cases_test_run = [
     ('echo "$USER"', getuser() + '\n', {'with_output': True}),
     ('echo "$BAR"', '\n', {'with_output': True}),
     ('echo "$BAR"', 'baz\n', {'environment_variables': {'BAR': 'baz'}, 'with_output': True}),
-    ('whoami', '\n', {'with_output': False}),
+    ('whoami', 0, {'with_output': False}),
 ]
 
 @pytest.mark.parametrize('cmd, output, kwargs', test_cases_test_run)
