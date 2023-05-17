@@ -1,13 +1,14 @@
 import json
+import shutil
 import sys
 import subprocess
 
-from shlex import quote
 from types import ModuleType
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 
+from ray.autoscaler._private.cli_logger import cf, cli_logger
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler._private.subprocess_output_util import (
     ProcessRunnerError,
@@ -15,7 +16,8 @@ from ray.autoscaler._private.subprocess_output_util import (
     run_cmd_redirected,
 )
 
-_config = {"use_login_shells": True, "silent_rsync": True}
+_config = {"use_login_shells": True,
+           "silent_rsync": False}  # TODO Should be {"use_login_shells": True, "silent_rsync": True}
 
 
 def is_rsync_silent():
@@ -180,7 +182,6 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
             if environment_variables:
                 cmd = _with_environment_variables(cmd=cmd, environment_variables=environment_variables)
 
-
         try:
             if not with_output:
                 return run_cmd_redirected(
@@ -218,3 +219,71 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
 
         return bytes_output.decode()
 
+    def _create_rsync_filter_args(self, options):
+        if not options:
+            rsync_excludes, rsync_filters = [], []
+        else:
+            rsync_excludes = options.get("rsync_exclude")
+            rsync_filters = options.get("rsync_filter")
+
+        exclude_args = [
+            ["--exclude", rsync_exclude] for rsync_exclude in rsync_excludes
+        ]
+        filter_args = [
+            ["--filter", "dir-merge,- {}".format(rsync_filter)]
+            for rsync_filter in rsync_filters
+        ]
+
+        # Combine and flatten the two lists
+        return [arg for args_list in exclude_args + filter_args for arg in args_list]
+
+    def _run_rsync(
+            self, source: str, target: str, options: Optional[Dict[str, Any]] = None
+    ) -> None:
+        if source == target:
+            return
+
+        command = ["rsync"]
+        # command += [
+        #     "--rsh",
+        #     subprocess.list2cmdline(
+        #         ["ssh"] + self.ssh_options.to_ssh_options_list(timeout=120)
+        #     ),
+        # ]
+        command += ["-avz"]
+        command += self._create_rsync_filter_args(options=options)
+        command += [source, target]
+        cli_logger.verbose("Running `{}`", cf.bold(" ".join(command)))
+        # self._run_helper(command, silent=is_rsync_silent())
+        final_cmd = ''
+        for index in range(len(command)):
+            final_cmd += command[index]
+            if index != len(command):
+                final_cmd += ' '
+        self.run(cmd=final_cmd, with_output=not is_rsync_silent())
+
+    def run_rsync_up(
+            self, source: str, target: str, options: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Rsync files up to the cluster node.
+
+        Args:
+            source: The (local) source directory or file.
+            target: The (remote) destination path.
+            options:
+        """
+        self._run_rsync(source=source, target=target, options=options)
+
+    def run_rsync_down(
+            self, source: str, target: str, options: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Rsync files down from the cluster node.
+
+        Args:
+            source: The (remote) source directory or file.
+            target: The (local) destination path.
+        """
+        self._run_rsync(source=source, target=target, options=options)
+
+    # TODO:
+    #
