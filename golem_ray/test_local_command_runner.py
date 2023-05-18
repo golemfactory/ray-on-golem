@@ -114,7 +114,7 @@ def are_files_the_same(file1: Path, file2: Path) -> bool:
             return f1.read() == f3.read()
 
 
-def test_run_rsync_up_files_exists():
+def test_run_rsync_up_dir_not_exists():
     files_data = _prepare_testing_directory()
     dir0 = files_data['dirs'][1]
     dir2 = files_data['dirs'][0] / "dir2"
@@ -122,46 +122,84 @@ def test_run_rsync_up_files_exists():
     runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
     runner.run_rsync_up(str(dir0)+'/', str(dir2))
 
-    are_same = are_files_the_same(dir0 / 'file1.txt', dir2 / 'file1.txt')
-    print(are_same)
-
-    with open(dir0 / 'file1.txt', 'r') as f1:
-        with open(dir2 / 'file1.txt', 'r') as f3:
-            assert f1.read() == f3.read()
+    assert True == are_files_the_same(dir0 / 'file0.txt', dir2 / 'file0.txt')
+    assert True == are_files_the_same(dir0 / 'file1.txt', dir2 / 'file1.txt')
+    assert True == are_files_the_same(dir0 / 'dir01' / 'file0.txt', dir2 / 'dir01' / 'file0.txt')
 
     shutil.rmtree(files_data['dirs'][0])
 
-# def test_run_rsync_up_or_down_dir_not_exists():
-#     cwd = os.getcwd()
-#     clear_test_run_rsync_up_or_down()
-#     runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
-#     with pytest.raises(Exception):
-#         runner.run_rsync_up(f'{cwd}/dir_proto/dir1', f'{cwd}/dir_proto/dir4')
-#         with open(f'{cwd}/dir_proto/dir1', 'r') as f1:
-#             with open(f'{cwd}/dir_proto/dir4', 'r') as f4:
-#                 f1_data = f1.read()
-#                 f4_data = f4.read()
-#                 assert f1_data == f4_data
-# def test_run_rsync_down_or_down_files_exists():
-#     cwd = os.getcwd()
-#     clear_test_run_rsync_up_or_down()
-#     runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
-#     with pytest.raises(Exception):
-#         runner.run_rsync_up(f'{cwd}/dir_proto/dir1', f'{cwd}/dir_proto/dir3')
-#         with open(f'{cwd}/dir_proto/dir1', 'r') as f1:
-#             with open(f'{cwd}/dir_proto/dir3', 'r') as f3:
-#                 f1_data = f1.read()
-#                 f3_data = f3.read()
-#                 assert f1_data == f3_data
-# def test_run_rsync_down_or_down_dir_not_exists():
-#     cwd = os.getcwd()
-#     clear_test_run_rsync_up_or_down()
-#
-#     runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
-#     with pytest.raises(Exception):
-#         runner.run_rsync_up(f'{cwd}/dir_proto/dir1', f'{cwd}/dir_proto/dir4')
-#     with open(f'{cwd}/dir_proto/dir1', 'r') as f1:
-#         with open(f'{cwd}/dir_proto/dir4', 'r') as f4:
-#             f1_data = f1.read()
-#             f4_data = f4.read()
-#             assert f1_data == f4_data
+def test_run_rsync_up_dir_exists_files_not_exist():
+    files_data = _prepare_testing_directory()
+    dir0 = files_data['dirs'][1]
+    dir2 = _prep_dir(files_data['dirs'][0], 'dir2')
+
+    runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
+    runner.run_rsync_up(str(dir0)+'/', str(dir2))
+
+    assert True == are_files_the_same(dir0 / 'file0.txt', dir2 / 'file0.txt')
+    assert True == are_files_the_same(dir0 / 'file1.txt', dir2 / 'file1.txt')
+    assert True == are_files_the_same(dir0 / 'dir01' / 'file0.txt', dir2 / 'dir01' / 'file0.txt')
+
+    shutil.rmtree(files_data['dirs'][0])
+
+def test_run_rsync_up_dir_exists_files_updated():
+    files_data = _prepare_testing_directory()
+    dir0 = files_data['dirs'][1]
+    dir1 = files_data['dirs'][3]
+    dir2 = files_data['dirs'][0] / "dir2"
+    shutil.copytree(dir0, str(dir2)+"/")
+    assert os.path.exists(dir0 / 'dir01')
+
+    runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
+    runner.run_rsync_up(str(dir1)+'/', str(dir2))
+
+    assert True == are_files_the_same(dir1 / 'file0.txt', dir2 / 'file0.txt')
+    assert True == are_files_the_same(dir1 / 'file1.txt', dir2 / 'file1.txt')
+    assert True == are_files_the_same(dir0 / 'dir01' / 'file0.txt', dir2 / 'dir01' / 'file0.txt')
+
+    shutil.rmtree(files_data['dirs'][0])
+
+def test_run_rsync_down_dir_not_exists():
+    files_data = _prepare_testing_directory()
+    dir0 = files_data['dirs'][1]
+    dir2 = files_data['dirs'][0] / "dir2"
+
+    runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
+    runner.run_rsync_down(str(dir0)+'/', str(dir2))
+
+    assert True == are_files_the_same(dir0 / 'file0.txt', dir2 / 'file0.txt')
+    assert True == are_files_the_same(dir0 / 'file1.txt', dir2 / 'file1.txt')
+    assert True == are_files_the_same(dir0 / 'dir01' / 'file0.txt', dir2 / 'dir01' / 'file0.txt')
+
+    shutil.rmtree(files_data['dirs'][0])
+
+def test_run_rsync_down_dir_exists_files_not_exist():
+    files_data = _prepare_testing_directory()
+    dir0 = files_data['dirs'][1]
+    dir2 = _prep_dir(files_data['dirs'][0], 'dir2')
+
+    runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
+    runner.run_rsync_down(str(dir0)+'/', str(dir2))
+
+    assert True == are_files_the_same(dir0 / 'file0.txt', dir2 / 'file0.txt')
+    assert True == are_files_the_same(dir0 / 'file1.txt', dir2 / 'file1.txt')
+    assert True == are_files_the_same(dir0 / 'dir01' / 'file0.txt', dir2 / 'dir01' / 'file0.txt')
+
+    shutil.rmtree(files_data['dirs'][0])
+
+def test_run_rsync_down_dir_exists_files_updated():
+    files_data = _prepare_testing_directory()
+    dir0 = files_data['dirs'][1]
+    dir1 = files_data['dirs'][3]
+    dir2 = files_data['dirs'][0] / "dir2"
+    shutil.copytree(dir0, str(dir2)+"/")
+    assert os.path.exists(dir0 / 'dir01')
+
+    runner = LocalHeadCommandRunner(log_prefix="", cluster_name="some_cluster", process_runner=subprocess)
+    runner.run_rsync_down(str(dir1)+'/', str(dir2))
+
+    assert True == are_files_the_same(dir1 / 'file0.txt', dir2 / 'file0.txt')
+    assert True == are_files_the_same(dir1 / 'file1.txt', dir2 / 'file1.txt')
+    assert True == are_files_the_same(dir0 / 'dir01' / 'file0.txt', dir2 / 'dir01' / 'file0.txt')
+
+    shutil.rmtree(files_data['dirs'][0])

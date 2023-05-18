@@ -1,5 +1,4 @@
 import json
-import shutil
 import sys
 import subprocess
 
@@ -17,7 +16,7 @@ from ray.autoscaler._private.subprocess_output_util import (
 )
 
 _config = {"use_login_shells": True,
-           "silent_rsync": False}  # TODO Should be {"use_login_shells": True, "silent_rsync": True}
+           "silent_rsync": True}
 
 
 def is_rsync_silent():
@@ -152,20 +151,20 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         finally:
             # Do our best to flush output to terminal.
             # See https://github.com/ray-project/ray/pull/19473.
-            sys.stdout.flush()  # TODO Czy to ma
+            sys.stdout.flush()
             sys.stderr.flush()
 
     def run(
             self,
             cmd: Optional[str] = None,
-            timeout: int = 120,  # Ogarnięte
-            exit_on_fail: bool = False,  # Ogarnięte
-            port_forward: List[Tuple[int, int]] = None,  # Ogarnięty
-            with_output: bool = False,  # TODO Potrzebne
-            environment_variables: Optional[Dict[str, object]] = None,  # Ogarnięte
-            run_env: str = "auto",  # Ogarnięte
-            ssh_options_override_ssh_key: str = "",  # Ogarnięte
-            shutdown_after_run: bool = False,  # Ogarnięte
+            timeout: int = 120,
+            exit_on_fail: bool = False,
+            port_forward: List[Tuple[int, int]] = None,
+            with_output: bool = False,
+            environment_variables: Optional[Dict[str, object]] = None,
+            run_env: str = "auto",
+            ssh_options_override_ssh_key: str = "",
+            shutdown_after_run: bool = False,
     ) -> str:
         if timeout != 120:
             raise InvalidLocalHeadArg('timeout', timeout)
@@ -244,17 +243,10 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
             return
 
         command = ["rsync"]
-        # command += [
-        #     "--rsh",
-        #     subprocess.list2cmdline(
-        #         ["ssh"] + self.ssh_options.to_ssh_options_list(timeout=120)
-        #     ),
-        # ]
         command += ["-avz"]
         command += self._create_rsync_filter_args(options=options)
         command += [source, target]
         cli_logger.verbose("Running `{}`", cf.bold(" ".join(command)))
-        # self._run_helper(command, silent=is_rsync_silent())
         final_cmd = ''
         for index in range(len(command)):
             final_cmd += command[index]
@@ -284,6 +276,3 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
             target: The (local) destination path.
         """
         self._run_rsync(source=source, target=target, options=options)
-
-    # TODO:
-    #
