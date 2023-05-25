@@ -12,11 +12,14 @@ from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler._private.subprocess_output_util import (
     ProcessRunnerError,
     is_output_redirected,
-    run_cmd_redirected,
 )
 
-_config = {"use_login_shells": True,
-           "silent_rsync": True}
+# Implementation note: This code is meant to be an MVP equivalent of SSHCommandRunner class from Ray for AWS/GCP.
+# Leading thought of implementation is that if we can copy structure of the code and code itself from original
+# implementation then we should do it. If you don't know why something is written the way it is check out this link:
+# https://github.com/ray-project/ray/blob/ab1767a5fa3009e6ef1df91f7ae2eeb9b186b1c1/python/ray/autoscaler/_private/command_runner.py#LL159C2-L159C2
+
+_config = {"use_login_shells": True, "silent_rsync": True} # TODO Coverage needed
 
 
 def is_rsync_silent():
@@ -53,8 +56,8 @@ def set_using_login_shells(val: bool):
     Args:
         val: If true, login shells will be used to run all commands.
     """
-    _config["use_login_shells"] = val
 
+    _config["use_login_shells"] = val
 
 class InvalidLocalHeadArg(Exception):
     def __init__(self, arg, val):
@@ -76,7 +79,7 @@ def _with_environment_variables(cmd: str, environment_variables: Dict[str, objec
     for key, val in environment_variables.items():
         val = json.dumps(val, separators=(",", ":"))
         s = "export {}={};".format(key,
-                                   val)  # TODO W oryginale było to "quote(val)" zamiast "val" - czy myślisz,że to jakoś bardzo ważne, bo zadziałało xd?
+                                   val)
         as_strings.append(s)
     all_vars = "".join(as_strings)
     return all_vars + cmd
@@ -94,65 +97,6 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         self.log_prefix = log_prefix
         self.cluster_name = cluster_name
         self.process_runner = process_runner
-
-    def _run_helper(
-            self, final_cmd, with_output=False, exit_on_fail=False, silent=False
-    ):
-        """Run a command that was already setup with SSH and `bash` settings.
-
-        Args:
-            cmd (List[str]):
-                Full command to run. Should include SSH options and other
-                processing that we do.
-            with_output (bool):
-                If `with_output` is `True`, command stdout will be captured and
-                returned.
-            exit_on_fail (bool):
-                If `exit_on_fail` is `True`, the process will exit
-                if the command fails (exits with a code other than 0).
-
-        Raises:
-            ProcessRunnerError if using new log style and disabled
-                login shells.
-            click.ClickException if using login shells.
-        """
-        try:
-            # For now, if the output is needed we just skip the new logic.
-            # In the future we could update the new logic to support
-            # capturing output, but it is probably not needed.
-            if not with_output:
-                return run_cmd_redirected(
-                    final_cmd,
-                    process_runner=self.process_runner,
-                    silent=silent,
-                    use_login_shells=is_using_login_shells(),
-                )
-            else:
-                return self.process_runner.check_output(final_cmd)
-        except subprocess.CalledProcessError as e:
-            joined_cmd = " ".join(final_cmd)
-            if not is_using_login_shells():
-                raise ProcessRunnerError(
-                    "Command failed",
-                    "ssh_command_failed",
-                    code=e.returncode,
-                    command=joined_cmd,
-                )
-
-            if exit_on_fail:
-                raise click.ClickException(
-                    "Command failed:\n\n  {}\n".format(joined_cmd)
-                ) from None
-            else:
-                fail_msg = "SSH command failed."
-                if is_output_redirected():
-                    fail_msg += " See above for the output from the failure."
-                raise click.ClickException(fail_msg) from None
-        finally:
-            # Do our best to flush output to terminal.
-            # See https://github.com/ray-project/ray/pull/19473.
-            sys.stdout.flush()
-            sys.stderr.flush()
 
     def run(
             self,
@@ -183,17 +127,12 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
 
         try:
             if not with_output:
-                return run_cmd_redirected(
-                    cmd,
-                    process_runner=self.process_runner,
-                    silent=True,
-                    use_login_shells=is_using_login_shells(),
-                )
+                return self.process_runner.call(cmd, shell=True)
             else:
                 bytes_output = self.process_runner.check_output(cmd, shell=True)
         except subprocess.CalledProcessError as e:
             joined_cmd = " ".join(cmd)
-            if not is_using_login_shells():
+            if not is_using_login_shells(): # TODO Coverage needed
                 raise ProcessRunnerError(
                     "Command failed",
                     "ssh_command_failed",
@@ -219,11 +158,8 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         return bytes_output.decode()
 
     def _create_rsync_filter_args(self, options):
-        if not options:
-            rsync_excludes, rsync_filters = [], []
-        else:
-            rsync_excludes = options.get("rsync_exclude")
-            rsync_filters = options.get("rsync_filter")
+        rsync_excludes = options.get("rsync_exclude")
+        rsync_filters = options.get("rsync_filter")
 
         exclude_args = [
             ["--exclude", rsync_exclude] for rsync_exclude in rsync_excludes
@@ -239,7 +175,7 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
     def _run_rsync(
             self, source: str, target: str, options: Optional[Dict[str, Any]] = None
     ) -> None:
-        if source == target:
+        if source == target + '/':
             return
 
         command = ["rsync"]
@@ -252,7 +188,7 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
             final_cmd += command[index]
             if index != len(command):
                 final_cmd += ' '
-        self.run(cmd=final_cmd, with_output=not is_rsync_silent())
+        self.run(cmd=final_cmd, with_output=not is_rsync_silent()) # TODO Coverage needed
 
     def run_rsync_up(
             self, source: str, target: str, options: Optional[Dict[str, Any]] = None
