@@ -44,8 +44,6 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
 
 
 class GolemNodeProvider:
-    PAYLOAD = None
-    # NUM_WORKERS = 5
     HEAD_IP = '192.168.0.2'
 
     def __init__(self, cluster_id: int):
@@ -55,13 +53,13 @@ class GolemNodeProvider:
         self.allocation = None
         self.network = None
         self.golem = GolemNode()
-        self.golem.event_bus.listen(DefaultLogger().on_event)
         self.PAYLOAD = None
         self.connections = {}
         self.activities = {}
         self.worker_nodes = []
 
     async def create_cluster(self, image_hash: str, provider_config: dict = {}, cluster_name=None):
+        self.golem.event_bus.listen(DefaultLogger().on_event)
         self.PAYLOAD = await self.create_payload(image_hash=image_hash, capabilities=[vm.VM_CAPS_VPN])
         async with self.golem:
             # self.PAYLOAD = await vm.repo(image_hash=image_hash, capabilities=[vm.VM_CAPS_VPN])
