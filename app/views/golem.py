@@ -1,4 +1,5 @@
 import asyncio
+from aiohttp import web
 from pathlib import Path
 from typing import Awaitable, Callable, Tuple, Any
 from urllib.parse import urlparse
@@ -44,46 +45,59 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
 
 class GolemNodeProvider:
     PAYLOAD = None
-    NUM_WORKERS = 5
+    # NUM_WORKERS = 5
     HEAD_IP = '192.168.0.2'
 
-    def __init__(self, image_hash):
-        self.id: int = 0
+    def __init__(self, cluster_id: int):
+        self.num_workers = None
+        self.id = cluster_id
         self.demand = None
         self.allocation = None
         self.network = None
         self.golem = GolemNode()
         self.golem.event_bus.listen(DefaultLogger().on_event)
-        self.PAYLOAD = Payload.from_image_hash(image_hash, capabilities=[vm.VM_CAPS_VPN])
+        self.PAYLOAD = None
         self.connections = {}
         self.activities = {}
         self.worker_nodes = []
 
-    async def create_cluster(self, provider_config=None, cluster_name=None):
+    async def create_cluster(self, image_hash: str, provider_config: dict = {}, cluster_name=None):
+        self.PAYLOAD = await self.create_payload(image_hash=image_hash, capabilities=[vm.VM_CAPS_VPN])
         async with self.golem:
+            # self.PAYLOAD = await vm.repo(image_hash=image_hash, capabilities=[vm.VM_CAPS_VPN])
             self.network = await self.golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
             self.allocation = await self.golem.create_allocation(amount=1, network="goerli")
             self.demand = await self.golem.create_demand(self.PAYLOAD, allocations=[self.allocation])
-
-            async for activity, ip, uri in Chain(
-                    self.demand.initial_proposals(),
-                    # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
-                    Map(default_negotiate),
-                    Map(default_create_agreement),
-                    Map(default_create_activity),
-                    Map(create_ssh_connection(self.network)),
-                    Limit(self.NUM_WORKERS + 1),
-                    Buffer(self.NUM_WORKERS + 1),
-            ):
-                self.activities[ip] = activity
-                print(f"Activities: {len(self.activities)}/{self.NUM_WORKERS + 1}")
-                self.connections[ip] = uri
-
+            self.num_workers: int = provider_config.get('num_workers', 5)
+            await self.create_activities()
             print("ACTIVITIES DEPLOYED")
             await self.network.refresh_nodes()
             await self.__add_my_key()
             await self.__add_other_keys()
             await self.__start_head_process()
+
+            return
+
+    # @staticmethod
+    async def create_payload(self, image_hash, **kwargs) -> "Payload":
+        async with self.golem:
+            result = await vm.repo(image_hash=image_hash, **kwargs)
+            return result
+
+    async def create_activities(self):
+        async for activity, ip, uri in Chain(
+                self.demand.initial_proposals(),
+                # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
+                Map(default_negotiate),
+                Map(default_create_agreement),
+                Map(default_create_activity),
+                Map(create_ssh_connection(self.network)),
+                Limit(self.num_workers + 1),
+                Buffer(self.num_workers + 1),
+        ):
+            self.activities[ip] = activity
+            print(f"Activities: {len(self.activities)}/{self.num_workers + 1}")
+            self.connections[ip] = uri
 
     @staticmethod
     async def add_authorized_key(activity, key):
@@ -140,10 +154,14 @@ class GolemNodeProvider:
             raise
 
     async def start_workers(self, count: int):
+        if count + len(self.worker_nodes) > len(self.worker_nodes):
+            raise web.HTTPBadRequest(body={"message": "Max workers limit exceeded"})
+
         start_worker_tasks = []
         for ip, activity in self.activities.items():
             if ip != self.HEAD_IP:
                 start_worker_tasks.append(self.__start_worker_process(activity))
+                self.worker_nodes.append({"node_ip": ip})
 
         if start_worker_tasks:
             await asyncio.gather(*start_worker_tasks)
