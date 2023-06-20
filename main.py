@@ -1,11 +1,12 @@
-import asyncio
 import base64
 import logging
+
 
 from aiohttp import web
 from aiohttp_session import setup
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 from cryptography import fernet
+
 from app.routes.golem import routes as nodes_routes
 from app.routes.yagna import routes as yagna_routes
 from app.middlewares import error_middleware
@@ -15,14 +16,16 @@ from app.views.golem import GolemNodeProvider
 async def golem_engine(app):
     golem_provider = GolemNodeProvider()
     app['golem'] = golem_provider
-    try:
+    # try:
+    #     await golem_provider.init()
+    # except Exception as e:
+    #     if not await golem_provider.shutdown(type(e), e, e.__traceback__):
+    #         raise e
+    async with golem_provider.golem:
         await golem_provider.init()
-    except Exception as e:
-        if not await golem_provider.shutdown(type(e), e, e.__traceback__):
-            raise e
+        yield  # before yield called on startup, after yield called on cleanup
+    # await golem_provider.shutdown()
 
-    yield  # before yield called on startup, after yield called on cleanup
-    await golem_provider.shutdown()
 
 
 def main():
@@ -47,16 +50,6 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.ERROR)
     main()
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(main())
-    # task = loop.create_task(main())
-    # try:
-    #     loop.run_until_complete(task)
-    # except KeyboardInterrupt:
-    #     task.cancel()
-    #     try:
-    #         loop.run_until_complete(task)
-    #     except asyncio.CancelledError:
-    #         pass
+

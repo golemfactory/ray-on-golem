@@ -6,8 +6,6 @@ from pathlib import Path
 from typing import Awaitable, Callable, Tuple, Any
 from urllib.parse import urlparse
 
-from ray.autoscaler.node_provider import NodeProvider
-
 from yapapi.payload import vm
 from golem_core import GolemNode, Payload, commands
 from golem_core.default_logger import DefaultLogger
@@ -46,25 +44,25 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
 
 
 class GolemNodeProvider:
-    HEAD_IP = '192.168.0.2'
 
     def __init__(self):
-        self.__golem = GolemNode()
-        self.__demand = None
-        self.__allocation = None
-        self.__network = None
-        self.__connections = {}
-        self.__activities = {}
-        self.__worker_nodes = []
+        self.golem = GolemNode()
+        self._demand = None
+        self._allocation = None
+        self._network = None
+        self._connections = {}
+        self._activities = {}
+        self._worker_nodes = []
 
     async def init(self) -> None:
-        await self.__golem.__aenter__()
-        self.__golem.event_bus.listen(DefaultLogger().on_event)
-        self.__network = await self.__golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
-        self.__allocation = await self.__golem.create_allocation(amount=1, network="goerli")
+        # await self.golem.__aenter__()
+        self.HEAD_IP = '192.168.0.2'
+        self.golem.event_bus.listen(DefaultLogger().on_event)
+        self._network = await self.golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
+        self._allocation = await self.golem.create_allocation(amount=1, network="goerli")
 
     async def shutdown(self, *exc_info) -> None:
-        await self.__golem.__aexit__(exc_info)
+        await self.golem.__aexit__(exc_info)
 
     @staticmethod
     def get_value_from_dict_or_throw(d, k):
@@ -75,16 +73,16 @@ class GolemNodeProvider:
 
     async def create_demand(self, provider_config: dict):
         payload = await self.create_payload(provider_config=provider_config, capabilities=[vm.VM_CAPS_VPN])
-        self.__demand = await self.__golem.create_demand(payload, allocations=[self.__allocation])
+        self._demand = await self.golem.create_demand(payload, allocations=[self._allocation])
         await self.create_activities(provider_config=provider_config)
-        await self.__network.refresh_nodes()
+        await self._network.refresh_nodes()
         await self.__add_my_key()
         await self.__add_other_keys()
         await self.__start_head_process()
 
-        return self.__activities
+        return self._activities
 
-    async def create_payload(self, provider_config: dict, **kwargs) -> "Payload":
+    async def create_payload(self, provider_config: dict, **kwargs):
         image_hash = self.get_value_from_dict_or_throw(provider_config, 'image_hash')
         result = await vm.repo(image_hash=image_hash, **kwargs)
         return result
@@ -92,18 +90,18 @@ class GolemNodeProvider:
     async def create_activities(self, provider_config):
         num_workers = provider_config.get('num_workers', 4)
         async for activity, ip, uri in Chain(
-                self.__demand.initial_proposals(),
+                self._demand.initial_proposals(),
                 # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
                 Map(default_negotiate),
                 Map(default_create_agreement),
                 Map(default_create_activity),
-                Map(create_ssh_connection(self.__network)),
+                Map(create_ssh_connection(self._network)),
                 Limit(num_workers + 1),
                 Buffer(num_workers + 1),
         ):
-            self.__activities[ip] = activity
-            print(f"Activities: {len(self.__activities)}/{num_workers + 1}")
-            self.__connections[ip] = uri
+            self._activities[ip] = activity
+            print(f"Activities: {len(self._activities)}/{num_workers + 1}")
+            self._connections[ip] = uri
 
     @staticmethod
     async def add_authorized_key(activity, key):
@@ -121,12 +119,12 @@ class GolemNodeProvider:
         with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
             my_key = f.readline().strip()
 
-        tasks = [self.add_authorized_key(activity, my_key) for activity in self.__activities.values()]
+        tasks = [self.add_authorized_key(activity, my_key) for activity in self._activities.values()]
         await asyncio.gather(*tasks)
 
     async def __add_other_keys(self):
         keys = {}
-        activities_values = self.__activities.values()
+        activities_values = self._activities.values()
         for activity in activities_values:
             batch = await activity.execute_commands(
                 commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
@@ -142,7 +140,7 @@ class GolemNodeProvider:
                 await self.add_authorized_key(activity, other_activity_key)
 
     async def __start_head_process(self):
-        batch = await self.__activities[self.HEAD_IP].execute_commands(
+        batch = await self._activities[self.HEAD_IP].execute_commands(
             commands.Run(
                 f'ray start --head --include-dashboard=True --node-ip-address {self.HEAD_IP} --disable-usage-stats'),
         )
@@ -160,14 +158,14 @@ class GolemNodeProvider:
             raise
 
     async def start_workers(self, count: int):
-        if count + len(self.__worker_nodes) > len(self.__worker_nodes):
+        if count + len(self._worker_nodes) > len(self._worker_nodes):
             raise web.HTTPBadRequest(body={"message": "Max workers limit exceeded"})
 
         start_worker_tasks = []
-        for ip, activity in self.__activities.items():
+        for ip, activity in self._activities.items():
             if ip != self.HEAD_IP:
                 start_worker_tasks.append(self.__start_worker_process(activity))
-                self.__worker_nodes.append({"node_ip": ip})
+                self._worker_nodes.append({"node_ip": ip})
 
         if start_worker_tasks:
             await asyncio.gather(*start_worker_tasks)
