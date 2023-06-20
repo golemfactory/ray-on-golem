@@ -10,21 +10,13 @@ routes = web.RouteTableDef()
 golem_clusters = {}
 
 
-@routes.post('/create_cluster')
-async def create_cluster(request: web.Request):
-    json_decoded = await request.json()
-    session = await get_session(request)
-    image_hash = json_decoded.get('image_hash')
-    golem_node_id = len(golem_clusters)
-    golem_node = GolemNodeProvider(cluster_id=golem_node_id)
-    await golem_node.create_cluster(image_hash=image_hash)
-    # await golem_node.create_cluster()
-    session['golem_node_id'] = golem_node_id
-    golem_clusters[golem_node_id] = golem_node
+@routes.post('/create_demand')
+async def create_demand(request: web.Request):
+    golem: GolemNodeProvider = request.app['golem']
+    provider_config = await request.json()
+    activities = await golem.create_demand(provider_config=provider_config)
 
-    return web.Response(body=
-                        {"golem_node_id": golem_node_id,
-                         "internal_ip": golem_node.HEAD_IP})
+    return web.json_response({"activities": activities})
 
 
 @routes.get('/node')

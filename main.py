@@ -9,6 +9,20 @@ from cryptography import fernet
 from app.routes.golem import routes as nodes_routes
 from app.routes.yagna import routes as yagna_routes
 from app.middlewares import error_middleware
+from app.views.golem import GolemNodeProvider
+
+
+async def golem_engine(app):
+    golem_provider = GolemNodeProvider()
+    app['golem'] = golem_provider
+    try:
+        await golem_provider.init()
+    except Exception as e:
+        if not await golem_provider.shutdown(type(e), e, e.__traceback__):
+            raise e
+
+    yield  # before yield called on startup, after yield called on cleanup
+    await golem_provider.shutdown()
 
 
 def main():
@@ -19,8 +33,9 @@ def main():
     secret_key = base64.urlsafe_b64decode(fernet_key)
     setup(app, EncryptedCookieStorage(secret_key))
 
-    nodes_sub_app = web.Application()
+    nodes_sub_app = web.Application(middlewares=[error_middleware])
     nodes_sub_app.router.add_routes(nodes_routes)
+    nodes_sub_app.cleanup_ctx.append(golem_engine)
     app.add_subapp('/golem/', nodes_sub_app)
 
     yagna_sub_app = web.Application()

@@ -12,5 +12,6 @@ async def error_middleware(request, handler):
         if ex.status != 404:
             raise
         message = ex.reason
+        print('hi')
 
     return web.json_response({"error": message})
