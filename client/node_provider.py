@@ -25,4 +25,5 @@ class GolemNodeProvider(NodeProvider):
         tags: dict[str, str],
         count: int,
     ) -> dict[str, dict]:
-        return self.golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
+        created_nodes = self.golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
+        return {node.node_id: node.dict() for node in created_nodes}
