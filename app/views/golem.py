@@ -60,8 +60,8 @@ class GolemNodeProvider:
     async def init(self) -> None:
         await self.__golem.__aenter__()
         self.__golem.event_bus.listen(DefaultLogger().on_event)
-        self.__network = await self.golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
-        self.__allocation = await self.golem.create_allocation(amount=1, network="goerli")
+        self.__network = await self.__golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
+        self.__allocation = await self.__golem.create_allocation(amount=1, network="goerli")
 
     async def shutdown(self, *exc_info) -> None:
         await self.__golem.__aexit__(exc_info)
@@ -75,7 +75,7 @@ class GolemNodeProvider:
 
     async def create_demand(self, provider_config: dict):
         payload = await self.create_payload(provider_config=provider_config, capabilities=[vm.VM_CAPS_VPN])
-        self.demand = await self.__golem.create_demand(payload, allocations=[self.__allocation])
+        self.__demand = await self.__golem.create_demand(payload, allocations=[self.__allocation])
         await self.create_activities(provider_config=provider_config)
         await self.__network.refresh_nodes()
         await self.__add_my_key()
@@ -92,7 +92,7 @@ class GolemNodeProvider:
     async def create_activities(self, provider_config):
         num_workers = provider_config.get('num_workers', 4)
         async for activity, ip, uri in Chain(
-                self.demand.initial_proposals(),
+                self.__demand.initial_proposals(),
                 # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
                 Map(default_negotiate),
                 Map(default_create_agreement),
