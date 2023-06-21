@@ -65,7 +65,6 @@ class GolemNodeProvider:
         return self._nodes
 
     async def init(self) -> None:
-        # await self.golem.__aenter__()
         self._golem.event_bus.listen(DefaultLogger().on_event)
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
@@ -109,7 +108,6 @@ class GolemNodeProvider:
                 Limit(self._num_workers + 1),
                 Buffer(self._num_workers + 1),
         ):
-            # self._nodes[node_id] = (ip, activity)
             self._nodes[node_id] = {"ip": ip, "activity": activity, "ray": False}
             print(f"Activities: {len(self._nodes)}/{self._num_workers + 1}")
             self._connections[ip] = uri
@@ -136,7 +134,6 @@ class GolemNodeProvider:
 
     async def _add_other_keys(self):
         keys = {}
-        nodes_values = self._nodes.values()
         for node_id, node in self._nodes.items():
             batch = await node.get('activity').execute_commands(
                 commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
