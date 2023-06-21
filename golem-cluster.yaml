@@ -1,0 +1,62 @@
+cluster_name: golem-cluster
+
+max_workers: 5
+
+provider:
+  type: "external"
+  module: "client.node_provider.GolemNodeProvider"
+  parameters:
+    golem_ray_url: "localhost:8080"
+
+available_node_types:
+  "ray.head.default":
+    resources: {"CPU": 1}
+    node_config:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        generateName: ray-head-
+        labels:
+          component: ray-head
+      spec:
+        serviceAccountName: autoscaler
+        restartPolicy: Never
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+        containers:
+          - name: ray-node
+            image: 'rayproject/ray-ml:1.0.1'
+            command:
+              - /bin/bash
+              - '-c'
+              - '--'
+            args:
+              - 'trap : TERM INT; sleep infinity & wait;'
+            ports:
+              - containerPort: 6379
+              - containerPort: 6380
+              - containerPort: 6381
+              - containerPort: 12345
+              - containerPort: 12346
+            volumeMounts:
+              - mountPath: /dev/shm
+                name: dshm
+            resources:
+              requests:
+                cpu: 1000m
+                memory: 512Mi
+              limits:
+                memory: 2Gi
+            env:
+              - name: MY_CPU_REQUEST
+                valueFrom:
+                  resourceFieldRef:
+                    resource: requests.cpu
+
+setup_commands: []
+head_setup_commands: []
+worker_setup_commands: []
+
+cluster_synced_files: []
