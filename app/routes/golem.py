@@ -27,7 +27,7 @@ async def create_demand(request: web.Request) -> web.Response:
     nodes = await golem.create_demand(provider_config=provider_config)
     response = get_node_response(nodes)
 
-    return web.json_response(response)
+    return web.json_response(response, status=201)
 
 
 @routes.get('/nodes')
@@ -35,7 +35,7 @@ async def get_nodes(request):
     golem: GolemNodeProvider = request.app['golem']
     response = get_node_response(golem.nodes)
 
-    return web.json_response(response)
+    return web.json_response(response, status=200)
 
 
 @routes.post('/nodes')
@@ -47,12 +47,14 @@ async def add_nodes(request: web.Request) -> web.Response:
     nodes = await golem.start_workers(count)
     response = get_node_response(nodes)
 
-    return web.json_response(response)
+    return web.json_response(response, status=201)
 
 
 @routes.delete('/node/{node_id}')
 async def delete_node(request):
-    # TODO: Finish endpoint
-    session = await get_session(request)
+    golem: GolemNodeProvider = request.app['golem']
     node_id = request.match_info['node_id']
-    pass
+    await golem.stop_worker(node_id)
+    response = get_node_response(golem.nodes)
+
+    return web.json_response(response)

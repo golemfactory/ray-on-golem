@@ -148,14 +148,11 @@ class GolemNodeProvider:
 
         for node_id, node in self._nodes.items():
             other_activities = ((_id, _node) for _id, _node in self._nodes.items() if _id != node_id)
-            # for other_activity in (a.get('activity') for a in nodes_values if
-            #                        a.get('ip') is not node.get('ip')):
             for other_activity in other_activities:
                 other_activity_key = keys[other_activity[0]]
                 await self.add_authorized_key(node.get('activity'), other_activity_key)
 
     async def _start_head_process(self):
-        print(self._nodes)
         head_node = next((obj for obj in self._nodes.values() if obj.get('ip') == self.HEAD_IP), None)
         head_node['type'] = "head"
         head_node['ray'] = True
@@ -194,4 +191,19 @@ class GolemNodeProvider:
         return self._nodes
 
     async def stop_worker(self, node_id: int):
-        pass
+        node = self._nodes[node_id]
+        if not node.get('ray'):
+            web.HTTPBadRequest(body=f"Node with id: {id} is not running ray!")
+        if node and node_id != 0:
+            activity = node.get('activity')
+            batch = await activity.execute_commands(
+                commands.Run(
+                    f'ray stop'),
+            )
+            try:
+                await batch.wait(60)
+                node['ray'] = False
+            except Exception:
+                print(batch.events)
+                print("Failed to stop a worker process")
+                raise
