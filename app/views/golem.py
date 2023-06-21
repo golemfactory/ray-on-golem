@@ -60,6 +60,10 @@ class GolemNodeProvider:
     def golem(self) -> GolemNode:
         return self._golem
 
+    @property
+    def nodes(self) -> dict:
+        return self._nodes
+
     async def init(self) -> None:
         # await self.golem.__aenter__()
         self._golem.event_bus.listen(DefaultLogger().on_event)

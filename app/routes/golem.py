@@ -33,6 +33,9 @@ async def create_demand(request: web.Request) -> web.Response:
 @routes.get('/nodes')
 async def get_nodes(request):
     golem: GolemNodeProvider = request.app['golem']
+    response = get_node_response(golem.nodes)
+
+    return web.json_response(response)
 
 
 @routes.post('/nodes')
