@@ -16,11 +16,6 @@ from app.views.golem import GolemNodeProvider
 async def golem_engine(app):
     golem_provider = GolemNodeProvider()
     app['golem'] = golem_provider
-    # try:
-    #     await golem_provider.init()
-    # except Exception as e:
-    #     if not await golem_provider.shutdown(type(e), e, e.__traceback__):
-    #         raise e
     async with golem_provider.golem:
         await golem_provider.init()
         yield  # before yield called on startup, after yield called on cleanup

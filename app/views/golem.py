@@ -46,23 +46,28 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
 class GolemNodeProvider:
 
     def __init__(self):
-        self.golem = GolemNode()
+        self._golem = GolemNode()
+        self.HEAD_IP = '192.168.0.2'
         self._demand = None
         self._allocation = None
         self._network = None
         self._connections = {}
-        self._activities = {}
-        self._worker_nodes = []
+        self._worker_nodes = {}
+        self._num_workers = None
+        self._nodes = {}
+
+    @property
+    def golem(self) -> GolemNode:
+        return self._golem
 
     async def init(self) -> None:
         # await self.golem.__aenter__()
-        self.HEAD_IP = '192.168.0.2'
-        self.golem.event_bus.listen(DefaultLogger().on_event)
-        self._network = await self.golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
-        self._allocation = await self.golem.create_allocation(amount=1, network="goerli")
+        self._golem.event_bus.listen(DefaultLogger().on_event)
+        self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
+        self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
 
     async def shutdown(self, *exc_info) -> None:
-        await self.golem.__aexit__(exc_info)
+        await self._golem.__aexit__(exc_info)
 
     @staticmethod
     def get_value_from_dict_or_throw(d, k):
@@ -73,14 +78,14 @@ class GolemNodeProvider:
 
     async def create_demand(self, provider_config: dict):
         payload = await self.create_payload(provider_config=provider_config, capabilities=[vm.VM_CAPS_VPN])
-        self._demand = await self.golem.create_demand(payload, allocations=[self._allocation])
+        self._demand = await self._golem.create_demand(payload, allocations=[self._allocation])
         await self.create_activities(provider_config=provider_config)
         await self._network.refresh_nodes()
-        await self.__add_my_key()
-        await self.__add_other_keys()
-        await self.__start_head_process()
+        await self._add_my_key()
+        await self._add_other_keys()
+        await self._start_head_process()
 
-        return self._activities
+        return self._nodes
 
     async def create_payload(self, provider_config: dict, **kwargs):
         image_hash = self.get_value_from_dict_or_throw(provider_config, 'image_hash')
@@ -88,7 +93,8 @@ class GolemNodeProvider:
         return result
 
     async def create_activities(self, provider_config):
-        num_workers = provider_config.get('num_workers', 4)
+        self._num_workers = provider_config.get('num_workers', 4)
+        node_id = 0
         async for activity, ip, uri in Chain(
                 self._demand.initial_proposals(),
                 # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
@@ -96,12 +102,14 @@ class GolemNodeProvider:
                 Map(default_create_agreement),
                 Map(default_create_activity),
                 Map(create_ssh_connection(self._network)),
-                Limit(num_workers + 1),
-                Buffer(num_workers + 1),
+                Limit(self._num_workers + 1),
+                Buffer(self._num_workers + 1),
         ):
-            self._activities[ip] = activity
-            print(f"Activities: {len(self._activities)}/{num_workers + 1}")
+            # self._nodes[node_id] = (ip, activity)
+            self._nodes[node_id] = {"ip": ip, "activity": activity, "ray": False}
+            print(f"Activities: {len(self._nodes)}/{self._num_workers + 1}")
             self._connections[ip] = uri
+            node_id += 1
 
     @staticmethod
     async def add_authorized_key(activity, key):
@@ -115,38 +123,45 @@ class GolemNodeProvider:
             print(batch.events)
             raise
 
-    async def __add_my_key(self):
+    async def _add_my_key(self):
         with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
             my_key = f.readline().strip()
 
-        tasks = [self.add_authorized_key(activity, my_key) for activity in self._activities.values()]
+        tasks = [self.add_authorized_key(value.get('activity'), my_key) for value in self._nodes.values()]
         await asyncio.gather(*tasks)
 
-    async def __add_other_keys(self):
+    async def _add_other_keys(self):
         keys = {}
-        activities_values = self._activities.values()
-        for activity in activities_values:
-            batch = await activity.execute_commands(
+        nodes_values = self._nodes.values()
+        for node_id, node in self._nodes.items():
+            batch = await node.get('activity').execute_commands(
                 commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
                 commands.Run('cat /root/.ssh/id_rsa.pub'),
             )
             await batch.wait()
             key = batch.events[-1].stdout.strip()
-            keys[activity] = key
+            keys[node_id] = key
 
-        for activity in activities_values:
-            for other_activity in (a for a in activities_values if a is not activity):
-                other_activity_key = keys[other_activity]
-                await self.add_authorized_key(activity, other_activity_key)
+        for node_id, node in self._nodes.items():
+            other_activities = ((_id, _node) for _id, _node in self._nodes.items() if _id != node_id)
+            # for other_activity in (a.get('activity') for a in nodes_values if
+            #                        a.get('ip') is not node.get('ip')):
+            for other_activity in other_activities:
+                other_activity_key = keys[other_activity[0]]
+                await self.add_authorized_key(node.get('activity'), other_activity_key)
 
-    async def __start_head_process(self):
-        batch = await self._activities[self.HEAD_IP].execute_commands(
+    async def _start_head_process(self):
+        print(self._nodes)
+        head_node = next((obj for obj in self._nodes.values() if obj.get('ip') == self.HEAD_IP), None)
+        head_node['type'] = "head"
+        head_node['ray'] = True
+        batch = await head_node.get('activity').execute_commands(
             commands.Run(
                 f'ray start --head --include-dashboard=True --node-ip-address {self.HEAD_IP} --disable-usage-stats'),
         )
         await batch.wait(20)
 
-    async def __start_worker_process(self, activity):
+    async def _start_worker_process(self, activity):
         batch = await activity.execute_commands(
             commands.Run(f'ray start --address {self.HEAD_IP}:6379'),
         )
@@ -158,14 +173,21 @@ class GolemNodeProvider:
             raise
 
     async def start_workers(self, count: int):
-        if count + len(self._worker_nodes) > len(self._worker_nodes):
-            raise web.HTTPBadRequest(body={"message": "Max workers limit exceeded"})
+        nodes_with_ray_on_count = sum(obj.get('ray') for obj in self._nodes.values())
+        if count + nodes_with_ray_on_count > self._num_workers + 1:
+            raise web.HTTPBadRequest(body="Max workers limit exceeded")
 
         start_worker_tasks = []
-        for ip, activity in self._activities.items():
-            if ip != self.HEAD_IP:
-                start_worker_tasks.append(self.__start_worker_process(activity))
-                self._worker_nodes.append({"node_ip": ip})
+        for node in self._nodes.values():
+            if node.get('ip') != self.HEAD_IP:
+                start_worker_tasks.append(self._start_worker_process(node.get('activity')))
+                node['type'] = "worker"
+                node['ray'] = True
 
         if start_worker_tasks:
             await asyncio.gather(*start_worker_tasks)
+
+        return self._nodes
+
+    async def stop_worker(self, node_id: int):
+        pass

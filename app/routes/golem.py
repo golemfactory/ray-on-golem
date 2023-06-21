@@ -10,29 +10,41 @@ routes = web.RouteTableDef()
 golem_clusters = {}
 
 
-@routes.post('/create_demand')
+def get_node_response(nodes: dict) -> dict:
+    result = {
+        "nodes": [
+            {"id": key, **{k: v for k, v in value.items() if k != 'activity'}}
+            for key, value in nodes.items()
+        ]
+    }
+    return result
+
+
+@routes.post('/create_cluster')
 async def create_demand(request: web.Request) -> web.Response:
     golem: GolemNodeProvider = request.app['golem']
     provider_config = await request.json()
-    activities = await golem.create_demand(provider_config=provider_config)
-    return web.json_response({"activities_ips": list(activities.keys())})
+    nodes = await golem.create_demand(provider_config=provider_config)
+    response = get_node_response(nodes)
+
+    return web.json_response(response)
 
 
-@routes.get('/node')
-async def get_node(request):
-    pass
+@routes.get('/nodes')
+async def get_nodes(request):
+    golem: GolemNodeProvider = request.app['golem']
 
 
-@routes.post('/node')
+@routes.post('/nodes')
 async def add_nodes(request: web.Request) -> web.Response:
-    # TODO: Finish endpoint
-    json_decoded = request.json()
-    session = await get_session(request)
-    golem_node: GolemNodeProvider = golem_clusters[session['golem_node_id']]
-    count: int = json_decoded.__getattribute__('count')
-    await golem_node.start_workers(count)
+    golem: GolemNodeProvider = request.app['golem']
+    json_decoded = await request.json()
+    count: int = json_decoded.get('count')
 
-    return web.Response()
+    nodes = await golem.start_workers(count)
+    response = get_node_response(nodes)
+
+    return web.json_response(response)
 
 
 @routes.delete('/node/{node_id}')
