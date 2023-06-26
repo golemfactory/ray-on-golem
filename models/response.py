@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic.main import BaseModel
 
 from models.types import CLUSTER_ID, Node
@@ -8,7 +10,7 @@ class CreateClusterResponse(BaseModel):
 
 
 class CreateNodesResponse(BaseModel):
-    nodes: list[Node]
+    nodes: List[Node]
 
 
 class GetNodeResponse(BaseModel):
@@ -16,4 +18,4 @@ class GetNodeResponse(BaseModel):
 
 
 class GetNodesResponse(BaseModel):
-    nodes: list[Node]
+    nodes: List[Node]

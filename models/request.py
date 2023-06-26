@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic.main import BaseModel
 
 from models.types import NODE_ID
@@ -13,4 +15,4 @@ class CreateNodesRequest(BaseModel):
 
 
 class DeleteNodesRequest(BaseModel):
-    node_ids: list[NODE_ID]
+    node_ids: List[NODE_ID]

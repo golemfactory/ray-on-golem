@@ -1,14 +1,12 @@
 import base64
 import logging
 
-
 from aiohttp import web
 from aiohttp_session import setup
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 from cryptography import fernet
 
 from app.routes.golem import routes as nodes_routes
-from app.routes.yagna import routes as yagna_routes
 from app.middlewares import error_middleware
 from app.views.golem import GolemNodeProvider
 
@@ -19,8 +17,6 @@ async def golem_engine(app):
     async with golem_provider.golem:
         await golem_provider.init()
         yield  # before yield called on startup, after yield called on cleanup
-    # await golem_provider.shutdown()
-
 
 
 def main():
@@ -36,10 +32,6 @@ def main():
     nodes_sub_app.cleanup_ctx.append(golem_engine)
     app.add_subapp('/golem/', nodes_sub_app)
 
-    yagna_sub_app = web.Application()
-    yagna_sub_app.router.add_routes(yagna_routes)
-    app.add_subapp('/yagna/', yagna_sub_app)
-
     logger.info('Server started')
     web.run_app(app)
 
@@ -47,4 +39,3 @@ def main():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.ERROR)
     main()
-

@@ -3,8 +3,11 @@ import json
 
 from aiohttp import web
 from pathlib import Path
-from typing import Awaitable, Callable, Tuple, Any
+from typing import Awaitable, Callable, Tuple, Any, List, Generator, Dict
 from urllib.parse import urlparse
+
+from models.response import GetNodesResponse
+from models.types import NodeState, Node
 
 from yapapi.payload import vm
 from golem_core import GolemNode, Payload, commands
@@ -14,6 +17,8 @@ from golem_core.mid import (
     default_negotiate, default_create_agreement, default_create_activity
 )
 from golem_core.low import Activity, Network
+
+from app.models.cluster_node import ClusterNode
 
 
 def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
@@ -55,22 +60,25 @@ class GolemNodeProvider:
         self._worker_nodes = {}
         self._num_workers = None
         self._nodes = {}
+        self._cluster_nodes: List[ClusterNode] = []
+
+    def get_nodes_response_dict(self) -> Dict[str, List[Dict[str, Any]]]:
+        return {"nodes": [x.get_response_dict().dict() for x in self._cluster_nodes]}
 
     @property
     def golem(self) -> GolemNode:
+        """Golem getter"""
         return self._golem
 
     @property
     def nodes(self) -> dict:
+        """Nodes getter"""
         return self._nodes
 
     async def init(self) -> None:
         self._golem.event_bus.listen(DefaultLogger().on_event)
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
-
-    async def shutdown(self, *exc_info) -> None:
-        await self._golem.__aexit__(exc_info)
 
     @staticmethod
     def get_value_from_dict_or_throw(d, k):
@@ -87,8 +95,6 @@ class GolemNodeProvider:
         await self._add_my_key()
         await self._add_other_keys()
         await self._start_head_process()
-
-        return self._nodes
 
     async def create_payload(self, provider_config: dict, **kwargs):
         image_hash = self.get_value_from_dict_or_throw(provider_config, 'image_hash')
@@ -108,8 +114,13 @@ class GolemNodeProvider:
                 Limit(self._num_workers + 1),
                 Buffer(self._num_workers + 1),
         ):
-            self._nodes[node_id] = {"ip": ip, "activity": activity, "ray": False}
-            print(f"Activities: {len(self._nodes)}/{self._num_workers + 1}")
+            cluster_node = ClusterNode(node_id=str(node_id),
+                                       activity=activity,
+                                       internal_ip=ip)
+            self._cluster_nodes.append(cluster_node)
+
+            # self._nodes[node_id] = {"ip": ip, "activity": activity, "ray": False}
+            print(f"Activities: {len(self._cluster_nodes)}/{self._num_workers + 1}")
             self._connections[ip] = uri
             node_id += 1
 
@@ -129,31 +140,31 @@ class GolemNodeProvider:
         with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
             my_key = f.readline().strip()
 
-        tasks = [self.add_authorized_key(value.get('activity'), my_key) for value in self._nodes.values()]
+        tasks = [self.add_authorized_key(value.activity, my_key) for value in self._cluster_nodes]
         await asyncio.gather(*tasks)
 
     async def _add_other_keys(self):
         keys = {}
-        for node_id, node in self._nodes.items():
-            batch = await node.get('activity').execute_commands(
+        for cluster_node in self._cluster_nodes:
+            batch = await cluster_node.activity.execute_commands(
                 commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
                 commands.Run('cat /root/.ssh/id_rsa.pub'),
             )
             await batch.wait()
             key = batch.events[-1].stdout.strip()
-            keys[node_id] = key
+            keys[cluster_node.node_id] = key
 
-        for node_id, node in self._nodes.items():
-            other_activities = ((_id, _node) for _id, _node in self._nodes.items() if _id != node_id)
-            for other_activity in other_activities:
-                other_activity_key = keys[other_activity[0]]
-                await self.add_authorized_key(node.get('activity'), other_activity_key)
+        for cluster_node in self._cluster_nodes:
+            other_nodes: Generator[ClusterNode] = (node for node in self._cluster_nodes if
+                                                   node.node_id != cluster_node.node_id)
+            for other_node in other_nodes:
+                other_activity_key = keys[other_node.node_id]
+                await self.add_authorized_key(cluster_node.activity, other_activity_key)
 
     async def _start_head_process(self):
-        head_node = next((obj for obj in self._nodes.values() if obj.get('ip') == self.HEAD_IP), None)
-        head_node['type'] = "head"
-        head_node['ray'] = True
-        batch = await head_node.get('activity').execute_commands(
+        head_node = next((node for node in self._cluster_nodes if node.internal_ip == self.HEAD_IP), None)
+        head_node.state = NodeState.running
+        batch = await head_node.activity.execute_commands(
             commands.Run(
                 f'ray start --head --include-dashboard=True --node-ip-address {self.HEAD_IP} --disable-usage-stats'),
         )
@@ -171,16 +182,14 @@ class GolemNodeProvider:
             raise
 
     async def start_workers(self, count: int):
-        nodes_with_ray_on_count = sum(obj.get('ray') for obj in self._nodes.values())
+        nodes_with_ray_on_count = sum(x for x in self._cluster_nodes if x.state == NodeState.running)
         if count + nodes_with_ray_on_count > self._num_workers + 1:
             raise web.HTTPBadRequest(body="Max workers limit exceeded")
 
         start_worker_tasks = []
-        for node in self._nodes.values():
-            if node.get('ip') != self.HEAD_IP:
-                start_worker_tasks.append(self._start_worker_process(node.get('activity')))
-                node['type'] = "worker"
-                node['ray'] = True
+        for node in self._cluster_nodes:
+            if node.internal_ip != self.HEAD_IP:
+                node.state = NodeState.running
 
         if start_worker_tasks:
             await asyncio.gather(*start_worker_tasks)
@@ -188,11 +197,11 @@ class GolemNodeProvider:
         return self._nodes
 
     async def stop_worker(self, node_id: int):
-        node = self._nodes[node_id]
-        if not node.get('ray'):
-            web.HTTPBadRequest(body=f"Node with id: {id} is not running ray!")
+        node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
+        if not node or not node.state != NodeState.running:
+            raise web.HTTPBadRequest(body=f"Node with id: {node_id} is not running ray!")
         if node and node_id != 0:
-            activity = node.get('activity')
+            activity = node.activity
             batch = await activity.execute_commands(
                 commands.Run(
                     f'ray stop'),
