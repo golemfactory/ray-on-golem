@@ -1,3 +1,4 @@
 .idea/
-client/__pycache__/
-models/__pycache__/
+log.log
+__pycache__/
+*.py[cod]
