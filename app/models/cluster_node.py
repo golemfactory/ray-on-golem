@@ -11,8 +11,8 @@ from golem_core.low import Activity
 
 class ClusterNode:
     def __init__(self, node_id: str,
-                 activity: Activity,
-                 internal_ip: IPv4Address):
+                 internal_ip: IPv4Address,
+                 activity: Activity = None):
         self.node_id = node_id
         self.activity = activity
         self.internal_ip = internal_ip
@@ -34,10 +34,9 @@ class ClusterNode:
     def get_response_dict(self) -> Node:
         """Returns response dict with needed fields"""
         attributes = self._convert_to_dict(self.__dict__)
+        # attributes.pop('activity', None)
         attributes['internal_ip'] = str(attributes['internal_ip'])
         if attributes.get('external_ip'):
             attributes['external_ip'] = str(attributes['external_ip'])
 
-        attributes.pop('activity')
-
-        return Node(**attributes)
+        return Node(**{i: attributes[i] for i in attributes if i != 'activity'})

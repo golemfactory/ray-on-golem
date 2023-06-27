@@ -1,5 +1,7 @@
 import asyncio
 import json
+import subprocess
+from ipaddress import IPv4Address
 
 from aiohttp import web
 from pathlib import Path
@@ -119,7 +121,6 @@ class GolemNodeProvider:
                                        internal_ip=ip)
             self._cluster_nodes.append(cluster_node)
 
-            # self._nodes[node_id] = {"ip": ip, "activity": activity, "ray": False}
             print(f"Activities: {len(self._cluster_nodes)}/{self._num_workers + 1}")
             self._connections[ip] = uri
             node_id += 1
@@ -135,6 +136,10 @@ class GolemNodeProvider:
         except Exception:
             print(batch.events)
             raise
+
+    @staticmethod
+    async def add_authorized_key_to_local_node():
+        pass
 
     async def _add_my_key(self):
         with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
@@ -155,8 +160,9 @@ class GolemNodeProvider:
             keys[cluster_node.node_id] = key
 
         for cluster_node in self._cluster_nodes:
-            other_nodes: Generator[ClusterNode] = (node for node in self._cluster_nodes if
-                                                   node.node_id != cluster_node.node_id)
+            other_nodes: List[ClusterNode] = [node for node in self._cluster_nodes if
+                                              node.node_id != cluster_node.node_id]
+
             for other_node in other_nodes:
                 other_activity_key = keys[other_node.node_id]
                 await self.add_authorized_key(cluster_node.activity, other_activity_key)
@@ -182,7 +188,7 @@ class GolemNodeProvider:
             raise
 
     async def start_workers(self, count: int):
-        nodes_with_ray_on_count = sum(x for x in self._cluster_nodes if x.state == NodeState.running)
+        nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
         if count + nodes_with_ray_on_count > self._num_workers + 1:
             raise web.HTTPBadRequest(body="Max workers limit exceeded")
 
@@ -197,8 +203,8 @@ class GolemNodeProvider:
         return self._nodes
 
     async def stop_worker(self, node_id: int):
-        node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
-        if not node or not node.state != NodeState.running:
+        node = next((obj for obj in self._cluster_nodes if obj.node_id == str(node_id)), None)
+        if not node or not node.state.value != NodeState.running:
             raise web.HTTPBadRequest(body=f"Node with id: {node_id} is not running ray!")
         if node and node_id != 0:
             activity = node.activity
@@ -208,7 +214,7 @@ class GolemNodeProvider:
             )
             try:
                 await batch.wait(60)
-                node['ray'] = False
+                node.state = NodeState.pending
             except Exception:
                 print(batch.events)
                 print("Failed to stop a worker process")
