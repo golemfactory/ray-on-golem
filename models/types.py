@@ -17,4 +17,4 @@ class Node(BaseModel):
     node_id: NODE_ID
     state: NodeState
     internal_ip: IPv4Address
-    external_ip: IPv4Address
+    external_ip: IPv4Address | None

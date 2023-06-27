@@ -4,7 +4,8 @@ from models.types import CLUSTER_ID, Node
 
 
 class CreateClusterResponse(BaseModel):
-    cluster_id: CLUSTER_ID
+    # cluster_id: CLUSTER_ID
+    pass
 
 
 class CreateNodesResponse(BaseModel):
