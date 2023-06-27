@@ -7,7 +7,7 @@ from ray.autoscaler._private.aws.node_provider import (
 from ray.autoscaler.node_provider import NodeProvider
 
 from client.golem_ray_client import GolemRayClient
-from models.types import NODE_ID
+from models.types import NODE_ID, NodeState
 
 
 class GolemNodeProvider(NodeProvider):
@@ -15,28 +15,34 @@ class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config, cluster_name):
         super().__init__(provider_config, cluster_name)
 
-        self.golem_ray_client = GolemRayClient(
-            golem_ray_url=provider_config["parameters"]["golem_ray_url"],
-        )
-        self._cluster_id = self.golem_ray_client.create_cluster()
+        golem_ray_url = provider_config["parameters"]["golem_ray_url"]
+        self._golem_ray_client = GolemRayClient(golem_ray_url=golem_ray_url)
+
+        image_hash = provider_config["parameters"]["image_hash"]
+        self._golem_ray_client.create_cluster(image_hash)
+        # self._cluster_id = self._golem_ray_client.create_cluster(image_hash)
 
     def non_terminated_nodes(self, tag_filters) -> list[NODE_ID]:
-        return self.golem_ray_client.non_terminated_nodes()
+        return self._golem_ray_client.non_terminated_nodes()
 
     def is_running(self, node_id: NODE_ID) -> bool:
-        return self.golem_ray_client.is_running(node_id)
+        node = self._golem_ray_client.fetch_node(node_id)
+        return node.state == NodeState.running
 
     def is_terminated(self, node_id: NODE_ID) -> bool:
-        return self.golem_ray_client.is_terminated(node_id)
+        node = self._golem_ray_client.fetch_node(node_id)
+        return node.state not in [NodeState.pending, NodeState.running]
 
     def node_tags(self, node_id: NODE_ID):
         ...
 
     def external_ip(self, node_id: NODE_ID) -> IPv4Address:
-        return self.golem_ray_client.external_ip(node_id)
+        node = self._golem_ray_client.fetch_node(node_id)
+        return node.external_ip
 
     def internal_ip(self, node_id: NODE_ID) -> IPv4Address:
-        return self.golem_ray_client.internal_ip(node_id)
+        node = self._golem_ray_client.fetch_node(node_id)
+        return node.internal_ip
 
     def set_node_tags(self, node_id, tags):
         ...
@@ -47,11 +53,11 @@ class GolemNodeProvider(NodeProvider):
         tags: dict[str, str],
         count: int,
     ) -> dict[str, dict]:
-        created_nodes = self.golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
+        created_nodes = self._golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
         return {node.node_id: node.dict() for node in created_nodes}
 
     def terminate_node(self, node_id: NODE_ID) -> None:
-        return self.golem_ray_client.terminate_node(node_id)
+        return self._golem_ray_client.terminate_node(node_id)
 
     def terminate_nodes(self, node_ids: list[NODE_ID]) -> None:
-        return self.golem_ray_client.terminate_nodes(node_ids)
+        return self._golem_ray_client.terminate_nodes(node_ids)

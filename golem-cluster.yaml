@@ -1,12 +1,13 @@
 cluster_name: golem-cluster
 
-max_workers: 5
+max_workers: 4
 
 provider:
   type: "external"
   module: "client.node_provider.GolemNodeProvider"
   parameters:
-    golem_ray_url: "localhost:8080"
+    golem_ray_url: "http://localhost:8080"
+    image_hash: "83a7145df831d9b62508a912485d2e9ac03e70df328e7142a899c2bf"
 
 available_node_types:
   "ray.head.default":

@@ -10,3 +10,4 @@ aiohttp-pydantic==1.12.2
 # client
 requests==2.31.0
 pydantic==1.10.9
+spacy==3.5.3
