@@ -6,7 +6,7 @@ from pydantic.main import BaseModel
 
 from models.response import GetNodeResponse
 from models.types import Node, NodeState, NODE_ID, CLUSTER_ID
-from golem_core.low import Activity
+from golem_core.core.market_api import Activity
 
 
 class ClusterNode:

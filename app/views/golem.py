@@ -1,6 +1,15 @@
 import asyncio
+import base64
 import json
+import os
+import logging
 import subprocess
+
+import async_timeout
+from pytimeparse import parse as parse_to_seconds
+from datetime import timedelta
+from random import random
+from subprocess import check_output, check_call
 from ipaddress import IPv4Address
 
 from aiohttp import web
@@ -11,16 +20,55 @@ from urllib.parse import urlparse
 from models.response import GetNodesResponse
 from models.types import NodeState, Node
 
-from yapapi.payload import vm
-from golem_core import GolemNode, Payload, commands
-from golem_core.default_logger import DefaultLogger
-from golem_core.mid import (
-    Buffer, Chain, Limit, Map, SimpleScorer,
-    default_negotiate, default_create_agreement, default_create_activity
-)
-from golem_core.low import Activity, Network
+# from yapapi.payload import vm
+from golem_core.core.activity_api import commands
+from golem_core.core.golem_node import GolemNode
+from golem_core.core.market_api import ManifestVmPayload
+# from golem_core.default_logger import DefaultLogger
+# from golem_core.mid import (
+#     Buffer, Chain, Limit, Map, SimpleScorer,
+#     default_negotiate, default_create_agreement, default_create_activity
+# )
+from golem_core.core.market_api import Activity
+from golem_core.core.network_api.resources import Network
+from golem_core.core.market_api.pipeline import default_negotiate, default_create_agreement, default_create_activity
+from golem_core.pipeline import Chain, Map, Buffer, Limit
+# from golem_core.low import Activity, Network
 
 from app.models.cluster_node import ClusterNode
+
+YAGNA_APPNAME = 'requestor-mainnet'
+
+logger = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+
+# "ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
+async def negotiate(proposal):
+    costam = await proposal.get_data()
+    return await asyncio.wait_for(default_negotiate(proposal), timeout=10)
+
+
+async def bestprice_score(proposal):
+    properties = proposal.data.properties
+    if properties['golem.com.pricing.model'] != 'linear':
+        return None
+
+    coeffs = properties['golem.com.pricing.model.linear.coeffs']
+    return 1 - (coeffs[0] + coeffs[1])
+
+
+async def random_score(proposal):
+    return random()
+
+
+STRATEGY_SCORING_FUNCTION = {"bestprice": bestprice_score, "random": random_score}
+DEFAULT_SCORING_STRATEGY = "bestprice"
+DEFAULT_CONNECTION_TIMEOUT = timedelta(minutes=5)
 
 
 def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
@@ -36,7 +84,7 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
         batch = await activity.execute_commands(
             commands.Deploy(deploy_args),
             commands.Start(),
-            commands.Run('service ssh start'),
+            commands.Run("ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"),
         )
         await batch.wait(600)
 
@@ -53,8 +101,9 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
 class GolemNodeProvider:
 
     def __init__(self):
-        self._golem = GolemNode()
         self.HEAD_IP = '192.168.0.2'
+        # self.HEAD_IP = '127.0.0.1'
+        self._loop = None
         self._demand = None
         self._allocation = None
         self._network = None
@@ -63,6 +112,8 @@ class GolemNodeProvider:
         self._num_workers = None
         self._nodes = {}
         self._cluster_nodes: List[ClusterNode] = []
+
+        self._golem = GolemNode(app_key=self._get_or_create_yagna_appkey())
 
     def get_nodes_response_dict(self) -> Dict[str, List[Dict[str, Any]]]:
         return {"nodes": [x.get_response_dict().dict() for x in self._cluster_nodes]}
@@ -78,9 +129,24 @@ class GolemNodeProvider:
         return self._nodes
 
     async def init(self) -> None:
-        self._golem.event_bus.listen(DefaultLogger().on_event)
+        async def on_event(event) -> None:
+            logger.info(f'-----EVENT: {event}')
+
+        self._golem.event_bus.listen(on_event)
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
+        await self._allocation.get_data()
+
+    def _get_or_create_yagna_appkey(self):
+        if os.getenv('YAGNA_APPKEY') is None:
+            id_data = json.loads(check_output(["yagna", "app-key", "list", "--json"]))
+            yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
+            if yagna_app is None:
+                return check_output(["yagna", "app-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
+            else:
+                return yagna_app['key']
+        else:
+            return os.getenv('YAGNA_APPKEY')
 
     @staticmethod
     def get_value_from_dict_or_throw(d, k):
@@ -90,40 +156,75 @@ class GolemNodeProvider:
             raise web.HTTPBadRequest(body=f"'{k}' is needed")
 
     async def create_demand(self, provider_config: dict):
-        payload = await self.create_payload(provider_config=provider_config, capabilities=[vm.VM_CAPS_VPN])
-        self._demand = await self._golem.create_demand(payload, allocations=[self._allocation])
-        await self.create_activities(provider_config=provider_config)
+        payload, connection_timeout = await self.create_payload(provider_config=provider_config)
+        self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
+        await self.create_activities(provider_config, connection_timeout)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()
         await self._start_head_process()
 
+    @staticmethod
+    async def _parse_manifest(image_hash, text=None):
+        """Parses manifest file and replaces image_hash used.
+           Decoding is needed in order to work.
+           :arg image_hash:
+           :arg text:
+        """
+        manifest = open(Path(__file__).parent.parent.parent.joinpath("manifest.json"), "rb").read()
+        manifest = (manifest
+                    .decode('utf-8')
+                    .replace('{sha3}', image_hash)
+                    )
+        manifest = base64.b64encode(manifest.encode('utf-8')).decode("utf-8")
+
+        params = {
+            "manifest": manifest,
+            "capabilities": ['vpn', 'inet', 'manifest-support'],
+            "min_mem_gib": 0,
+            "min_cpu_threads": 0,
+            "min_storage_gib": 0,
+        }
+        # strategy = DEFAULT_SCORING_STRATEGY
+        connection_timeout = DEFAULT_CONNECTION_TIMEOUT
+        connection_timeout = timedelta(seconds=150)
+        offer_scorer = None
+        payload = ManifestVmPayload(**params)
+        return payload, offer_scorer, connection_timeout
+
     async def create_payload(self, provider_config: dict, **kwargs):
         image_hash = self.get_value_from_dict_or_throw(provider_config, 'image_hash')
-        result = await vm.repo(image_hash=image_hash, **kwargs)
-        return result
+        payload, offer_scorer, connection_timeout = await self._parse_manifest(image_hash)
 
-    async def create_activities(self, provider_config):
+        return payload, connection_timeout
+
+    async def create_activities(self, provider_config, connection_timeout):
         self._num_workers = provider_config.get('num_workers', 4)
         node_id = 0
-        async for activity, ip, uri in Chain(
-                self._demand.initial_proposals(),
-                # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
-                Map(default_negotiate),
-                Map(default_create_agreement),
-                Map(default_create_activity),
-                Map(create_ssh_connection(self._network)),
-                Limit(self._num_workers + 1),
-                Buffer(self._num_workers + 1),
-        ):
-            cluster_node = ClusterNode(node_id=str(node_id),
-                                       activity=activity,
-                                       internal_ip=ip)
-            self._cluster_nodes.append(cluster_node)
+        try:
+            async with async_timeout.timeout(int(150)):
+                chain = Chain(
+                    self._demand.initial_proposals(),
+                    # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
+                    Map(negotiate),
+                    Map(default_create_agreement),
+                    Map(default_create_activity),
+                    # Map(create_ssh_connection(self._network)),
+                    Buffer(self._num_workers),
+                    Limit(self._num_workers))
+                async for activity, ip, uri in chain:
+                    cluster_node = ClusterNode(node_id=str(node_id),
+                                               activity=activity,
+                                               internal_ip=ip)
+                    self._cluster_nodes.append(cluster_node)
 
-            print(f"Activities: {len(self._cluster_nodes)}/{self._num_workers + 1}")
-            self._connections[ip] = uri
-            node_id += 1
+                    logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
+                    print(f"Activities: {len(self._cluster_nodes)}/{self._num_workers}")
+                    node_id += 1
+                    # yield cluster_node
+                    # self._connections[ip] = uri
+        except asyncio.TimeoutError:
+            raise web.HTTPBadRequest(body="Creating activities timeout reached")
 
     @staticmethod
     async def add_authorized_key(activity, key):
@@ -167,14 +268,22 @@ class GolemNodeProvider:
                 other_activity_key = keys[other_node.node_id]
                 await self.add_authorized_key(cluster_node.activity, other_activity_key)
 
+    # async def _start_head_process(self):
+    #     head_node = next((node for node in self._cluster_nodes if node.internal_ip == self.HEAD_IP), None)
+    #     head_node.state = NodeState.running
+    #     batch = await head_node.activity.execute_commands(
+    #         commands.Run(
+    #             f'ray start --head --include-dashboard=True --node-ip-address {self.HEAD_IP} --disable-usage-stats'),
+    #     )
+    #     await batch.wait(20)
+
     async def _start_head_process(self):
-        head_node = next((node for node in self._cluster_nodes if node.internal_ip == self.HEAD_IP), None)
-        head_node.state = NodeState.running
-        batch = await head_node.activity.execute_commands(
-            commands.Run(
-                f'ray start --head --include-dashboard=True --node-ip-address {self.HEAD_IP} --disable-usage-stats'),
-        )
-        await batch.wait(20)
+        head_node = ClusterNode(node_id='0', internal_ip=IPv4Address(self.HEAD_IP))
+        process_id = subprocess.Popen(
+            ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
+        if process_id:
+            head_node.state = NodeState.running
+            self._cluster_nodes.append(head_node)
 
     async def _start_worker_process(self, activity):
         batch = await activity.execute_commands(

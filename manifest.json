@@ -1,0 +1,35 @@
+{
+  "version": "0.1.0",
+  "createdAt": "2023-06-26T00:00:00.000000Z",
+  "expiresAt": "2100-01-01T00:00:00.000000Z",
+  "metadata": {
+    "name": "Golem Ray",
+    "description": "Golem ray webserver",
+    "version": "0.0.1"
+    },
+  "payload": [
+    {
+      "urls": [
+        "http://yacn2.dev.golem.network:8000/docker-golem-script-curl-latest-d75268e752.gvmi"
+      ],
+      "hash": "sha3:{sha3}"
+    }
+  ],
+  "compManifest": {
+    "version": "0.1.0",
+    "script": {
+      "commands": [
+	"run /bin/sh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
+      ],
+      "match": "regex"
+    },
+    "net": {
+      "inet": {
+        "out": {
+          "protocols": ["https", "tcp"],
+          "urls": ["tcp://proxy.dev.golem.network:3001/"]
+        }
+      }
+    }
+  }
+}

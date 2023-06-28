@@ -1,6 +1,7 @@
 # web-server
 ray==2.5.0
-golem-core==0.1.0
+# golem-core==0.1.0
+golem-api-python==0.1.1
 aiohttp==3.8.4
 aiohttp_session==2.12.0
 cryptography==41.0.1
