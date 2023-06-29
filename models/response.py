@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic.main import BaseModel
 
-from models.types import CLUSTER_ID, Node
+from models.types import ClusterId, Node
 
 
 class CreateClusterResponse(BaseModel):

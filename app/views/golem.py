@@ -106,11 +106,22 @@ class GolemNodeProvider:
         self._num_workers = None
         self._nodes = {}
         self._cluster_nodes: List[ClusterNode] = []
-
         self._golem = GolemNode(app_key=self._get_or_create_yagna_appkey())
 
-    def get_nodes_response_dict(self) -> Dict[str, List[Dict[str, Any]]]:
-        return {"nodes": [x.get_response_dict().dict() for x in self._cluster_nodes]}
+    def get_nodes_response(self) -> List[Node]:
+        return [Node(node_id=cluster_node.node_id,
+                     state=cluster_node.state,
+                     internal_ip=cluster_node.internal_ip,
+                     external_ip=cluster_node.external_ip) for cluster_node in self._cluster_nodes]
+
+    def get_node_response_by_id(self, node_id: str):
+        node = next((cluster_node for cluster_node in self._cluster_nodes if cluster_node.node_id == node_id), None)
+        if not node:
+            raise web.HTTPBadRequest(body=f"No node with {node_id} id")
+        return Node(node_id=node.node_id,
+                    state=node.state,
+                    internal_ip=node.internal_ip,
+                    external_ip=node.external_ip)
 
     @property
     def golem(self) -> GolemNode:
@@ -230,7 +241,7 @@ class GolemNodeProvider:
             commands.Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
         )
         try:
-            await batch.wait(10)
+            await batch.wait(15)
         except Exception:
             print(batch.events)
             raise
