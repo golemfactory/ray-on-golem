@@ -20,20 +20,13 @@ from urllib.parse import urlparse
 from models.response import GetNodesResponse
 from models.types import NodeState, Node
 
-# from yapapi.payload import vm
 from golem_core.core.activity_api import commands
 from golem_core.core.golem_node import GolemNode
 from golem_core.core.market_api import ManifestVmPayload
-# from golem_core.default_logger import DefaultLogger
-# from golem_core.mid import (
-#     Buffer, Chain, Limit, Map, SimpleScorer,
-#     default_negotiate, default_create_agreement, default_create_activity
-# )
-from golem_core.core.market_api import Activity
+from golem_core.core.activity_api.resources import Activity
 from golem_core.core.network_api.resources import Network
 from golem_core.core.market_api.pipeline import default_negotiate, default_create_agreement, default_create_activity
 from golem_core.pipeline import Chain, Map, Buffer, Limit
-# from golem_core.low import Activity, Network
 
 from app.models.cluster_node import ClusterNode
 
@@ -70,7 +63,7 @@ STRATEGY_SCORING_FUNCTION = {"bestprice": bestprice_score, "random": random_scor
 DEFAULT_SCORING_STRATEGY = "bestprice"
 DEFAULT_CONNECTION_TIMEOUT = timedelta(minutes=5)
 
-
+# -R *:3001:127.0.0.1:6379 proxy@proxy.dev.golem.network
 def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
     async def _create_ssh_connection(activity: Activity) -> Tuple[Activity, Any, str]:
         #   1.  Create node
@@ -84,7 +77,8 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
         batch = await activity.execute_commands(
             commands.Deploy(deploy_args),
             commands.Start(),
-            commands.Run("ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"),
+            commands.Run('service ssh start'),
+            commands.Run('ssh -R "*:3001:127.0.0.1:6379" proxy@proxy.dev.golem.network'),
         )
         await batch.wait(600)
 
@@ -158,7 +152,10 @@ class GolemNodeProvider:
     async def create_demand(self, provider_config: dict):
         payload, connection_timeout = await self.create_payload(provider_config=provider_config)
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
-        await self.create_activities(provider_config, connection_timeout)
+        id = 0
+        async for activity, ip, uri in self.create_activities(provider_config, connection_timeout):
+            cluster_node = ClusterNode(node_id=str(id), activity=activity, internal_ip=IPv4Address('192.168.0.2'))
+            self._cluster_nodes.append(cluster_node)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()
@@ -209,20 +206,20 @@ class GolemNodeProvider:
                     Map(negotiate),
                     Map(default_create_agreement),
                     Map(default_create_activity),
-                    # Map(create_ssh_connection(self._network)),
-                    Buffer(self._num_workers),
-                    Limit(self._num_workers))
-                async for activity, ip, uri in chain:
-                    cluster_node = ClusterNode(node_id=str(node_id),
-                                               activity=activity,
-                                               internal_ip=ip)
-                    self._cluster_nodes.append(cluster_node)
-
+                    Map(create_ssh_connection(self._network)),
+                    Buffer(self._num_workers)
+                    # Limit(self._num_workers))
+                )
+                async for activity, ip, connection_uri in chain:
+                    batch = await activity.execute_commands(
+                        commands.Deploy(),
+                        commands.Start()
+                    )
+                    await batch.wait()
                     logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
-                    print(f"Activities: {len(self._cluster_nodes)}/{self._num_workers}")
                     node_id += 1
-                    # yield cluster_node
-                    # self._connections[ip] = uri
+                    yield activity, ip, connection_uri
+
         except asyncio.TimeoutError:
             raise web.HTTPBadRequest(body="Creating activities timeout reached")
 

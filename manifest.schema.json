@@ -1,0 +1,290 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Computation Payload Manifest",
+  "type": "object",
+  "required": [
+    "createdAt",
+    "expiresAt",
+    "payload",
+    "version"
+  ],
+  "properties": {
+    "version": {
+      "description": "Semver",
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metadata": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AppMetadata"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "payload": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AppPayload"
+      }
+    },
+    "compManifest": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CompManifest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "AppMetadata": {
+      "title": "Application Metadata",
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "homepage": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "AppPayload": {
+      "title": "Payload",
+      "type": "object",
+      "required": [
+        "hash",
+        "urls"
+      ],
+      "properties": {
+        "platform": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PayloadPlatform"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "hash": {
+          "type": "string"
+        }
+      }
+    },
+    "PayloadPlatform": {
+      "title": "Payload Platform",
+      "type": "object",
+      "required": [
+        "arch",
+        "os"
+      ],
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "osVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "CompManifest": {
+      "title": "Computation Manifest",
+      "description": "Computation Manifests lets Requestors to define a certain set of allowed actions, to be negotiated with and approved by a Provider. Requestors' actions will be verified against the Manifest during computation.",
+      "type": "object",
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "version": {
+          "title": "Version",
+          "description": "Semver",
+          "type": "string"
+        },
+        "script": {
+          "title": "Script",
+          "description": "Defines a set of allowed ExeScript commands and applies constraints to their arguments.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Script"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "net": {
+          "title": "Net",
+          "description": "Applies constraints to networking. Currently, outgoing requests to the public Internet network are covered.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Net"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Script": {
+      "title": "Script",
+      "description": "Defines a set of allowed ExeScript commands and applies constraints to their arguments.",
+      "type": "object",
+      "required": [
+        "commands"
+      ],
+      "properties": {
+        "commands": {
+          "description": "Specifies a curated list of commands.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Command"
+          }
+        },
+        "match": {
+          "description": "Selects a default way of comparing command arguments stated in the manifest and the ones received in the ExeScript, unless stated otherwise in a command JSON object.",
+          "default": "strict",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ArgMatch"
+            }
+          ]
+        }
+      }
+    },
+    "Command": {
+      "title": "Command",
+      "anyOf": [
+        {
+          "description": "UTF-8 encoded string. No command context or matching mode need to be specified. E.g. [\"run /bin/cat /etc/motd\", \"run /bin/date -R\"]",
+          "type": "string"
+        },
+        {
+          "description": "UTF-8 encoded JSON string. Command context (e.g. env) or argument matching mode need to be specified for a command. E.g. [\"{\\\"run\\\": { \\\"args\\\": \\\"/bin/date -R\\\", \\\"env\\\": { \\\"MYVAR\\\": \\\"42\\\", \\\"match\\\": \\\"strict\\\" }}}\"]"
+        }
+      ]
+    },
+    "ArgMatch": {
+      "title": "Argument Match",
+      "type": "string",
+      "enum": [
+        "strict",
+        "regex"
+      ]
+    },
+    "Net": {
+      "title": "Net",
+      "description": "Applies constraints to networking. Currently, outgoing requests to the public Internet network are covered.",
+      "type": "object",
+      "properties": {
+        "inet": {
+          "title": "Internet Network",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Inet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Inet": {
+      "title": "Internet Network",
+      "type": "object",
+      "properties": {
+        "out": {
+          "description": "Internet Outbound Network",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InetOut"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "InetOut": {
+      "title": "Internet Outbound Network",
+      "description": "Applies constraints to networking. Currently, outgoing requests to the public Internet network are covered.",
+      "type": "object",
+      "properties": {
+        "protocols": {
+          "description": "List of allowed outbound protocols. Supports \"http\", \"https\", \"ws\", and \"wss\".",
+          "default": [
+            "http",
+            "https",
+            "ws",
+            "wss"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "urls": {
+          "description": "List of allowed external URLs that outbound requests can be sent to. E.g. [\"http://golemfactory.s3.amazonaws.com/file1\", \"http://golemfactory.s3.amazonaws.com/file2\"]",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    }
+  }
+}

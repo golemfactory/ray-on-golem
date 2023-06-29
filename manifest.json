@@ -19,7 +19,10 @@
     "version": "0.1.0",
     "script": {
       "commands": [
-	"run /bin/sh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
+        "run /bin/sh -c echo*",
+        "run /bin/sh -c mkdir -p /root/.ssh",
+        "run /bin/sh -c service ssh start",
+        "run /bin/sh -c ssh*"
       ],
       "match": "regex"
     },
