@@ -9,8 +9,14 @@ provider:
     golem_ray_url: "http://localhost:8080"
     image_hash: "83a7145df831d9b62508a912485d2e9ac03e70df328e7142a899c2bf"
 
+file_mounts:
+  {
+      "/home": "/tmp/golem"
+  }
+
 available_node_types:
   "ray.head.default":
+    max_workers: 0
     resources: {"CPU": 1}
     node_config:
       apiVersion: v1
@@ -59,5 +65,10 @@ available_node_types:
 setup_commands: []
 head_setup_commands: []
 worker_setup_commands: []
+
+head_start_ray_commands: ["ray start --autoscaling-config=~/ray_bootstrap_config.yaml"]
+initialization_commands: []
+auth:
+  ssh_user: 'test'
 
 cluster_synced_files: []

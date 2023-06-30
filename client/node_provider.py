@@ -33,8 +33,10 @@ class GolemNodeProvider(NodeProvider):
         node = self._golem_ray_client.fetch_node(node_id)
         return node.state not in [NodeState.pending, NodeState.running]
 
-    def node_tags(self, node_id: NODE_ID):
-        ...
+    def node_tags(self, node_id: NODE_ID) -> dict:
+        return {}
+        # node = self._golem_ray_client.fetch_node(node_id)
+        # return node.tags
 
     def external_ip(self, node_id: NODE_ID) -> IPv4Address:
         node = self._golem_ray_client.fetch_node(node_id)
@@ -44,8 +46,9 @@ class GolemNodeProvider(NodeProvider):
         node = self._golem_ray_client.fetch_node(node_id)
         return node.internal_ip
 
-    def set_node_tags(self, node_id, tags):
-        ...
+    def set_node_tags(self, node_id: NODE_ID, tags: dict) -> None:
+        return
+        # return self._golem_ray_client.set_node_tags(node_id, tags)
 
     def create_node(
         self,
@@ -53,7 +56,12 @@ class GolemNodeProvider(NodeProvider):
         tags: dict[str, str],
         count: int,
     ) -> dict[str, dict]:
-        created_nodes = self._golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
+        # created_nodes = self._golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
+        created_nodes = self._golem_ray_client.create_nodes(
+            cluster_id="",
+            count=count,
+            head_node=node_config.get("metadata", {}).get("labels", {}).get("component") == "ray-head",
+        )
         return {node.node_id: node.dict() for node in created_nodes}
 
     def terminate_node(self, node_id: NODE_ID) -> None:
