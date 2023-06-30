@@ -15,4 +15,8 @@ class CreateNodesRequest(BaseModel):
 
 
 class DeleteNodesRequest(BaseModel):
-    node_ids: List[NODE_ID]
+    node_ids: list[NODE_ID]
+
+
+class SetNodeTagsRequest(BaseModel):
+    tags: dict
