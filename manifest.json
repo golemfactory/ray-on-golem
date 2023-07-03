@@ -10,7 +10,7 @@
   "payload": [
     {
       "urls": [
-        "http://yacn2.dev.golem.network:8000/docker-golem-script-curl-latest-d75268e752.gvmi"
+        "http://registry.golem.network/download/0ce63e86c7c7afeee38c2a7282e0f778089eea727d7bc65c82549976"
       ],
       "hash": "sha3:{sha3}"
     }
@@ -21,8 +21,10 @@
       "commands": [
         "run /bin/sh -c echo*",
         "run /bin/sh -c mkdir -p /root/.ssh",
+        "run /bin/sh -c cat*",
         "run /bin/sh -c service ssh start",
-        "run /bin/sh -c ssh*"
+        "run /bin/sh -c ssh*",
+        "run /bin/sh -c *"
       ],
       "match": "regex"
     },
@@ -30,7 +32,7 @@
       "inet": {
         "out": {
           "protocols": ["https", "tcp"],
-          "urls": ["tcp://proxy.dev.golem.network:3001/"]
+          "urls": ["tcp://proxy.dev.golem.network:3001/", "https://pypi.dev.golem.network"]
         }
       }
     }
