@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic.main import BaseModel
 
-from models.types import NODE_ID
+from models.types import NodeId
 
 
 class CreateClusterRequest(BaseModel):
@@ -15,8 +15,7 @@ class CreateNodesRequest(BaseModel):
 
 
 class DeleteNodesRequest(BaseModel):
-    node_ids: list[NODE_ID]
-
+    node_ids: List[NodeId]
 
 class SetNodeTagsRequest(BaseModel):
     tags: dict

@@ -2,11 +2,11 @@ from typing import List
 
 from pydantic.main import BaseModel
 
-from models.types import CLUSTER_ID, Node
+from models.types import ClusterId, Node
 
 
 class CreateClusterResponse(BaseModel):
-    # cluster_id: CLUSTER_ID
+    # cluster_id: ClusterId
     pass
 
 

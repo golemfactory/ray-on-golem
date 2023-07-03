@@ -1,10 +1,11 @@
 from enum import Enum
 from ipaddress import IPv4Address
+from typing import Dict
 
 from pydantic.main import BaseModel
 
-NODE_ID = str
-CLUSTER_ID = str
+NodeId = str
+ClusterId = str
 
 
 class NodeState(Enum):
@@ -14,8 +15,8 @@ class NodeState(Enum):
 
 
 class Node(BaseModel):
-    node_id: NODE_ID
+    node_id: NodeId
     state: NodeState
     internal_ip: IPv4Address
     external_ip: IPv4Address | None
-    tags: dict = {}
+    tags: Dict = {}
