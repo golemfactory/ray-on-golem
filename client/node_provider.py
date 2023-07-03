@@ -7,7 +7,7 @@ from ray.autoscaler._private.aws.node_provider import (
 from ray.autoscaler.node_provider import NodeProvider
 
 from client.golem_ray_client import GolemRayClient
-from models.types import NODE_ID, NodeState
+from models.types import NodeId, NodeState
 
 
 class GolemNodeProvider(NodeProvider):
@@ -22,25 +22,25 @@ class GolemNodeProvider(NodeProvider):
         self._golem_ray_client.create_cluster(image_hash)
         # self._cluster_id = self._golem_ray_client.create_cluster(image_hash)
 
-    def non_terminated_nodes(self, tag_filters) -> list[NODE_ID]:
+    def non_terminated_nodes(self, tag_filters) -> list[NodeId]:
         return self._golem_ray_client.non_terminated_nodes()
 
-    def is_running(self, node_id: NODE_ID) -> bool:
+    def is_running(self, node_id: NodeId) -> bool:
         node = self._golem_ray_client.fetch_node(node_id)
         return node.state == NodeState.running
 
-    def is_terminated(self, node_id: NODE_ID) -> bool:
+    def is_terminated(self, node_id: NodeId) -> bool:
         node = self._golem_ray_client.fetch_node(node_id)
         return node.state not in [NodeState.pending, NodeState.running]
 
-    def node_tags(self, node_id: NODE_ID):
+    def node_tags(self, node_id: NodeId):
         ...
 
-    def external_ip(self, node_id: NODE_ID) -> IPv4Address:
+    def external_ip(self, node_id: NodeId) -> IPv4Address:
         node = self._golem_ray_client.fetch_node(node_id)
         return node.external_ip
 
-    def internal_ip(self, node_id: NODE_ID) -> IPv4Address:
+    def internal_ip(self, node_id: NodeId) -> IPv4Address:
         node = self._golem_ray_client.fetch_node(node_id)
         return node.internal_ip
 
@@ -56,8 +56,8 @@ class GolemNodeProvider(NodeProvider):
         created_nodes = self._golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
         return {node.node_id: node.dict() for node in created_nodes}
 
-    def terminate_node(self, node_id: NODE_ID) -> None:
+    def terminate_node(self, node_id: NodeId) -> None:
         return self._golem_ray_client.terminate_node(node_id)
 
-    def terminate_nodes(self, node_ids: list[NODE_ID]) -> None:
+    def terminate_nodes(self, node_ids: list[NodeId]) -> None:
         return self._golem_ray_client.terminate_nodes(node_ids)

@@ -6,7 +6,7 @@ from models.types import ClusterId, Node
 
 
 class CreateClusterResponse(BaseModel):
-    # cluster_id: CLUSTER_ID
+    # cluster_id: ClusterId
     pass
 
 
