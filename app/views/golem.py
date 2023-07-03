@@ -1,35 +1,30 @@
 import asyncio
 import base64
 import json
-import os
 import logging
+import os
 import subprocess
+from datetime import timedelta
+from ipaddress import IPv4Address
+from pathlib import Path
+from random import random
+from subprocess import check_output
+from typing import Awaitable, Callable, Tuple, Any, List, Dict
+from urllib.parse import urlparse
 from uuid import uuid4
 
 import async_timeout
-from pytimeparse import parse as parse_to_seconds
-from datetime import timedelta
-from random import random
-from subprocess import check_output, check_call
-from ipaddress import IPv4Address
-
 from aiohttp import web
-from pathlib import Path
-from typing import Awaitable, Callable, Tuple, Any, List, Generator, Dict
-from urllib.parse import urlparse
-
-from models.response import GetNodesResponse
-from models.types import NodeState, Node
-
 from golem_core.core.activity_api import commands
+from golem_core.core.activity_api.resources import Activity
 from golem_core.core.golem_node import GolemNode
 from golem_core.core.market_api import ManifestVmPayload
-from golem_core.core.activity_api.resources import Activity
-from golem_core.core.network_api.resources import Network
 from golem_core.core.market_api.pipeline import default_negotiate, default_create_agreement, default_create_activity
+from golem_core.core.network_api.resources import Network
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
 from app.models.cluster_node import ClusterNode
+from models.types import NodeState, Node
 
 YAGNA_APPNAME = 'requestor-mainnet'
 
@@ -138,6 +133,7 @@ class GolemNodeProvider:
     async def init(self) -> None:
         async def on_event(event) -> None:
             logger.info(f'-----EVENT: {event}')
+
         self._golem.event_bus.listen(on_event)
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
@@ -172,16 +168,39 @@ class GolemNodeProvider:
                 f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
             )
 
-    async def create_demand(self, provider_config: Dict):
+    @staticmethod
+    def create_reverse_ssh_to_golem_network() -> None:
+        subprocess.Popen(["ssh", "-R", r"*:3001:127.0.0.1:6379", "proxy@proxy.dev.golem.network"])
+        logger.info('Reverse ssh tunnel from 127.0.0.1:6379 to *:3001 created.')
+
+    def break_if_head_node_is_active(self):
+        head_node = next((x for x in self._cluster_nodes if x.node_id == '0'), None)
+        if head_node:
+            raise Exception('Head node already exists.')
+
+    def add_local_head_node(self) -> None:
+        head_node = ClusterNode(node_id='0', internal_ip=IPv4Address('127.0.0.1'))
+        head_node.state = NodeState.pending
+        self._cluster_nodes.append(head_node)
+
+    async def create_cluster(self, provider_config: Dict):
+        self.break_if_head_node_is_active()
+        self._num_workers = provider_config.get('num_workers', 4)
         payload, connection_timeout = await self.create_payload(provider_config=provider_config)
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
+        self.add_local_head_node()
+        self.create_reverse_ssh_to_golem_network()
 
-        await self.create_activities(provider_config, connection_timeout)
-        await self._network.refresh_nodes()
-        await self._add_my_key()
-        await self._add_other_keys()
-        await self._start_head_process()
-        self.print_ws_connection_data()
+    # async def create_demand(self, provider_config: Dict):
+    #     payload, connection_timeout = await self.create_payload(provider_config=provider_config)
+    #     self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
+    #
+    #     await self.create_activities(provider_config, connection_timeout)
+    #     await self._network.refresh_nodes()
+    #     await self._add_my_key()
+    #     await self._add_other_keys()
+    #     # await self._start_head_process()
+    #     self.print_ws_connection_data()
 
     @staticmethod
     async def _parse_manifest(image_hash, text=None):
@@ -217,8 +236,7 @@ class GolemNodeProvider:
 
         return payload, connection_timeout
 
-    async def create_activities(self, provider_config, connection_timeout):
-        self._num_workers = provider_config.get('num_workers', 4)
+    async def create_activities(self, connection_timeout=None):
         node_id = 1
         try:
             async with async_timeout.timeout(int(150)):
@@ -289,6 +307,8 @@ class GolemNodeProvider:
                                               node.node_id != cluster_node.node_id]
 
             for other_node in other_nodes:
+                if other_node.node_id == '0':
+                    continue
                 other_activity_key = keys[other_node.node_id]
                 if cluster_node.activity:
                     await self.add_authorized_key(cluster_node.activity, other_activity_key)
@@ -306,13 +326,15 @@ class GolemNodeProvider:
     #         await batch.wait(20)
 
     async def _start_head_process(self):
-        head_node = ClusterNode(node_id='0', internal_ip=IPv4Address(self.HEAD_IP))
-        process = subprocess.Popen(
-            ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
-        process.wait()
-        if process:
-            head_node.state = NodeState.running
-            self._cluster_nodes.append(head_node)
+        head_node = next((x for x in self._cluster_nodes if x.node_id == '0'), None)
+        if head_node:
+            process = subprocess.Popen(
+                ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
+            process.wait()
+            if process:
+                head_node.state = NodeState.running
+        else:
+            raise Exception('Head node on local doesnt exist')
 
     async def _start_worker_process(self, activity):
         batch = await activity.execute_commands(
@@ -329,6 +351,13 @@ class GolemNodeProvider:
         nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
         if count + nodes_with_ray_on_count > self._num_workers + 1:
             raise web.HTTPBadRequest(body="Max workers limit exceeded")
+
+        await self.create_activities()
+        await self._network.refresh_nodes()
+        await self._add_my_key()
+        await self._add_other_keys()
+        # await self._start_head_process()
+        self.print_ws_connection_data()
 
         start_worker_tasks = []
         for node in self._cluster_nodes:

@@ -1,11 +1,6 @@
-import asyncio
-import json
-
 from aiohttp import web
-from aiohttp_session import get_session
 
 from app.views.golem import GolemNodeProvider
-from models.encoder import NodesResponseEncoder
 from models.response import GetNodesResponse, GetNodeResponse
 
 routes = web.RouteTableDef()
@@ -18,7 +13,7 @@ async def create_demand(request: web.Request) -> web.Response:
     golem: GolemNodeProvider = request.app['golem']
     # TODO: pydantic request
     provider_config = await request.json()
-    await golem.create_demand(provider_config=provider_config)
+    await golem.create_cluster(provider_config=provider_config)
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
 
     return web.json_response(text=response, status=201)
@@ -46,6 +41,15 @@ async def add_nodes(request: web.Request) -> web.Response:
     json_decoded = await request.json()
     count: int = json_decoded.get('count')
     await golem.start_workers(count)
+    response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
+
+    return web.json_response(text=response, status=201)
+
+
+@routes.post('/head_nodes')
+async def add_head_nodes(request: web.Request) -> web.Response:
+    golem: GolemNodeProvider = request.app['golem']
+    await golem._start_head_process()
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
 
     return web.json_response(text=response, status=201)
