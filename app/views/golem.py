@@ -54,14 +54,18 @@ class GolemNodeProvider:
         await self._allocation.get_data()
 
     def get_nodes_response(self) -> List[Node]:
-        """Prepares ClusterNode instances data to pydantic Node class object"""
+        """
+        Prepares ClusterNode instances data to pydantic Node class object
+        """
         return [Node(node_id=cluster_node.node_id,
                      state=cluster_node.state,
                      internal_ip=cluster_node.internal_ip,
                      external_ip=cluster_node.external_ip) for cluster_node in self._cluster_nodes]
 
     def get_node_response_by_id(self, node_id: str) -> Node:
-        """Prepares single ClusterNode instance data to pydantic Node class Object"""
+        """
+        Prepares single ClusterNode instance data to pydantic Node class Object
+        """
         node = next((cluster_node for cluster_node in self._cluster_nodes if cluster_node.node_id == node_id), None)
         if not node:
             raise GolemRayException(message=f"No node with {node_id} id", status_code=StatusCode.BAD_REQUEST)
@@ -71,9 +75,11 @@ class GolemNodeProvider:
                     external_ip=node.external_ip)
 
     async def create_cluster(self, provider_config: Dict):
-        """Manages creating cluster, creates payload from given data and creates demand basing on payload
-           Local node is being created without ray instance.
-           :param provider_config: dictionary containing 'num_workers', and 'image_hash' keys"""
+        """
+        Manages creating cluster, creates payload from given data and creates demand basing on payload
+        Local node is being created without ray instance.
+        :param provider_config: dictionary containing 'num_workers', and 'image_hash' keys
+        """
         self._break_if_head_node_is_active()
         self._num_workers = provider_config.get('num_workers', 4)
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
