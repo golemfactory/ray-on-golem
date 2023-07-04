@@ -142,6 +142,39 @@ class GolemNodeProvider:
         else:
             logger.info('-----FAILED ADDING PROVIDER KEY TO LOCAL')
 
+    @staticmethod
+    async def _create_payload(provider_config: dict, **kwargs):
+        image_hash = provider_config.get('image_hash')
+        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash)
+
+        return payload, connection_timeout
+
+    @staticmethod
+    async def _start_worker_process(self, activity):
+        batch = await activity.execute_commands(
+            commands.Run(f'ray start --address 192.168.0.1:3001'),
+        )
+        try:
+            await batch.wait(60)
+        except Exception:
+            print(batch.events)
+            print("Failed to start a worker process")
+            raise
+
+    @staticmethod
+    async def _stop_node(node: ClusterNode):
+        if node and node.state.value == NodeState.running:
+            batch = await node.activity.execute_commands(
+                commands.Run(f'ray stop'),
+            )
+            try:
+                await batch.wait(60)
+                node.state = NodeState.pending
+            except Exception:
+                print(batch.events)
+                print(f"Failed to stop a worker process with id: {node.node_id}")
+                raise
+
     def _print_ws_connection_data(self) -> None:
         for node in self._cluster_nodes:
             print(
@@ -161,12 +194,6 @@ class GolemNodeProvider:
         head_node = ClusterNode(node_id='0', internal_ip=IPv4Address('127.0.0.1'))
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)
-
-    async def _create_payload(self, provider_config: dict, **kwargs):
-        image_hash = provider_config.get('image_hash')
-        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash)
-
-        return payload, connection_timeout
 
     async def _create_activities(self, connection_timeout=None):
         node_id = 1
@@ -225,28 +252,3 @@ class GolemNodeProvider:
                     await self._add_authorized_key(cluster_node.activity, other_activity_key)
                 else:
                     await self._add_authorized_key_to_local_node(other_activity_key)
-
-    async def _start_worker_process(self, activity):
-        batch = await activity.execute_commands(
-            commands.Run(f'ray start --address 192.168.0.1:3001'),
-        )
-        try:
-            await batch.wait(60)
-        except Exception:
-            print(batch.events)
-            print("Failed to start a worker process")
-            raise
-
-    @staticmethod
-    async def _stop_node(node: ClusterNode):
-        if node and node.state.value == NodeState.running:
-            batch = await node.activity.execute_commands(
-                commands.Run(f'ray stop'),
-            )
-            try:
-                await batch.wait(60)
-                node.state = NodeState.pending
-            except Exception:
-                print(batch.events)
-                print(f"Failed to stop a worker process with id: {node.node_id}")
-                raise
