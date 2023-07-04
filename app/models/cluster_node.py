@@ -9,7 +9,7 @@ from models.types import Node, NodeState
 from golem_core.core.activity_api.resources import Activity
 
 class ClusterNode(BaseModel):
-    node_id: str
+    node_id: int
     activity: Optional[Activity]
     internal_ip: IPv4Address
     external_ip: Optional[IPv4Address]

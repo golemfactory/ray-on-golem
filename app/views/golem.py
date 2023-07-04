@@ -54,12 +54,14 @@ class GolemNodeProvider:
         await self._allocation.get_data()
 
     def get_nodes_response(self) -> List[Node]:
+        """Prepares ClusterNode instances data to pydantic Node class object"""
         return [Node(node_id=cluster_node.node_id,
                      state=cluster_node.state,
                      internal_ip=cluster_node.internal_ip,
                      external_ip=cluster_node.external_ip) for cluster_node in self._cluster_nodes]
 
-    def get_node_response_by_id(self, node_id: str):
+    def get_node_response_by_id(self, node_id: str) -> Node:
+        """Prepares single ClusterNode instance data to pydantic Node class Object"""
         node = next((cluster_node for cluster_node in self._cluster_nodes if cluster_node.node_id == node_id), None)
         if not node:
             raise GolemRayException(message=f"No node with {node_id} id", status_code=StatusCode.BAD_REQUEST)
@@ -69,6 +71,9 @@ class GolemNodeProvider:
                     external_ip=node.external_ip)
 
     async def create_cluster(self, provider_config: Dict):
+        """Manages creating cluster, creates payload from given data and creates demand basing on payload
+           Local node is being created without ray instance.
+           :param provider_config: dictionary containing 'num_workers', and 'image_hash' keys"""
         self._break_if_head_node_is_active()
         self._num_workers = provider_config.get('num_workers', 4)
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
@@ -77,7 +82,10 @@ class GolemNodeProvider:
         create_reverse_ssh_to_golem_network()
 
     async def start_head_process(self):
-        head_node = next((x for x in self._cluster_nodes if x.node_id == '0'), None)
+        """
+        Runs ray head node on local machine
+        """
+        head_node = next((x for x in self._cluster_nodes if x.node_id == 0), None)
         if head_node:
             process = subprocess.Popen(
                 ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
@@ -88,6 +96,10 @@ class GolemNodeProvider:
             raise Exception('Head node on local doesnt exist')
 
     async def start_workers(self, count: int):
+        """
+        Creates {count} worker nodes on providers. No ray instances is running at the moment.
+        :param count: Quantity of workers that should be started
+        """
         nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
         if count + nodes_with_ray_on_count > self._num_workers + 1:
             raise GolemRayException(message="Max workers limit exceeded", status_code=StatusCode.BAD_REQUEST)
@@ -109,6 +121,10 @@ class GolemNodeProvider:
             await asyncio.gather(*start_worker_tasks)
 
     async def stop_worker(self, node_id: int):
+        """
+        Stops selected worker with {node_id} id.
+        :param node_id: id of node where you want to stop ray
+        """
         node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
         if not node or not node.state.value != NodeState.running:
             raise GolemRayException(message=f"Node with id: {node_id} is not running ray!",
@@ -117,6 +133,10 @@ class GolemNodeProvider:
             await self._stop_node(node)
 
     async def stop_workers_by_ids(self, workers_ids: List[int]):
+        """
+        Stops selected workers ray instances basing on id list
+        :param workers_ids: list of workers id you want to stop ray on
+        """
         nodes_to_stop = [node for node in self._cluster_nodes if node.node_id in workers_ids and node.node_id != 0]
         for node in nodes_to_stop:
             await self._stop_node(node)
@@ -124,6 +144,11 @@ class GolemNodeProvider:
     # Private
     @staticmethod
     async def _add_authorized_key(activity, key):
+        """
+        Adds local machine ssh key to providers machine
+        :param activity: Activity object from golem
+        :param key: Key you want to add to authorized_keys on provider machine
+        """
         batch = await activity.execute_commands(
             commands.Run('mkdir -p /root/.ssh'),
             commands.Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
@@ -136,6 +161,11 @@ class GolemNodeProvider:
 
     @staticmethod
     async def _add_authorized_key_to_local_node(key):
+        """
+        Adds keys from providers to local machine"
+        :param key: ssh key
+        :return:
+        """
         result = subprocess.run(['echo', f"{key}", ">>", "~/.ssh/authorized_keys"])
         if result.returncode == 0:
             logger.info('-----ADDED PROVIDER KEY TO LOCAL')
@@ -144,13 +174,25 @@ class GolemNodeProvider:
 
     @staticmethod
     async def _create_payload(provider_config: dict, **kwargs):
+        """
+        Creates payload from given image_hash and parses manifest.json file
+        which is then used to create demand in golem network
+        :param provider_config: dictionary containing image_hash and num_workers
+        :param kwargs:
+        :return:
+        """
         image_hash = provider_config.get('image_hash')
         payload, offer_scorer, connection_timeout = await parse_manifest(image_hash)
 
         return payload, connection_timeout
 
     @staticmethod
-    async def _start_worker_process(self, activity):
+    async def _start_worker_process(activity):
+        """
+        Starts ray worker process on external providers
+        :param activity: Activity object from golem
+        :return:
+        """
         batch = await activity.execute_commands(
             commands.Run(f'ray start --address 192.168.0.1:3001'),
         )
@@ -163,6 +205,11 @@ class GolemNodeProvider:
 
     @staticmethod
     async def _stop_node(node: ClusterNode):
+        """
+        Stops ray process on selected node
+        :param node: node to stop ray on
+        :return:
+        """
         if node and node.state.value == NodeState.running:
             batch = await node.activity.execute_commands(
                 commands.Run(f'ray stop'),
@@ -176,6 +223,10 @@ class GolemNodeProvider:
                 raise
 
     def _print_ws_connection_data(self) -> None:
+        """
+        Prints command which allows to manually ssh on providers machines
+        :return:
+        """
         for node in self._cluster_nodes:
             print(
                 "Connect with:\n"
@@ -186,16 +237,31 @@ class GolemNodeProvider:
             )
 
     def _break_if_head_node_is_active(self):
+        """
+        Looks for head node existence in _cluster_nodes. If it exists, throw.
+        :return:
+        """
         head_node = next((x for x in self._cluster_nodes if x.node_id == '0'), None)
         if head_node:
             raise Exception('Head node already exists.')
 
     def _add_local_head_node(self) -> None:
-        head_node = ClusterNode(node_id='0', internal_ip=IPv4Address('127.0.0.1'))
+        """
+        Adds ClusterNode with node_id=0 to list of nodes.
+        :return:
+        """
+        head_node = ClusterNode(node_id=0, internal_ip=IPv4Address('127.0.0.1'))
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)
 
     async def _create_activities(self, connection_timeout=None):
+        """
+        This functions manages demands, negotiations, agreements, creates activities
+        and creates ssh connection to nodes.
+
+        :param connection_timeout: Currently not used
+        :return:
+        """
         node_id = 1
         try:
             async with async_timeout.timeout(int(150)):
@@ -210,7 +276,7 @@ class GolemNodeProvider:
                     Limit(self._num_workers))
 
                 async for activity, ip, connection_uri in chain:
-                    cluster_node = ClusterNode(node_id=str(node_id),
+                    cluster_node = ClusterNode(node_id=node_id,
                                                activity=activity,
                                                internal_ip=IPv4Address(ip),
                                                connection_uri=connection_uri)
@@ -222,6 +288,9 @@ class GolemNodeProvider:
             raise GolemRayException(message="Creating activities timeout reached", status_code=StatusCode.SERVER_ERROR)
 
     async def _add_my_key(self):
+        """
+        Add local ssh key to all providers
+        """
         with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
             my_key = f.readline().strip()
 
@@ -229,6 +298,9 @@ class GolemNodeProvider:
         await asyncio.gather(*tasks)
 
     async def _add_other_keys(self):
+        """
+        Adds all providers key to other providers machines
+        """
         keys = {}
         for cluster_node in self._cluster_nodes:
             if cluster_node.activity:
@@ -245,7 +317,7 @@ class GolemNodeProvider:
                                               node.node_id != cluster_node.node_id]
 
             for other_node in other_nodes:
-                if other_node.node_id == '0':
+                if other_node.node_id == 0:
                     continue
                 other_activity_key = keys[other_node.node_id]
                 if cluster_node.activity:
