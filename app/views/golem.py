@@ -37,6 +37,8 @@ class GolemNodeProvider:
         self._allocation = None
         self._network = None
         self._num_workers = None
+        self._head_node_process: subprocess.Popen | None = None
+        self._reverse_ssh_process: subprocess.Popen | None = None
         self._cluster_nodes: List[ClusterNode] = []
         self._golem = GolemNode(app_key=get_or_create_yagna_appkey())
 
@@ -87,19 +89,23 @@ class GolemNodeProvider:
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
         self._add_local_head_node()
-        create_reverse_ssh_to_golem_network()
+        self._reverse_ssh_process = create_reverse_ssh_to_golem_network()
 
     async def start_head_process(self):
         """
         Runs ray head node on local machine
         """
-        head_node = next((x for x in self._cluster_nodes if x.node_id == 0), None)
+        head_node = self._get_head_node()
         if head_node:
-            process = subprocess.Popen(
-                ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
-            process.wait()
-            if process:
-                head_node.state = NodeState.running
+            if head_node.state == NodeState.pending:
+                process = subprocess.Popen(
+                    ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
+                process.wait()
+                if process:
+                    head_node.state = NodeState.running
+                    self._head_node_process = process
+            elif head_node.state == NodeState.running:
+                raise GolemRayException(message='Head node is already running ray', status_code=StatusCode.BAD_REQUEST)
         else:
             raise GolemRayException(message='Head node on local doesnt exist', status_code=StatusCode.BAD_REQUEST)
 
@@ -139,6 +145,7 @@ class GolemNodeProvider:
                                     status_code=StatusCode.BAD_REQUEST)
         if node_id != 0:
             await self._stop_node(node)
+            self._cluster_nodes.remove(node)
 
     async def stop_workers_by_ids(self, workers_ids: List[int]):
         """
@@ -148,8 +155,31 @@ class GolemNodeProvider:
         nodes_to_stop = [node for node in self._cluster_nodes if node.node_id in workers_ids and node.node_id != 0]
         for node in nodes_to_stop:
             await self._stop_node(node)
+            self._cluster_nodes.remove(node)
+
+    async def shutdown(self) -> None:
+        """
+        Terminates all activities and ray on head node.
+
+        :return:
+        """
+        tasks = [node.activity.destroy() for node in self._cluster_nodes if node.activity]
+        await asyncio.gather(*tasks)
+        logger.info(f'-----{len(tasks)} activities stopped')
+        self._stop_local_head_node()
+        logger.info(f'-----Ray on local machine stopped')
+        self._reverse_ssh_process.terminate()
+        logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
+        self._reverse_ssh_process = None
 
     # Private
+
+    def _get_head_node(self) -> ClusterNode | None:
+        head_node = next((x for x in self._cluster_nodes if x.node_id == 0), None)
+        if head_node:
+            return head_node
+        return None
+
     @staticmethod
     async def _add_authorized_key(activity, key):
         """
@@ -201,13 +231,14 @@ class GolemNodeProvider:
         :param node: node to stop ray on
         :return:
         """
-        if node and node.state.value == NodeState.running:
+        if node and node.state == NodeState.running:
             batch = await node.activity.execute_commands(
                 commands.Run(f'ray stop'),
             )
             try:
                 await batch.wait(60)
                 node.state = NodeState.pending
+                await node.activity.destroy()
             except Exception:
                 print(batch.events)
                 print(f"Failed to stop a worker process with id: {node.node_id}")
@@ -232,7 +263,7 @@ class GolemNodeProvider:
         Looks for head node existence in _cluster_nodes. If it exists, throw.
         :return:
         """
-        head_node = next((x for x in self._cluster_nodes if x.node_id == '0'), None)
+        head_node = self._get_head_node()
         if head_node:
             raise Exception('Head node already exists.')
 
@@ -244,6 +275,16 @@ class GolemNodeProvider:
         head_node = ClusterNode(node_id=0, internal_ip=IPv4Address('127.0.0.1'))
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)
+
+    def _stop_local_head_node(self) -> None:
+        self._get_head_node()
+        head_node = self._get_head_node()
+        process = subprocess.Popen(
+            ['ray', 'stop'])
+        process.wait()
+        if process:
+            self._cluster_nodes.remove(head_node)
+        self._head_node_process = None
 
     async def _start_worker_process(self, activity):
         """

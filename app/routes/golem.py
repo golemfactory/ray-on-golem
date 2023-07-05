@@ -65,7 +65,12 @@ async def delete_node(request):
 
     return web.json_response(text=response, status=204)
 
+
 @routes.delete('/nodes')
 async def delete_nodes(request):
     golem: GolemNodeProvider = request.app['golem']
     request_data = DeleteNodesRequest(**await request.json()).dict()
+    await golem.stop_workers_by_ids(request_data.get('node_ids'))
+    response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
+
+    return web.json_response(text=response, status=204)

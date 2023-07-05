@@ -17,7 +17,7 @@ async def golem_engine(app):
     async with golem_provider.golem:
         await golem_provider.init()
         yield  # before yield called on startup, after yield called on cleanup
-
+        await golem_provider.shutdown()
 
 def main():
     logger = logging.getLogger('aiohttp')

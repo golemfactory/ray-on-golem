@@ -4,9 +4,9 @@ import os
 import subprocess
 from datetime import timedelta
 from pathlib import Path
+from subprocess import check_output, Popen
 from typing import Tuple, Any, Awaitable, Callable
 from urllib.parse import urlparse
-from subprocess import check_output
 
 from golem_core.core.activity_api import commands
 from golem_core.core.activity_api.resources import Activity
@@ -20,9 +20,11 @@ YAGNA_APPNAME = 'requestor-mainnet'
 logger = get_logger()
 
 
-def create_reverse_ssh_to_golem_network() -> None:
-    subprocess.Popen(["ssh", "-R", r"*:3001:127.0.0.1:6379", "proxy@proxy.dev.golem.network"])
+def create_reverse_ssh_to_golem_network() -> Popen[bytes] | Popen[str | bytes | Any]:
+    process = subprocess.Popen(["ssh", "-R", r"*:3001:127.0.0.1:6379", "proxy@proxy.dev.golem.network"])
     logger.info('Reverse ssh tunnel from 127.0.0.1:6379 to *:3001 created.')
+
+    return process
 
 
 def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
