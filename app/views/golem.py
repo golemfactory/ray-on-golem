@@ -99,7 +99,7 @@ class GolemNodeProvider:
             if process:
                 head_node.state = NodeState.running
         else:
-            raise Exception('Head node on local doesnt exist')
+            raise GolemRayException(message='Head node on local doesnt exist', status_code=StatusCode.BAD_REQUEST)
 
     async def start_workers(self, count: int):
         """
@@ -193,23 +193,6 @@ class GolemNodeProvider:
         return payload, connection_timeout
 
     @staticmethod
-    async def _start_worker_process(activity):
-        """
-        Starts ray worker process on external providers
-        :param activity: Activity object from golem
-        :return:
-        """
-        batch = await activity.execute_commands(
-            commands.Run(f'ray start --address 192.168.0.1:3001'),
-        )
-        try:
-            await batch.wait(60)
-        except Exception:
-            print(batch.events)
-            print("Failed to start a worker process")
-            raise
-
-    @staticmethod
     async def _stop_node(node: ClusterNode):
         """
         Stops ray process on selected node
@@ -259,6 +242,22 @@ class GolemNodeProvider:
         head_node = ClusterNode(node_id=0, internal_ip=IPv4Address('127.0.0.1'))
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)
+
+    async def _start_worker_process(self, activity):
+        """
+        Starts ray worker process on external providers
+        :param activity: Activity object from golem
+        :return:
+        """
+        batch = await activity.execute_commands(
+            commands.Run(f'ray start --address {self.HEAD_IP}:3001'),
+        )
+        try:
+            await batch.wait(60)
+        except Exception:
+            print(batch.events)
+            print("Failed to start a worker process")
+            raise
 
     async def _create_activities(self, connection_timeout=None):
         """
