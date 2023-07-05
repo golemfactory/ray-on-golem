@@ -160,6 +160,7 @@ class GolemNodeProvider:
     async def shutdown(self) -> None:
         """
         Terminates all activities and ray on head node.
+        Additionally, closes reverse ssh connection from local to proxy.
 
         :return:
         """
@@ -175,6 +176,10 @@ class GolemNodeProvider:
     # Private
 
     def _get_head_node(self) -> ClusterNode | None:
+        """
+        Returns head node (ClusterNode obj) or None if not exists
+        :return:
+        """
         head_node = next((x for x in self._cluster_nodes if x.node_id == 0), None)
         if head_node:
             return head_node
