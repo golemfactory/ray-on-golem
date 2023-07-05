@@ -55,32 +55,34 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
     return _create_ssh_connection
 
 
-async def parse_manifest(image_hash, text=None):
+async def parse_manifest(image_hash: str, text=None):
     """Parses manifest file and replaces image_hash used.
        Decoding is needed in order to work.
        :arg image_hash:
        :arg text:
     """
-    manifest = open(Path(__file__).parent.parent.parent.joinpath("manifest.json"), "rb").read()
-    manifest = (manifest
-                .decode('utf-8')
-                .replace('{sha3}', image_hash)
-                )
-    manifest = base64.b64encode(manifest.encode('utf-8')).decode("utf-8")
+    with open(Path(__file__).parent.parent.parent.joinpath("manifest.json"), "rb") as manifest:
+        manifest = manifest.read()
+        manifest = (manifest
+                    .decode('utf-8')
+                    .replace('{sha3}', image_hash)
+                    )
+        manifest = base64.b64encode(manifest.encode('utf-8')).decode("utf-8")
 
-    params = {
-        "manifest": manifest,
-        "capabilities": ['vpn', 'inet', 'manifest-support'],
-        "min_mem_gib": 0,
-        "min_cpu_threads": 0,
-        "min_storage_gib": 0,
-    }
-    # strategy = DEFAULT_SCORING_STRATEGY
-    # connection_timeout = DEFAULT_CONNECTION_TIMEOUT
-    connection_timeout = timedelta(seconds=150)
-    offer_scorer = None
-    payload = ManifestVmPayload(**params)
-    return payload, offer_scorer, connection_timeout
+        params = {
+            "manifest": manifest,
+            "capabilities": ['vpn', 'inet', 'manifest-support'],
+            "min_mem_gib": 0,
+            "min_cpu_threads": 0,
+            "min_storage_gib": 0,
+        }
+        # strategy = DEFAULT_SCORING_STRATEGY
+        # connection_timeout = DEFAULT_CONNECTION_TIMEOUT
+        connection_timeout = timedelta(seconds=150)
+        offer_scorer = None
+        payload = ManifestVmPayload(**params)
+
+        return payload, offer_scorer, connection_timeout
 
 
 def get_or_create_yagna_appkey():
