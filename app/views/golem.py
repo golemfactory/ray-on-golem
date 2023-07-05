@@ -30,6 +30,7 @@ class GolemNodeProvider:
 
     def __init__(self):
         self.HEAD_IP = '192.168.0.2'
+        self._proxy_ip = 'proxy.dev.golem.network'
         # self.HEAD_IP = '127.0.0.1'
         self._loop = None
         self._demand = None
@@ -50,6 +51,7 @@ class GolemNodeProvider:
 
         self._golem.event_bus.listen(on_event)
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
+        await self._golem.add_to_network(self._network)
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
         await self._allocation.get_data()
 
@@ -236,7 +238,7 @@ class GolemNodeProvider:
 
     def _add_local_head_node(self) -> None:
         """
-        Adds ClusterNode with node_id=0 to list of nodes.
+        Adds ClusterNode with node_id=0 (head_node) to list of nodes.
         :return:
         """
         head_node = ClusterNode(node_id=0, internal_ip=IPv4Address('127.0.0.1'))
@@ -250,7 +252,7 @@ class GolemNodeProvider:
         :return:
         """
         batch = await activity.execute_commands(
-            commands.Run(f'ray start --address {self.HEAD_IP}:3001'),
+            commands.Run(f'ray start --address {self._proxy_ip}:3001'),
         )
         try:
             await batch.wait(60)

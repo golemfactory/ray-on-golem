@@ -1,12 +1,11 @@
-from enum import Enum
 from ipaddress import IPv4Address
-from typing import Any, Optional
+from typing import Optional
 
+from golem_core.core.activity_api.resources import Activity
 from pydantic.main import BaseModel
 
-from models.response import GetNodeResponse
-from models.types import Node, NodeState
-from golem_core.core.activity_api.resources import Activity
+from models.types import NodeState
+
 
 class ClusterNode(BaseModel):
     node_id: int
