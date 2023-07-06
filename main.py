@@ -6,18 +6,24 @@ from aiohttp_session import setup
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 from cryptography import fernet
 
-from app.routes.golem import routes as nodes_routes
 from app.middlewares import error_middleware
+from app.routes.golem import routes as nodes_routes
+from app.utils.yagna import YagnaManager
 from app.views.golem import GolemNodeProvider
 
 
 async def golem_engine(app):
+    yagna_manager = YagnaManager()
     golem_provider = GolemNodeProvider()
     app['golem'] = golem_provider
+    app['yagna'] = yagna_manager
+
     async with golem_provider.golem:
         await golem_provider.init()
         yield  # before yield called on startup, after yield called on cleanup
         await golem_provider.shutdown()
+        yagna_manager.shutdown()
+
 
 def main():
     logger = logging.getLogger('aiohttp')
