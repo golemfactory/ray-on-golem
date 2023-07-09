@@ -287,7 +287,7 @@ class GolemNodeProvider:
         process = subprocess.Popen(
             ['ray', 'stop'])
         process.wait()
-        if process:
+        if process and head_node:
             self._cluster_nodes.remove(head_node)
         self._head_node_process = None
 

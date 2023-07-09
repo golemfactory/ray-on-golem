@@ -14,6 +14,7 @@ from app.views.golem import GolemNodeProvider
 
 async def golem_engine(app):
     yagna_manager = YagnaManager()
+    await yagna_manager.run()
     golem_provider = GolemNodeProvider()
     app['golem'] = golem_provider
     app['yagna'] = yagna_manager
