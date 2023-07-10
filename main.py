@@ -15,15 +15,16 @@ from app.views.golem import GolemNodeProvider
 async def golem_engine(app):
     yagna_manager = YagnaManager()
     await yagna_manager.run()
+    app['yagna'] = yagna_manager
+
     golem_provider = GolemNodeProvider()
     app['golem'] = golem_provider
-    app['yagna'] = yagna_manager
 
     async with golem_provider.golem:
         await golem_provider.init()
         yield  # before yield called on startup, after yield called on cleanup
         await golem_provider.shutdown()
-        yagna_manager.shutdown()
+        await yagna_manager.shutdown()
 
 
 def main():

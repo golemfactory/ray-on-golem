@@ -31,7 +31,7 @@ async def get_nodes(request):
 async def get_node(request):
     golem: GolemNodeProvider = request.app['golem']
     node_id = GetNodeRequest(node_id=request.match_info['node_id']).node_id
-    response = GetNodeResponse(node=golem.get_node_response_by_id(str(node_id))).json()
+    response = GetNodeResponse(node=golem.get_node_response_by_id(int(node_id))).json()
 
     return web.json_response(text=response)
 

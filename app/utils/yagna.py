@@ -14,12 +14,14 @@ class YagnaManager:
     yagna_running_string = 'Error: yagna is already running'
     payment_fund_success_string = 'Received funds from the faucet'
     yagna_started_string = 'Http server thread started on'
-    timeout = 20  # in seconds
+    timeout = 60  # in seconds
 
     def __init__(self):
         self._is_running = False
         self._yagna_process: subprocess.Popen | None = None
 
+    ##
+    # Public
     async def run(self) -> None:
         if await self._check_if_yagna_is_running():
             logger.info('Yagna service is running')
@@ -30,8 +32,15 @@ class YagnaManager:
 
     def shutdown(self):
         if self._yagna_process:
-            self._yagna_process.terminate()
+            try:
+                # self._yagna_process.terminate()
+                yield from self._yagna_process.wait()
+            except asyncio.CancelledError:
+                self._yagna_process.terminate()
+                raise
 
+    ##
+    # Private
     async def _listen_output(self, process):
         while True:
             line = await process.stdout.readline()

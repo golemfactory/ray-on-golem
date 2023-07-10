@@ -66,7 +66,7 @@ class GolemNodeProvider:
                      internal_ip=cluster_node.internal_ip,
                      external_ip=cluster_node.external_ip) for cluster_node in self._cluster_nodes]
 
-    def get_node_response_by_id(self, node_id: str) -> Node:
+    def get_node_response_by_id(self, node_id: int) -> Node:
         """
         Prepares single ClusterNode instance data to pydantic Node class Object
         """
@@ -88,14 +88,13 @@ class GolemNodeProvider:
         self._num_workers = provider_config.get('num_workers', 4)
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
-        self._add_local_head_node()
         self._reverse_ssh_process = create_reverse_ssh_to_golem_network()
 
     async def start_head_process(self):
         """
         Runs ray head node on local machine
         """
-        head_node = self._get_head_node()
+        head_node = self._add_local_head_node()
         if head_node:
             if head_node.state == NodeState.pending:
                 process = subprocess.Popen(
@@ -272,7 +271,7 @@ class GolemNodeProvider:
         if head_node:
             raise Exception('Head node already exists.')
 
-    def _add_local_head_node(self) -> None:
+    def _add_local_head_node(self) -> ClusterNode:
         """
         Adds ClusterNode with node_id=0 (head_node) to list of nodes.
         :return:
@@ -280,6 +279,8 @@ class GolemNodeProvider:
         head_node = ClusterNode(node_id=0, internal_ip=IPv4Address('127.0.0.1'))
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)
+
+        return head_node
 
     def _stop_local_head_node(self) -> None:
         self._get_head_node()
