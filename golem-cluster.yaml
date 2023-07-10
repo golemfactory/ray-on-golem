@@ -4,10 +4,11 @@ max_workers: 4
 
 provider:
   type: "external"
-  module: "client.node_provider.GolemNodeProvider"
+  use_internal_ips: true
+  module: "golem_ray.client.node_provider.GolemNodeProvider"
   parameters:
     golem_ray_url: "http://localhost:8080"
-    image_hash: "83a7145df831d9b62508a912485d2e9ac03e70df328e7142a899c2bf"
+    image_hash: "0ce63e86c7c7afeee38c2a7282e0f778089eea727d7bc65c82549976"
 
 file_mounts:
   {

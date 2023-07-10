@@ -4,8 +4,8 @@ from typing import Dict
 
 from pydantic.main import BaseModel
 
-NodeId = str
-ClusterId = str
+NodeID = str
+ClusterID = str
 
 
 class NodeState(Enum):
@@ -15,7 +15,7 @@ class NodeState(Enum):
 
 
 class Node(BaseModel):
-    node_id: NodeId
+    node_id: NodeID
     state: NodeState
     internal_ip: IPv4Address
     external_ip: IPv4Address | None
