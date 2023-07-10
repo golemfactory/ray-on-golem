@@ -1,168 +1,258 @@
 import asyncio
-import base64
-import json
-import os
-import logging
 import subprocess
+from ipaddress import IPv4Address
+from pathlib import Path
+from typing import List, Dict
 from uuid import uuid4
 
 import async_timeout
-from pytimeparse import parse as parse_to_seconds
-from datetime import timedelta
-from random import random
-from subprocess import check_output, check_call
-from ipaddress import IPv4Address
-
-from aiohttp import web
-from pathlib import Path
-from typing import Awaitable, Callable, Tuple, Any, List, Generator, Dict
-from urllib.parse import urlparse
-
-from models.response import GetNodesResponse
-from models.types import NodeState, Node
-
 from golem_core.core.activity_api import commands
 from golem_core.core.golem_node import GolemNode
-from golem_core.core.market_api import ManifestVmPayload
-from golem_core.core.activity_api.resources import Activity
-from golem_core.core.network_api.resources import Network
-from golem_core.core.market_api.pipeline import default_negotiate, default_create_agreement, default_create_activity
+from golem_core.core.market_api.pipeline import default_create_agreement, default_create_activity
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
+from app.consts import StatusCode
+from app.logger import get_logger
+from app.middlewares.error_handling import GolemRayException
 from app.models.cluster_node import ClusterNode
+from app.utils.negotiation_utils import negotiate
+from app.utils.utils import create_ssh_connection, create_reverse_ssh_to_golem_network, parse_manifest, \
+    get_or_create_yagna_appkey
+from models.types import NodeState, Node
 
-YAGNA_APPNAME = 'requestor-mainnet'
-
-# TODO: move to method
-logger = logging.getLogger()
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = get_logger()
 
 
 # "ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
-async def negotiate(proposal):
-    return await asyncio.wait_for(default_negotiate(proposal), timeout=10)
-
-
-async def bestprice_score(proposal):
-    properties = proposal.data.properties
-    if properties['golem.com.pricing.model'] != 'linear':
-        return None
-
-    coeffs = properties['golem.com.pricing.model.linear.coeffs']
-    return 1 - (coeffs[0] + coeffs[1])
-
-
-async def random_score(proposal):
-    return random()
-
-
-STRATEGY_SCORING_FUNCTION = {"bestprice": bestprice_score, "random": random_score}
-DEFAULT_SCORING_STRATEGY = "bestprice"
-DEFAULT_CONNECTION_TIMEOUT = timedelta(minutes=5)
-
-
-# -R *:3001:127.0.0.1:6379 proxy@proxy.dev.golem.network
-def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
-    async def _create_ssh_connection(activity: Activity) -> Tuple[Activity, Any, str]:
-        #   1.  Create node
-        provider_id = activity.parent.parent.data.issuer_id
-        assert provider_id is not None  # mypy
-        ip = await network.create_node(provider_id)
-
-        #   2.  Run commands
-        deploy_args = {"net": [network.deploy_args(ip)]}
-
-        batch = await activity.execute_commands(
-            commands.Deploy(deploy_args),
-            commands.Start(),
-            commands.Run('service ssh start'),
-            # commands.Run('ssh -R "*:3001:127.0.0.1:6379" proxy@proxy.dev.golem.network'),
-        )
-        await batch.wait(600)
-
-        #   3.  Create connection uri
-        url = network.node._api_config.net_url
-        net_api_ws = urlparse(url)._replace(scheme="ws").geturl()
-        connection_uri = f"{net_api_ws}/net/{network.id}/tcp/{ip}"
-
-        return activity, ip, connection_uri
-
-    return _create_ssh_connection
 
 
 class GolemNodeProvider:
 
     def __init__(self):
         self.HEAD_IP = '192.168.0.2'
+        self._proxy_ip = 'proxy.dev.golem.network'
         # self.HEAD_IP = '127.0.0.1'
         self._loop = None
         self._demand = None
         self._allocation = None
         self._network = None
-        self._connections = {}
-        self._worker_nodes = {}
         self._num_workers = None
-        self._nodes = {}
+        self._head_node_process: subprocess.Popen | None = None
+        self._reverse_ssh_process: subprocess.Popen | None = None
         self._cluster_nodes: List[ClusterNode] = []
-        self._golem = GolemNode(app_key=self._get_or_create_yagna_appkey())
+        self._golem = GolemNode(app_key=get_or_create_yagna_appkey())
+
+    # Public api
+    @property
+    def golem(self):
+        return self._golem
+
+    async def init(self) -> None:
+        async def on_event(event) -> None:
+            logger.info(f'-----EVENT: {event}')
+
+        self._golem.event_bus.listen(on_event)
+        self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
+        await self._golem.add_to_network(self._network)
+        self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
+        await self._allocation.get_data()
 
     def get_nodes_response(self) -> List[Node]:
+        """
+        Prepares ClusterNode instances data to pydantic Node class object
+        """
         return [Node(node_id=cluster_node.node_id,
                      state=cluster_node.state,
                      internal_ip=cluster_node.internal_ip,
                      external_ip=cluster_node.external_ip) for cluster_node in self._cluster_nodes]
 
-    def get_node_response_by_id(self, node_id: str):
+    def get_node_response_by_id(self, node_id: int) -> Node:
+        """
+        Prepares single ClusterNode instance data to pydantic Node class Object
+        """
         node = next((cluster_node for cluster_node in self._cluster_nodes if cluster_node.node_id == node_id), None)
         if not node:
-            raise web.HTTPBadRequest(body=f"No node with {node_id} id")
+            raise GolemRayException(message=f"No node with {node_id} id", status_code=StatusCode.BAD_REQUEST)
         return Node(node_id=node.node_id,
                     state=node.state,
                     internal_ip=node.internal_ip,
                     external_ip=node.external_ip)
 
-    @property
-    def golem(self) -> GolemNode:
-        """Golem getter"""
-        return self._golem
+    async def create_cluster(self, provider_config: Dict):
+        """
+        Manages creating cluster, creates payload from given data and creates demand basing on payload
+        Local node is being created without ray instance.
+        :param provider_config: dictionary containing 'num_workers', and 'image_hash' keys
+        """
+        self._break_if_head_node_is_active()
+        self._num_workers = provider_config.get('num_workers', 4)
+        payload, connection_timeout = await self._create_payload(provider_config=provider_config)
+        self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
+        self._reverse_ssh_process = create_reverse_ssh_to_golem_network()
 
-    @property
-    def nodes(self) -> dict:
-        """Nodes getter"""
-        return self._nodes
-
-    async def init(self) -> None:
-        async def on_event(event) -> None:
-            logger.info(f'-----EVENT: {event}')
-        self._golem.event_bus.listen(on_event)
-        self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
-        self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
-
-        await self._allocation.get_data()
-
-    def _get_or_create_yagna_appkey(self):
-        if os.getenv('YAGNA_APPKEY') is None:
-            id_data = json.loads(check_output(["yagna", "app-key", "list", "--json"]))
-            yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
-            if yagna_app is None:
-                return check_output(["yagna", "app-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
-            else:
-                return yagna_app['key']
+    async def start_head_process(self):
+        """
+        Runs ray head node on local machine
+        """
+        head_node = self._add_local_head_node()
+        if head_node:
+            if head_node.state == NodeState.pending:
+                process = subprocess.Popen(
+                    ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
+                process.wait()
+                if process:
+                    head_node.state = NodeState.running
+                    self._head_node_process = process
+            elif head_node.state == NodeState.running:
+                raise GolemRayException(message='Head node is already running ray', status_code=StatusCode.BAD_REQUEST)
         else:
-            return os.getenv('YAGNA_APPKEY')
+            raise GolemRayException(message='Head node on local doesnt exist', status_code=StatusCode.BAD_REQUEST)
+
+    async def start_workers(self, count: int):
+        """
+        Creates {count} worker nodes on providers. No ray instances is running at the moment.
+        :param count: Quantity of workers that should be started
+        """
+        nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
+        if count + nodes_with_ray_on_count > self._num_workers + 1:
+            raise GolemRayException(message="Max workers limit exceeded", status_code=StatusCode.BAD_REQUEST)
+
+        await self._create_activities()
+        await self._network.refresh_nodes()
+        await self._add_my_key()
+        await self._add_other_keys()
+        self._print_ws_connection_data()
+
+        start_worker_tasks = []
+        for node in self._cluster_nodes:
+            # if node.internal_ip != self.HEAD_IP:
+            if node.activity:
+                await self._start_worker_process(node.activity)
+                node.state = NodeState.running
+
+        if start_worker_tasks:
+            await asyncio.gather(*start_worker_tasks)
+
+    async def stop_worker(self, node_id: int):
+        """
+        Stops selected worker with {node_id} id.
+        :param node_id: id of node where you want to stop ray
+        """
+        node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
+        if not node or not node.state.value != NodeState.running:
+            raise GolemRayException(message=f"Node with id: {node_id} is not running ray!",
+                                    status_code=StatusCode.BAD_REQUEST)
+        if node_id != 0:
+            await self._stop_node(node)
+            self._cluster_nodes.remove(node)
+
+    async def stop_workers_by_ids(self, workers_ids: List[int]):
+        """
+        Stops selected workers ray instances basing on id list
+        :param workers_ids: list of workers id you want to stop ray on
+        """
+        nodes_to_stop = [node for node in self._cluster_nodes if node.node_id in workers_ids and node.node_id != 0]
+        for node in nodes_to_stop:
+            await self._stop_node(node)
+            self._cluster_nodes.remove(node)
+
+    async def shutdown(self) -> None:
+        """
+        Terminates all activities and ray on head node.
+        Additionally, closes reverse ssh connection from local to proxy.
+
+        :return:
+        """
+        tasks = [node.activity.destroy() for node in self._cluster_nodes if node.activity]
+        await asyncio.gather(*tasks)
+        logger.info(f'-----{len(tasks)} activities stopped')
+        self._stop_local_head_node()
+        logger.info(f'-----Ray on local machine stopped')
+        self._reverse_ssh_process.terminate()
+        logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
+        self._reverse_ssh_process = None
+
+    # Private
+
+    def _get_head_node(self) -> ClusterNode | None:
+        """
+        Returns head node (ClusterNode obj) or None if not exists
+        :return:
+        """
+        head_node = next((x for x in self._cluster_nodes if x.node_id == 0), None)
+        if head_node:
+            return head_node
+        return None
 
     @staticmethod
-    def get_value_from_dict_or_throw(d, k):
-        if k in d:
-            return d[k]
-        else:
-            raise web.HTTPBadRequest(body=f"'{k}' is needed")
+    async def _add_authorized_key(activity, key):
+        """
+        Adds local machine ssh key to providers machine
+        :param activity: Activity object from golem
+        :param key: Key you want to add to authorized_keys on provider machine
+        """
+        batch = await activity.execute_commands(
+            commands.Run('mkdir -p /root/.ssh'),
+            commands.Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
+        )
+        try:
+            await batch.wait(15)
+        except Exception:
+            print(batch.events)
+            raise
 
-    def print_ws_connection_data(self) -> None:
+    @staticmethod
+    async def _add_authorized_key_to_local_node(key):
+        """
+        Adds keys from providers to local machine"
+        :param key: ssh key
+        :return:
+        """
+        result = subprocess.run(['echo', f"{key}", ">>", "~/.ssh/authorized_keys"])
+        if result.returncode == 0:
+            logger.info('-----ADDED PROVIDER KEY TO LOCAL')
+        else:
+            logger.info('-----FAILED ADDING PROVIDER KEY TO LOCAL')
+
+    @staticmethod
+    async def _create_payload(provider_config: dict, **kwargs):
+        """
+        Creates payload from given image_hash and parses manifest.json file
+        which is then used to create demand in golem network
+        :param provider_config: dictionary containing image_hash and num_workers
+        :param kwargs:
+        :return:
+        """
+        image_hash = provider_config.get('image_hash')
+        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash)
+
+        return payload, connection_timeout
+
+    @staticmethod
+    async def _stop_node(node: ClusterNode):
+        """
+        Stops ray process on selected node
+        :param node: node to stop ray on
+        :return:
+        """
+        if node and node.state == NodeState.running:
+            batch = await node.activity.execute_commands(
+                commands.Run(f'ray stop'),
+            )
+            try:
+                await batch.wait(60)
+                node.state = NodeState.pending
+                await node.activity.destroy()
+            except Exception:
+                print(batch.events)
+                print(f"Failed to stop a worker process with id: {node.node_id}")
+                raise
+
+    def _print_ws_connection_data(self) -> None:
+        """
+        Prints command which allows to manually ssh on providers machines
+        :return:
+        """
         for node in self._cluster_nodes:
             print(
                 "Connect with:\n"
@@ -172,53 +262,60 @@ class GolemNodeProvider:
                 f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
             )
 
-    async def create_demand(self, provider_config: Dict):
-        payload, connection_timeout = await self.create_payload(provider_config=provider_config)
-        self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
-
-        await self.create_activities(provider_config, connection_timeout)
-        await self._network.refresh_nodes()
-        await self._add_my_key()
-        await self._add_other_keys()
-        await self._start_head_process()
-        self.print_ws_connection_data()
-
-    @staticmethod
-    async def _parse_manifest(image_hash, text=None):
-        """Parses manifest file and replaces image_hash used.
-           Decoding is needed in order to work.
-           :arg image_hash:
-           :arg text:
+    def _break_if_head_node_is_active(self):
         """
-        manifest = open(Path(__file__).parent.parent.parent.joinpath("manifest.json"), "rb").read()
-        manifest = (manifest
-                    .decode('utf-8')
-                    .replace('{sha3}', image_hash)
-                    )
-        manifest = base64.b64encode(manifest.encode('utf-8')).decode("utf-8")
+        Looks for head node existence in _cluster_nodes. If it exists, throw.
+        :return:
+        """
+        head_node = self._get_head_node()
+        if head_node:
+            raise Exception('Head node already exists.')
 
-        params = {
-            "manifest": manifest,
-            "capabilities": ['vpn', 'inet', 'manifest-support'],
-            "min_mem_gib": 0,
-            "min_cpu_threads": 0,
-            "min_storage_gib": 0,
-        }
-        # strategy = DEFAULT_SCORING_STRATEGY
-        # connection_timeout = DEFAULT_CONNECTION_TIMEOUT
-        connection_timeout = timedelta(seconds=150)
-        offer_scorer = None
-        payload = ManifestVmPayload(**params)
-        return payload, offer_scorer, connection_timeout
+    def _add_local_head_node(self) -> ClusterNode:
+        """
+        Adds ClusterNode with node_id=0 (head_node) to list of nodes.
+        :return:
+        """
+        head_node = ClusterNode(node_id=0, internal_ip=IPv4Address('127.0.0.1'))
+        head_node.state = NodeState.pending
+        self._cluster_nodes.append(head_node)
 
-    async def create_payload(self, provider_config: dict, **kwargs):
-        image_hash = self.get_value_from_dict_or_throw(provider_config, 'image_hash')
-        payload, offer_scorer, connection_timeout = await self._parse_manifest(image_hash)
+        return head_node
 
-        return payload, connection_timeout
+    def _stop_local_head_node(self) -> None:
+        self._get_head_node()
+        head_node = self._get_head_node()
+        process = subprocess.Popen(
+            ['ray', 'stop'])
+        process.wait()
+        if process and head_node:
+            self._cluster_nodes.remove(head_node)
+        self._head_node_process = None
 
-    async def create_activities(self, provider_config, connection_timeout):
-        self._num_workers = provider_config.get('num_workers', 4)
+    async def _start_worker_process(self, activity):
+        """
+        Starts ray worker process on external providers
+        :param activity: Activity object from golem
+        :return:
+        """
+        batch = await activity.execute_commands(
+            commands.Run(f'ray start --address {self._proxy_ip}:3001'),
+        )
+        try:
+            await batch.wait(60)
+        except Exception:
+            print(batch.events)
+            print("Failed to start a worker process")
+            raise
+
+    async def _create_activities(self, connection_timeout=None):
+        """
+        This functions manages demands, negotiations, agreements, creates activities
+        and creates ssh connection to nodes.
+
+        :param connection_timeout: Currently not used
+        :return:
+        """
         node_id = 1
         try:
             async with async_timeout.timeout(int(150)):
@@ -233,7 +330,7 @@ class GolemNodeProvider:
                     Limit(self._num_workers))
 
                 async for activity, ip, connection_uri in chain:
-                    cluster_node = ClusterNode(node_id=str(node_id),
+                    cluster_node = ClusterNode(node_id=node_id,
                                                activity=activity,
                                                internal_ip=IPv4Address(ip),
                                                connection_uri=connection_uri)
@@ -241,38 +338,23 @@ class GolemNodeProvider:
                     logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
                     node_id += 1
 
-        # TODO: raise not by web (write own exception)
         except asyncio.TimeoutError:
-            raise web.HTTPBadRequest(body="Creating activities timeout reached")
-
-    @staticmethod
-    async def add_authorized_key(activity, key):
-        batch = await activity.execute_commands(
-            commands.Run('mkdir -p /root/.ssh'),
-            commands.Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
-        )
-        try:
-            await batch.wait(15)
-        except Exception:
-            print(batch.events)
-            raise
-
-    @staticmethod
-    async def add_authorized_key_to_local_node(key):
-        result = subprocess.run(['echo', f"{key}", ">>", "/root/.ssh/authorized_keys"])
-        if result.returncode == 0:
-            logger.info('-----ADDED PROVIDER KEY TO LOCAL')
-        else:
-            logger.info('-----FAILED ADDING PROVIDER KEY TO LOCAL')
+            raise GolemRayException(message="Creating activities timeout reached", status_code=StatusCode.SERVER_ERROR)
 
     async def _add_my_key(self):
+        """
+        Add local ssh key to all providers
+        """
         with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
             my_key = f.readline().strip()
 
-        tasks = [self.add_authorized_key(value.activity, my_key) for value in self._cluster_nodes if value.activity]
+        tasks = [self._add_authorized_key(value.activity, my_key) for value in self._cluster_nodes if value.activity]
         await asyncio.gather(*tasks)
 
     async def _add_other_keys(self):
+        """
+        Adds all providers key to other providers machines
+        """
         keys = {}
         for cluster_node in self._cluster_nodes:
             if cluster_node.activity:
@@ -289,71 +371,10 @@ class GolemNodeProvider:
                                               node.node_id != cluster_node.node_id]
 
             for other_node in other_nodes:
+                if other_node.node_id == 0:
+                    continue
                 other_activity_key = keys[other_node.node_id]
                 if cluster_node.activity:
-                    await self.add_authorized_key(cluster_node.activity, other_activity_key)
+                    await self._add_authorized_key(cluster_node.activity, other_activity_key)
                 else:
-                    await self.add_authorized_key_to_local_node(other_activity_key)
-
-    # async def _start_head_process(self):
-    #     head_node = next((node for node in self._cluster_nodes if str(node.internal_ip) == self.HEAD_IP), None)
-    #     if head_node:
-    #         head_node.state = NodeState.running
-    #         batch = await head_node.activity.execute_commands(
-    #             commands.Run(
-    #                 f'ray start --head --include-dashboard=True --node-ip-address {self.HEAD_IP} --disable-usage-stats'),
-    #         )
-    #         await batch.wait(20)
-
-    async def _start_head_process(self):
-        head_node = ClusterNode(node_id='0', internal_ip=IPv4Address(self.HEAD_IP))
-        process = subprocess.Popen(
-            ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
-        process.wait()
-        if process:
-            head_node.state = NodeState.running
-            self._cluster_nodes.append(head_node)
-
-    async def _start_worker_process(self, activity):
-        batch = await activity.execute_commands(
-            commands.Run(f'ray start --address {self.HEAD_IP}:6379'),
-        )
-        try:
-            await batch.wait(60)
-        except Exception:
-            print(batch.events)
-            print("Failed to start a worker process")
-            raise
-
-    async def start_workers(self, count: int):
-        nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
-        if count + nodes_with_ray_on_count > self._num_workers + 1:
-            raise web.HTTPBadRequest(body="Max workers limit exceeded")
-
-        start_worker_tasks = []
-        for node in self._cluster_nodes:
-            if node.internal_ip != self.HEAD_IP:
-                node.state = NodeState.running
-
-        if start_worker_tasks:
-            await asyncio.gather(*start_worker_tasks)
-
-        return self._nodes
-
-    async def stop_worker(self, node_id: int):
-        node = next((obj for obj in self._cluster_nodes if obj.node_id == str(node_id)), None)
-        if not node or not node.state.value != NodeState.running:
-            raise web.HTTPBadRequest(body=f"Node with id: {node_id} is not running ray!")
-        if node and node_id != 0:
-            activity = node.activity
-            batch = await activity.execute_commands(
-                commands.Run(
-                    f'ray stop'),
-            )
-            try:
-                await batch.wait(60)
-                node.state = NodeState.pending
-            except Exception:
-                print(batch.events)
-                print("Failed to stop a worker process")
-                raise
+                    await self._add_authorized_key_to_local_node(other_activity_key)
