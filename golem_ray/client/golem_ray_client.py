@@ -1,12 +1,15 @@
 import json
 from http import HTTPStatus
+from typing import List
 
 import requests
+from pydantic import parse_raw_as
 from pydantic.error_wrappers import ValidationError
+from yarl import URL
 
 from models.request import CreateNodesRequest, CreateClusterRequest, DeleteNodesRequest, SetNodeTagsRequest
 from models.response import CreateNodesResponse, GetNodesResponse, GetNodeResponse
-from models.types import ClusterId, NodeId, Node
+from models.types import ClusterID, NodeID, Node
 
 
 class GolemRayClientException(Exception):
@@ -16,26 +19,22 @@ class GolemRayClientException(Exception):
 class GolemRayClient:
 
     def __init__(self, golem_ray_url: str) -> None:
-        self.golem_ray_url = golem_ray_url
+        self.golem_ray_url = URL(golem_ray_url) / "golem"
         self.session = requests.Session()
 
         self._cluster_id = None
-        self._deleted_nodes: set[NodeId] = set()
-
-    def _build_url(self, path: str) -> str:
-        return '/'.join([self.golem_ray_url.rstrip('/'), 'golem', path.lstrip('/')])
+        self._deleted_nodes: set[NodeID] = set()
 
     def create_cluster(self, image_hash: str) -> None:  # -> CLUSTER_ID:
-        url = self._build_url("create_cluster")
-        data = CreateClusterRequest(image_hash=image_hash).dict()
-        json_data = json.dumps(data)
+        url = self.golem_ray_url / "create_cluster"
+        json_data = CreateClusterRequest(image_hash=image_hash).json()
         print(f"POST {url} data={json_data}")
         response = self.session.post(url, data=json_data, headers={'Content-type': 'application/json'})
 
         if response.status_code != HTTPStatus.CREATED:
             raise GolemRayClientException(
                 f"Couldn't create cluster details: \n"
-                f"request url: {url}, data: {data}\n"
+                f"request url: {url}, json_data: {json_data}\n"
                 f"response status_code: {response.status_code}, text: {response.text}"
             )
 
@@ -49,9 +48,9 @@ class GolemRayClient:
         #     self._cluster_id = cluster_id
         #     return cluster_id
 
-    def non_terminated_nodes(self) -> list[NodeId]:
+    def non_terminated_nodes(self) -> List[NodeID]:
         # url = self._build_url(f"nodes/{self._cluster_id}")
-        url = self._build_url(f"nodes")
+        url = self.golem_ray_url / "nodes"
         print(f"GET {url}")
         response = self.session.get(url)
 
@@ -63,7 +62,8 @@ class GolemRayClient:
         print(response.json())
 
         try:
-            parsed_data = GetNodesResponse(**response.json())
+            # parsed_data = GetNodesResponse(**response.json())
+            parsed_data = parse_raw_as(GetNodesResponse, response.content)
         except ValidationError:
             raise GolemRayClientException(
                 "Couldn't parse response from server, \n"
@@ -74,16 +74,16 @@ class GolemRayClient:
             nodes = parsed_data.nodes
             return [node.node_id for node in nodes if node.node_id not in self._deleted_nodes]
 
-    def fetch_node(self, node_id: NodeId) -> Node:
+    def fetch_node(self, node_id: NodeID) -> Node:
         # TODO: uncomment after server implements cluster_id
         # url = self._build_url(f"{self._cluster_id}/nodes/{node_id}")
-        url = self._build_url(f"nodes/{node_id}")
+        url = self.golem_ray_url / "nodes" / node_id
         print(f"GET {url}")
         response = self.session.get(url)
 
         if response.status_code == HTTPStatus.OK:
             try:
-                parsed_data = GetNodeResponse(**response.json())
+                parsed_data = parse_raw_as(GetNodeResponse, response.content)
             except ValidationError:
                 raise GolemRayClientException(
                     "Couldn't parse response from server, \n"
@@ -98,8 +98,8 @@ class GolemRayClient:
             f"response status_code: {response.status_code}, text: {response.text}"
         )
 
-    def set_node_tags(self, node_id: NodeId, tags: dict) -> None:
-        url = self._build_url(f"set_node_tags/{node_id}")
+    def set_node_tags(self, node_id: NodeID, tags: dict) -> None:
+        url = self.golem_ray_url / "set_node_tags" / node_id
         data = SetNodeTagsRequest(tags=tags).dict()
         json_data = json.dumps(data)
         print(f"POST {url} data={json_data}")
@@ -112,9 +112,9 @@ class GolemRayClient:
                 f"response status_code: {response.status_code}, text: {response.text}"
             )
 
-    def terminate_node(self, node_id: NodeId) -> None:
+    def terminate_node(self, node_id: NodeID) -> None:
         # url = self._build_url(f"{self._cluster_id}/nodes/{node_id}")
-        url = self._build_url(f"nodes/{node_id}")
+        url = self.golem_ray_url / "nodes" / node_id
         print(f"DELETE {url}")
         # TODO: uncomment after server implements deleting
         # response = self.session.delete(url)
@@ -128,9 +128,9 @@ class GolemRayClient:
         #     f"response status_code: {response.status_code}, text: {response.text}"
         # )
 
-    def terminate_nodes(self, node_ids: list[NodeId]) -> None:
+    def terminate_nodes(self, node_ids: List[NodeID]) -> None:
         # url = self._build_url(f"{self._cluster_id}/nodes")
-        url = self._build_url(f"nodes")
+        url = self.golem_ray_url / "nodes"
         data = DeleteNodesRequest(node_ids=node_ids).dict()
         json_data = json.dumps(data)
         print(f"DELETE {url} data={json_data}")
@@ -146,13 +146,13 @@ class GolemRayClient:
             f"response status_code: {response.status_code}, text: {response.text}"
         )
 
-    def create_nodes(self, cluster_id: ClusterId, count: int, head_node: bool = False) -> list[Node]:
+    def create_nodes(self, cluster_id: ClusterID, count: int, head_node: bool = False) -> List[Node]:
         # TODO: uncomment after server implements cluster_id
         # url = self._build_url(f"{cluster_id}/create_nodes")
         if head_node:
-            url = self._build_url(f"head_nodes")
+            url = self.golem_ray_url / "head_nodes"
         else:
-            url = self._build_url(f"nodes")
+            url = self.golem_ray_url / "nodes"
         data = CreateNodesRequest(count=count).dict()
         json_data = json.dumps(data)
         print(f"POST {url} data={json_data!r}")
@@ -166,7 +166,7 @@ class GolemRayClient:
             )
 
         try:
-            parsed_data = CreateNodesResponse(**response.json())
+            parsed_data = parse_raw_as(CreateNodesResponse, response.content)
         except ValidationError:
             raise GolemRayClientException(
                 "Couldn't parse response from server, \n"
