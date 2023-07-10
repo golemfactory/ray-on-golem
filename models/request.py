@@ -1,8 +1,8 @@
-from typing import List
+from typing import List, Dict
 
 from pydantic.main import BaseModel
 
-from models.types import NodeId
+from models.types import NodeID
 
 
 class CreateClusterRequest(BaseModel):
@@ -15,7 +15,8 @@ class CreateNodesRequest(BaseModel):
 
 
 class DeleteNodesRequest(BaseModel):
-    node_ids: List[NodeId]
+    node_ids: List[NodeID]
+
 
 class SetNodeTagsRequest(BaseModel):
-    tags: dict
+    tags: Dict
