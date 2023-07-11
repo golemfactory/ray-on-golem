@@ -17,6 +17,6 @@ class NodeState(Enum):
 class Node(BaseModel):
     node_id: NodeID
     state: NodeState
+    tags: Dict
     internal_ip: IPv4Address
     external_ip: IPv4Address | None
-    tags: Dict = {}
