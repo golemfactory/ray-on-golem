@@ -1,6 +1,6 @@
 import json
 from http import HTTPStatus
-from typing import List
+from typing import List, Dict
 
 import requests
 from pydantic import parse_raw_as
@@ -146,14 +146,14 @@ class GolemRayClient:
             f"response status_code: {response.status_code}, text: {response.text}"
         )
 
-    def create_nodes(self, cluster_id: ClusterID, count: int, head_node: bool = False) -> List[Node]:
+    def create_nodes(self, cluster_id: ClusterID, count: int, tags: Dict, head_node: bool = False) -> List[Node]:
         # TODO: uncomment after server implements cluster_id
         # url = self._build_url(f"{cluster_id}/create_nodes")
         if head_node:
             url = self.golem_ray_url / "head_nodes"
         else:
             url = self.golem_ray_url / "nodes"
-        data = CreateNodesRequest(count=count).dict()
+        data = CreateNodesRequest(count=count, tags=tags).dict()
         json_data = json.dumps(data)
         print(f"POST {url} data={json_data!r}")
         response = self.session.post(url, data=json_data, headers={'Content-type': 'application/json'})
