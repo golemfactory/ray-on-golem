@@ -95,7 +95,9 @@ class GolemNodeProvider:
         Local node is being created without ray instance.
         :param provider_config: dictionary containing 'num_workers', and 'image_hash' keys
         """
-        self._break_if_head_node_is_active()
+        if self._demand:
+            logger.info('Cluster was created already.')
+            return
         self._num_workers = provider_config.get('num_workers', 4)
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
@@ -295,15 +297,6 @@ class GolemNodeProvider:
                 f"-o ProxyCommand='websocat asyncstdio: {node.connection_uri}/22 --binary "
                 f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
             )
-
-    def _break_if_head_node_is_active(self):
-        """
-        Looks for head node existence in _cluster_nodes. If it exists, throw.
-        :return:
-        """
-        head_node = self._get_head_node()
-        if head_node:
-            raise Exception('Head node already exists.')
 
     def _add_local_head_node(self, tags=None) -> ClusterNode:
         """
