@@ -23,6 +23,5 @@ class DeleteNodesRequest(BaseModel):
     node_ids: List[NodeID]
 
 
-
 class SetNodeTagsRequest(BaseModel):
     tags: Dict

@@ -9,6 +9,7 @@ import async_timeout
 from golem_core.core.activity_api import commands
 from golem_core.core.golem_node import GolemNode
 from golem_core.core.market_api.pipeline import default_create_agreement, default_create_activity
+from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
 from app.consts import StatusCode
@@ -41,11 +42,16 @@ class GolemNodeProvider:
         self._reverse_ssh_process: subprocess.Popen | None = None
         self._cluster_nodes: List[ClusterNode] = []
         self._golem = GolemNode(app_key=get_or_create_yagna_appkey())
+        self._payment_manager: DefaultPaymentManager | None = None
 
     # Public api
     @property
     def golem(self):
         return self._golem
+
+    @property
+    def payment_manager(self) -> DefaultPaymentManager:
+        return self._payment_manager
 
     async def init(self) -> None:
         async def on_event(event) -> None:
@@ -55,6 +61,7 @@ class GolemNodeProvider:
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
         await self._golem.add_to_network(self._network)
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
+        self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
         await self._allocation.get_data()
 
     def get_nodes_response(self) -> List[Node]:
@@ -64,7 +71,9 @@ class GolemNodeProvider:
         return [Node(node_id=cluster_node.node_id,
                      state=cluster_node.state,
                      internal_ip=cluster_node.internal_ip,
-                     external_ip=cluster_node.external_ip) for cluster_node in self._cluster_nodes]
+                     external_ip=cluster_node.external_ip,
+                     tags=cluster_node.tags)
+                for cluster_node in self._cluster_nodes]
 
     def get_node_response_by_id(self, node_id: int) -> Node:
         """
@@ -76,7 +85,8 @@ class GolemNodeProvider:
         return Node(node_id=node.node_id,
                     state=node.state,
                     internal_ip=node.internal_ip,
-                    external_ip=node.external_ip)
+                    external_ip=node.external_ip,
+                    tags=node.tags)
 
     async def create_cluster(self, provider_config: Dict):
         """
@@ -90,11 +100,13 @@ class GolemNodeProvider:
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
         self._reverse_ssh_process = create_reverse_ssh_to_golem_network()
 
-    async def start_head_process(self):
+    async def start_head_process(self, tags=None):
         """
         Runs ray head node on local machine
         """
-        head_node = self._add_local_head_node()
+        if tags is None:
+            tags = {}
+        head_node = self._add_local_head_node(tags=tags)
         if head_node:
             if head_node.state == NodeState.pending:
                 process = subprocess.Popen(
@@ -108,16 +120,17 @@ class GolemNodeProvider:
         else:
             raise GolemRayException(message='Head node on local doesnt exist', status_code=StatusCode.BAD_REQUEST)
 
-    async def start_workers(self, count: int):
+    async def start_workers(self, count: int, tags: Dict = None):
         """
         Creates {count} worker nodes on providers. No ray instances is running at the moment.
+        :param tags: tags given by ray
         :param count: Quantity of workers that should be started
         """
         nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
         if count + nodes_with_ray_on_count > self._num_workers + 1:
             raise GolemRayException(message="Max workers limit exceeded", status_code=StatusCode.BAD_REQUEST)
 
-        await self._create_activities()
+        await self._create_activities(tags=tags)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()
@@ -163,14 +176,17 @@ class GolemNodeProvider:
 
         :return:
         """
+        await self.payment_manager.terminate_agreements()
+        await self.payment_manager.wait_for_invoices()
         tasks = [node.activity.destroy() for node in self._cluster_nodes if node.activity]
         await asyncio.gather(*tasks)
         logger.info(f'-----{len(tasks)} activities stopped')
         self._stop_local_head_node()
         logger.info(f'-----Ray on local machine stopped')
-        self._reverse_ssh_process.terminate()
-        logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
-        self._reverse_ssh_process = None
+        if self._reverse_ssh_process:
+            self._reverse_ssh_process.terminate()
+            logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
+            self._reverse_ssh_process = None
 
     # Private
 
@@ -271,12 +287,18 @@ class GolemNodeProvider:
         if head_node:
             raise Exception('Head node already exists.')
 
-    def _add_local_head_node(self) -> ClusterNode:
+    def _add_local_head_node(self, tags=None) -> ClusterNode:
         """
         Adds ClusterNode with node_id=0 (head_node) to list of nodes.
+
+        :param tags: dict - contains ray tags
         :return:
         """
-        head_node = ClusterNode(node_id=0, internal_ip=IPv4Address('127.0.0.1'))
+        if tags is None:
+            tags = {}
+        head_node = ClusterNode(node_id=0,
+                                internal_ip=IPv4Address('127.0.0.1'),
+                                tags=tags)
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)
 
@@ -308,7 +330,7 @@ class GolemNodeProvider:
             print("Failed to start a worker process")
             raise
 
-    async def _create_activities(self, connection_timeout=None):
+    async def _create_activities(self, connection_timeout=None, tags: Dict = None):
         """
         This functions manages demands, negotiations, agreements, creates activities
         and creates ssh connection to nodes.
@@ -333,7 +355,8 @@ class GolemNodeProvider:
                     cluster_node = ClusterNode(node_id=node_id,
                                                activity=activity,
                                                internal_ip=IPv4Address(ip),
-                                               connection_uri=connection_uri)
+                                               connection_uri=connection_uri,
+                                               tags=tags)
                     self._cluster_nodes.append(cluster_node)
                     logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
                     node_id += 1
