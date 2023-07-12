@@ -1,5 +1,6 @@
 import asyncio
 import subprocess
+from asyncio.subprocess import Process
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import List, Dict
@@ -39,7 +40,7 @@ class GolemNodeProvider:
         self._network = None
         self._num_workers = None
         self._head_node_process: subprocess.Popen | None = None
-        self._reverse_ssh_process: subprocess.Popen | None = None
+        self._reverse_ssh_process: Process | None = None
         self._cluster_nodes: List[ClusterNode] = []
         self._golem = GolemNode(app_key=get_or_create_yagna_appkey())
         self._payment_manager: DefaultPaymentManager | None = None
@@ -98,7 +99,7 @@ class GolemNodeProvider:
         self._num_workers = provider_config.get('num_workers', 4)
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
-        self._reverse_ssh_process = create_reverse_ssh_to_golem_network()
+        self._reverse_ssh_process = await create_reverse_ssh_to_golem_network()
 
     async def start_head_process(self, tags=None):
         """
@@ -169,6 +170,18 @@ class GolemNodeProvider:
             await self._stop_node(node)
             self._cluster_nodes.remove(node)
 
+    async def set_node_tags(self, node_id: int, tags: Dict):
+        """
+        Updates selected cluster_node tags
+
+        :param node_id: node_id to update
+        :param tags: ray tags as dict
+        :return:
+        """
+        node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
+        if node:
+            node.tags = tags
+
     async def shutdown(self) -> None:
         """
         Terminates all activities and ray on head node.
@@ -178,13 +191,18 @@ class GolemNodeProvider:
         """
         await self.payment_manager.terminate_agreements()
         await self.payment_manager.wait_for_invoices()
+
         tasks = [node.activity.destroy() for node in self._cluster_nodes if node.activity]
-        await asyncio.gather(*tasks)
-        logger.info(f'-----{len(tasks)} activities stopped')
-        self._stop_local_head_node()
+        if tasks:
+            await asyncio.gather(*tasks)
+            logger.info(f'-----{len(tasks)} activities stopped')
+
+        await self._stop_local_head_node()
         logger.info(f'-----Ray on local machine stopped')
+
         if self._reverse_ssh_process:
             self._reverse_ssh_process.terminate()
+            await self._reverse_ssh_process.wait()
             logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
             self._reverse_ssh_process = None
 
@@ -304,15 +322,16 @@ class GolemNodeProvider:
 
         return head_node
 
-    def _stop_local_head_node(self) -> None:
+    async def _stop_local_head_node(self) -> None:
         self._get_head_node()
         head_node = self._get_head_node()
-        process = subprocess.Popen(
-            ['ray', 'stop'])
-        process.wait()
-        if process and head_node:
-            self._cluster_nodes.remove(head_node)
-        self._head_node_process = None
+        if head_node:
+            process = await asyncio.create_subprocess_shell(
+                'ray stop')
+            await process.wait()
+            if process and head_node:
+                self._cluster_nodes.remove(head_node)
+            self._head_node_process = None
 
     async def _start_worker_process(self, activity):
         """
