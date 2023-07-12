@@ -1,5 +1,5 @@
 from ipaddress import IPv4Address
-from typing import Optional
+from typing import Optional, Dict
 
 from golem_core.core.activity_api.resources import Activity
 from pydantic.main import BaseModel
@@ -14,6 +14,7 @@ class ClusterNode(BaseModel):
     external_ip: Optional[IPv4Address]
     state: Optional[NodeState]
     connection_uri: Optional[str]
+    tags: Dict = {}
 
     class Config:
         arbitrary_types_allowed = True

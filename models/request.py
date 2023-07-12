@@ -16,11 +16,11 @@ class CreateClusterRequest(BaseModel):
 
 class CreateNodesRequest(BaseModel):
     count: int
+    tags: Dict
 
 
 class DeleteNodesRequest(BaseModel):
     node_ids: List[NodeID]
-
 
 
 class SetNodeTagsRequest(BaseModel):
