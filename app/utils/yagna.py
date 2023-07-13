@@ -34,28 +34,27 @@ class YagnaManager:
     async def shutdown(self):
         if self._yagna_process:
             try:
-                # self._yagna_process.terminate()
+                self._yagna_process.terminate()
                 await self._yagna_process.wait()
             except asyncio.CancelledError:
-                self._yagna_process.terminate()
+                self._yagna_process.kill()
 
     ##
     # Private
     async def _wait_for_yagna(self):
         while True:
+            await asyncio.sleep(25)
             is_running = await self._check_if_yagna_is_running()
             if is_running:
                 break
-            await asyncio.sleep(20)
 
         return True
 
     async def _check_if_yagna_is_running(self):
         process = await asyncio.create_subprocess_exec('yagna', 'net', 'status',
-                                                      stdout=subprocess.PIPE,
-                                                      stderr=subprocess.PIPE)
+                                                       stdout=subprocess.PIPE,
+                                                       stderr=subprocess.PIPE)
         stdout_output, _ = await process.communicate()
-        stdout_output = stdout_output.decode('utf-8')
         if process.returncode == 0:
             return True
         else:
@@ -67,12 +66,14 @@ class YagnaManager:
                                                       stderr=subprocess.PIPE)
         stdout_output, _ = await result.communicate()
         if result.returncode == 0:
-            stdout_output = stdout_output.decode('utf-8')
-            if self.payment_fund_success_string in stdout_output:
-                return True
-            else:
-                raise GolemRayException(message='Cant fund payment in yagna',
-                                        status_code=StatusCode.SERVER_ERROR)
+            await asyncio.sleep(2)
+            return True
+            # stdout_output = stdout_output.decode('utf-8')
+            # if self.payment_fund_success_string in stdout_output:
+            #     return True
+            # else:
+            #     raise GolemRayException(message='Cant fund payment in yagna',
+            #                             status_code=StatusCode.SERVER_ERROR)
         else:
             raise GolemRayException(message='Cant check yagna status',
                                     status_code=StatusCode.SERVER_ERROR)

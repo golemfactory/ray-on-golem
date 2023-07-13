@@ -182,7 +182,7 @@ class GolemNodeProvider:
         """
         node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
         if node:
-            node.tags = tags
+            node.tags.update(tags)
 
     async def shutdown(self) -> None:
         """
@@ -204,7 +204,7 @@ class GolemNodeProvider:
 
         if self._reverse_ssh_process:
             self._reverse_ssh_process.terminate()
-            await self._reverse_ssh_process.wait()
+            await asyncio.sleep(1)
             logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
             self._reverse_ssh_process = None
 
@@ -333,7 +333,7 @@ class GolemNodeProvider:
         :return:
         """
         batch = await activity.execute_commands(
-            commands.Run(f'ray start --address {self._proxy_ip}:3001'),
+            commands.Run(f'ray start --address {self._proxy_ip}:3002'),
         )
         try:
             await batch.wait(60)
