@@ -79,8 +79,7 @@ def _with_environment_variables(cmd: str, environment_variables: Dict[str, objec
     as_strings = []
     for key, val in environment_variables.items():
         val = json.dumps(val, separators=(",", ":"))
-        s = "export {}={};".format(key,
-                                   val)
+        s = "export {}='{}';".format(key, val)
         as_strings.append(s)
     all_vars = "".join(as_strings)
     return all_vars + cmd

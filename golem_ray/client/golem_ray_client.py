@@ -100,15 +100,14 @@ class GolemRayClient:
 
     def set_node_tags(self, node_id: NodeID, tags: dict) -> None:
         url = self.golem_ray_url / "set_node_tags" / node_id
-        data = SetNodeTagsRequest(tags=tags).dict()
-        json_data = json.dumps(data)
-        print(f"POST {url} data={json_data}")
-        response = self.session.post(url, json=json_data)
+        json_data = SetNodeTagsRequest(tags=tags).json()
+        print(f"PATCH {url} data={json_data}")
+        response = self.session.patch(url, json=json_data, headers={'Content-type': 'application/json'})
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(
                 f"Couldn't create node,\n"
-                f"request url: {url}, data: {data}\n"
+                f"request url: {url}, data: {json_data}\n"
                 f"response status_code: {response.status_code}, text: {response.text}"
             )
 
