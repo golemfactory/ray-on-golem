@@ -2,7 +2,6 @@
 Setup project
 ```bach
 pip install -r requirements.txt
-pip install yapapi==0.10.0
 python setup.py develop
 ```
 Run yagna
