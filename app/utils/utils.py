@@ -1,11 +1,13 @@
+import asyncio.subprocess
 import base64
 import json
 import os
-import subprocess
+from asyncio import subprocess
+from asyncio.subprocess import Process
 from datetime import timedelta
 from pathlib import Path
 from subprocess import check_output, Popen
-from typing import Tuple, Any, Awaitable, Callable
+from typing import Tuple, Any, Awaitable, Callable, Coroutine
 from urllib.parse import urlparse
 
 from golem_core.core.activity_api import commands
@@ -20,9 +22,10 @@ YAGNA_APPNAME = 'requestor-mainnet'
 logger = get_logger()
 
 
-def create_reverse_ssh_to_golem_network() -> Popen[bytes] | Popen[str | bytes | Any]:
-    process = subprocess.Popen(["ssh", "-R", r"*:3001:127.0.0.1:6379", "proxy@proxy.dev.golem.network"])
-    logger.info('Reverse ssh tunnel from 127.0.0.1:6379 to *:3001 created.')
+async def create_reverse_ssh_to_golem_network() -> Process:
+    process = await subprocess.create_subprocess_shell(
+        r"ssh -R *:3002:127.0.0.1:6380 proxy@proxy.dev.golem.network")
+    logger.info('Reverse ssh tunnel from 127.0.0.1:6379 to *:3002 created.')
 
     return process
 

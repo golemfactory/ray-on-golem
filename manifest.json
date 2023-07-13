@@ -32,7 +32,7 @@
       "inet": {
         "out": {
           "protocols": ["https", "tcp"],
-          "urls": ["tcp://proxy.dev.golem.network:3001/", "https://pypi.dev.golem.network"]
+          "urls": ["tcp://proxy.dev.golem.network:3002/", "https://pypi.dev.golem.network"]
         }
       }
     }
