@@ -112,8 +112,8 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
     ) -> str:
         # if timeout != 120:
         #     raise InvalidLocalHeadArg('timeout', timeout)
-        if port_forward is not None:
-            raise InvalidLocalHeadArg('port_forward', port_forward)
+        # if port_forward is not None:
+        #     raise InvalidLocalHeadArg('port_forward', port_forward)
         # if run_env != 'auto':
         #     raise InvalidLocalHeadArg('run_env', run_env)
         if ssh_options_override_ssh_key:
