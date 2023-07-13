@@ -100,9 +100,8 @@ class GolemRayClient:
 
     def set_node_tags(self, node_id: NodeID, tags: dict) -> None:
         url = self.golem_ray_url / "set_node_tags" / node_id
-        data = SetNodeTagsRequest(tags=tags).dict()
-        json_data = json.dumps(data)
-        print(f"PATCH {url} data={data}")
+        json_data = SetNodeTagsRequest(tags=tags).json()
+        print(f"PATCH {url} data={json_data}")
         response = self.session.patch(url, data=json_data, headers={'Content-type': 'application/json'})
 
         if response.status_code != HTTPStatus.OK:
@@ -166,7 +165,7 @@ class GolemRayClient:
             )
 
         try:
-            parsed_data = parse_raw_as(CreateNodesResponse, response.content)
+            parsed_data = CreateNodesResponse.parse_raw(response.text)
         except ValidationError:
             raise GolemRayClientException(
                 "Couldn't parse response from server, \n"
