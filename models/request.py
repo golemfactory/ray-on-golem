@@ -7,6 +7,8 @@ from models.types import NodeID
 
 class CreateClusterRequest(BaseModel):
     image_hash: str
+    network: str
+    budget: int
     num_workers: int = 1
 
 
