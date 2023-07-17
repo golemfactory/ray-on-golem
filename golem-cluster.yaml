@@ -1,5 +1,6 @@
 cluster_name: golem-cluster
 
+min_workers: 3
 max_workers: 4
 
 provider:
@@ -9,10 +10,12 @@ provider:
   parameters:
     golem_ray_url: "http://localhost:8080"
     image_hash: "0ce63e86c7c7afeee38c2a7282e0f778089eea727d7bc65c82549976"
+    network: "goerli"
+    budget: 1000
 
 file_mounts:
   {
-      "/home": "/tmp/golem"
+      "/tmp/golem": "/tmp/golem"
   }
 
 available_node_types:
@@ -26,42 +29,16 @@ available_node_types:
         generateName: ray-head-
         labels:
           component: ray-head
-      spec:
-        serviceAccountName: autoscaler
-        restartPolicy: Never
-        volumes:
-          - name: dshm
-            emptyDir:
-              medium: Memory
-        containers:
-          - name: ray-node
-            image: 'rayproject/ray-ml:1.0.1'
-            command:
-              - /bin/bash
-              - '-c'
-              - '--'
-            args:
-              - 'trap : TERM INT; sleep infinity & wait;'
-            ports:
-              - containerPort: 6379
-              - containerPort: 6380
-              - containerPort: 6381
-              - containerPort: 12345
-              - containerPort: 12346
-            volumeMounts:
-              - mountPath: /dev/shm
-                name: dshm
-            resources:
-              requests:
-                cpu: 1000m
-                memory: 512Mi
-              limits:
-                memory: 2Gi
-            env:
-              - name: MY_CPU_REQUEST
-                valueFrom:
-                  resourceFieldRef:
-                    resource: requests.cpu
+  "ray.worker.default":
+    max_workers: 5
+    resources: {"CPU": 1}
+    node_config:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        generateName: ray-worker-
+        labels:
+          component: ray-worker
 
 setup_commands: []
 head_setup_commands: []
@@ -69,7 +46,7 @@ worker_setup_commands: []
 
 head_start_ray_commands: ["ray start --head --port 6380 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"]
 worker_start_ray_commands: []
-initialization_commands: []
+initialization_commands: ["pip install pandas"]
 auth:
   ssh_user: 'test'
 

@@ -1,10 +1,11 @@
 import socket
-
+import pandas
 import ray
 from random import random
 
 # Let's start Ray
-ray.init()
+# ray.init()
+ray.init(address="auto")
 
 SAMPLES = 1000000
 
@@ -26,6 +27,7 @@ if __name__ == '__main__':
     # To invoke this remote function, use the `remote` method.
     # This will immediately return an object ref (a future) and then create
     # a task that will be executed on a worker process. Get retreives the result.
+    print(f'{pandas.__version__ = }')
     future = pi4_sample.remote()
     pi = ray.get(future) * 4.0 / SAMPLES
     print(f'{pi} is an approximation of pi')
@@ -34,7 +36,7 @@ if __name__ == '__main__':
     # With regular python this would take 11 hours
     # Ray on a modern laptop, roughly 2 hours
     # On a 10-node Ray cluster, roughly 10 minutes
-    BATCHES = 1_000
+    BATCHES = 300
     results = []
     for _ in range(BATCHES):
         results.append(pi4_sample.remote())

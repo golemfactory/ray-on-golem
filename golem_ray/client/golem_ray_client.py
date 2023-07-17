@@ -25,9 +25,13 @@ class GolemRayClient:
         self._cluster_id = None
         self._deleted_nodes: set[NodeID] = set()
 
-    def create_cluster(self, image_hash: str) -> None:  # -> CLUSTER_ID:
+    def create_cluster(self, image_hash: str, network: str, budget: int) -> None:  # -> CLUSTER_ID:
         url = self.golem_ray_url / "create_cluster"
-        json_data = CreateClusterRequest(image_hash=image_hash).json()
+        json_data = CreateClusterRequest(
+            image_hash=image_hash,
+            network=network,
+            budget=budget,
+        ).json()
         print(f"POST {url} data={json_data}")
         response = self.session.post(url, data=json_data, headers={'Content-type': 'application/json'})
 
