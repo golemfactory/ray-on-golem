@@ -85,7 +85,7 @@ async def delete_nodes(request):
 async def set_node_tags(request):
     golem: GolemNodeProvider = request.app['golem']
     node_id = int(request.match_info['node_id'])
-    request_data = SetNodeTagsRequest(**json.loads(await request.json())).dict()
+    request_data = SetNodeTagsRequest(**await request.json()).dict()
     await golem.set_node_tags(node_id=node_id,
                               tags=request_data['tags'])
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
