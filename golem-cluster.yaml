@@ -1,7 +1,7 @@
 cluster_name: golem-cluster
 
 min_workers: 3
-max_workers: 4
+max_workers: 10
 
 provider:
   type: "external"
@@ -19,8 +19,8 @@ file_mounts:
   }
 
 available_node_types:
-  "ray.head.default":
-    max_workers: 0
+  ray.head.default:
+    max_workers: 1
     resources: {"CPU": 1}
     node_config:
       apiVersion: v1
@@ -29,8 +29,9 @@ available_node_types:
         generateName: ray-head-
         labels:
           component: ray-head
-  "ray.worker.default":
-    max_workers: 5
+  ray.worker.default:
+    min_workers: 3
+    max_workers: 10
     resources: {"CPU": 1}
     node_config:
       apiVersion: v1
@@ -40,13 +41,14 @@ available_node_types:
         labels:
           component: ray-worker
 
+initialization_commands: ["pip install pandas"]
 setup_commands: []
+
 head_setup_commands: []
 worker_setup_commands: []
 
 head_start_ray_commands: []
 worker_start_ray_commands: []
-initialization_commands: ["pip install pandas"]
 auth:
   ssh_user: 'test'
 
