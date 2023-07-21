@@ -22,7 +22,6 @@ class GolemNodeProvider(NodeProvider):
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1_000)
         self._golem_ray_client.create_cluster(image_hash, network, budget)
-        # self._cluster_id = self._golem_ray_client.create_cluster(image_hash)
 
     def get_command_runner(
         self,

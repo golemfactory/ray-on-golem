@@ -1,20 +1,23 @@
+import os
 import socket
-import pandas
-import ray
 from random import random
 
+import pandas
+import ray
+
+# os.environ["RAY_OVERRIDE_RESOURCES"] = "{}"
 # Let's start Ray
-# ray.init()
-ray.init(address="auto")
+ray.init()
+# ray.init(address="auto")
 
 SAMPLES = 1000000
 
 
 # By adding the `@ray.remote` decorator, a regular Python function
 # becomes a Ray remote function.
-@ray.remote
+@ray.remote  # (resources={"num_cpus": 1})
 def pi4_sample():
-    print(socket.gethostbyname(socket.gethostname()))
+    # print(socket.gethostbyname(socket.gethostname()))
     in_count = 0
     for _ in range(SAMPLES):
         x, y = random(), random()
