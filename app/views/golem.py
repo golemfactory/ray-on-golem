@@ -308,7 +308,7 @@ class GolemNodeProvider:
     async def _start_head_process(self):
         head_node = ClusterNode(node_id='0', internal_ip=IPv4Address(self.HEAD_IP))
         process = subprocess.Popen(
-            ['ray', 'start', '--head', ' --autoscaling-config', '~/ray_bootstrap_config.yaml' '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
+            ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
         process.wait()
         if process:
             head_node.state = NodeState.running
