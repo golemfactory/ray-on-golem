@@ -102,6 +102,8 @@ class GolemNodeProvider:
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
         self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
         self._reverse_ssh_process = await create_reverse_ssh_to_golem_network()
+        head_node = self._add_local_head_node()
+        head_node.state = NodeState.running
 
     async def start_head_process(self, tags=None):
         """
@@ -306,7 +308,13 @@ class GolemNodeProvider:
         :return:
         """
         if tags is None:
-            tags = {}
+            tags = {
+                "ray-node-type": "head",
+                "ray-user-node-type": "ray.head.default",
+                "ray-launch-config": "16f876b77cccdf74cc2c8fc94c44db68ac63c25d",
+                "ray-node-name": "ray-golem-cluster-head",
+                "ray-node-status": "uninitialized"
+            }
         head_node = ClusterNode(node_id=0,
                                 internal_ip=IPv4Address('127.0.0.1'),
                                 tags=tags)
