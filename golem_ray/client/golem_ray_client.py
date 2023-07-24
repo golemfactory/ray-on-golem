@@ -135,6 +135,7 @@ class GolemRayClient:
             )
 
     def terminate_node(self, node_id: NodeID) -> None:
+        return self.terminate_nodes([node_id])
         # url = self._build_url(f"{self._cluster_id}/nodes/{node_id}")
         url = self.golem_ray_url / "nodes" / node_id
 
@@ -144,7 +145,7 @@ class GolemRayClient:
         # TODO: uncomment after server implements deleting
         response = self.session.delete(url)
 
-        print(json.dumps(response.json(), indent=2))
+        print(f"{response.status_code = }")
         print("\\" + '=' * 100 + '\n')
 
         if response.status_code == HTTPStatus.OK:
