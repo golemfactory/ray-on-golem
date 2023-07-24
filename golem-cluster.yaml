@@ -2,6 +2,7 @@ cluster_name: golem-cluster
 
 min_workers: 3
 max_workers: 10
+upscaling_speed: 9999
 
 provider:
   type: "external"
@@ -32,7 +33,7 @@ available_node_types:
   ray.worker.default:
     min_workers: 3
     max_workers: 10
-    resources: {"CPU": 1}
+    resources: {"CPU": 3}
     node_config:
       apiVersion: v1
       kind: Pod
