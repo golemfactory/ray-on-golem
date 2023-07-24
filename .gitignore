@@ -3,3 +3,4 @@ log.log
 __pycache__/
 *.py[cod]
 venv*
+.env

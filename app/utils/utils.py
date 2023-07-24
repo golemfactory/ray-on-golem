@@ -24,8 +24,8 @@ logger = get_logger()
 
 async def create_reverse_ssh_to_golem_network() -> Process:
     process = await subprocess.create_subprocess_shell(
-        r"ssh -R *:3002:127.0.0.1:6380 proxy@proxy.dev.golem.network")
-    logger.info('Reverse ssh tunnel from 127.0.0.1:6379 to *:3002 created.')
+        rf"ssh -R *:{os.getenv('SSH_TUNNEL_PORT')}:127.0.0.1:6379 proxy@proxy.dev.golem.network")
+    logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{os.getenv("SSH_TUNNEL_PORT")} created.')
 
     return process
 
@@ -58,7 +58,7 @@ def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tu
     return _create_ssh_connection
 
 
-async def parse_manifest(image_hash: str, text=None):
+async def parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
     """Parses manifest file and replaces image_hash used.
        Decoding is needed in order to work.
        :arg image_hash:
@@ -69,6 +69,7 @@ async def parse_manifest(image_hash: str, text=None):
         manifest = (manifest
                     .decode('utf-8')
                     .replace('{sha3}', image_hash)
+                    .replace('{SSH_TUNNEL_PORT}', ssh_tunnel_port)
                     )
         manifest = base64.b64encode(manifest.encode('utf-8')).decode("utf-8")
 

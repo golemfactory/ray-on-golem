@@ -1,4 +1,5 @@
 import asyncio
+import os
 import subprocess
 from asyncio.subprocess import Process
 from ipaddress import IPv4Address
@@ -61,7 +62,7 @@ class GolemNodeProvider:
         self._golem.event_bus.listen(on_event)
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
         await self._golem.add_to_network(self._network)
-        self._allocation = await self._golem.create_allocation(amount=1, network="goerli")
+        self._allocation = await self._golem.create_allocation(amount=1, network="goerli", autoclose=True)
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
         await self._allocation.get_data()
 
@@ -100,7 +101,9 @@ class GolemNodeProvider:
             return
         self._num_workers = provider_config.get('num_workers', 4)
         payload, connection_timeout = await self._create_payload(provider_config=provider_config)
-        self._demand = await self._golem.create_demand(payload, allocations=[self._allocation], autostart=True)
+        self._demand = await self._golem.create_demand(payload,
+                                                       allocations=[self._allocation],
+                                                       autostart=True)
         self._reverse_ssh_process = await create_reverse_ssh_to_golem_network()
         head_node = self._add_local_head_node()
         head_node.state = NodeState.running
@@ -145,6 +148,7 @@ class GolemNodeProvider:
         for node in self._cluster_nodes:
             # if node.internal_ip != self.HEAD_IP:
             if node.activity:
+                node.state = NodeState.pending
                 await self._start_worker_process(node.activity)
                 node.state = NodeState.running
 
@@ -262,7 +266,8 @@ class GolemNodeProvider:
         :return:
         """
         image_hash = provider_config.get('image_hash')
-        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash)
+        ssh_tunnel_port = os.getenv('SSH_TUNNEL_PORT')
+        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash, ssh_tunnel_port)
 
         return payload, connection_timeout
 
@@ -308,13 +313,7 @@ class GolemNodeProvider:
         :return:
         """
         if tags is None:
-            tags = {
-                "ray-node-type": "head",
-                "ray-user-node-type": "ray.head.default",
-                "ray-launch-config": "16f876b77cccdf74cc2c8fc94c44db68ac63c25d",
-                "ray-node-name": "ray-golem-cluster-head",
-                "ray-node-status": "uninitialized"
-            }
+            tags = {}
         head_node = ClusterNode(node_id=0,
                                 internal_ip=IPv4Address('127.0.0.1'),
                                 tags=tags)
@@ -326,7 +325,7 @@ class GolemNodeProvider:
     async def _stop_local_head_node(self) -> None:
         self._get_head_node()
         head_node = self._get_head_node()
-        if head_node:
+        if head_node and head_node.state == NodeState.running:
             process = await asyncio.create_subprocess_shell(
                 'ray stop')
             await process.wait()
@@ -341,7 +340,7 @@ class GolemNodeProvider:
         :return:
         """
         batch = await activity.execute_commands(
-            commands.Run(f'ray start --address {self._proxy_ip}:3002'),
+            commands.Run(f'ray start --address {self._proxy_ip}:{os.getenv("SSH_TUNNEL_PORT")}'),
         )
         try:
             await batch.wait(60)

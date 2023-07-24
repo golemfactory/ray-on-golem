@@ -56,6 +56,8 @@ async def add_head_nodes(request: web.Request) -> web.Response:
     golem: GolemNodeProvider = request.app['golem']
     request_data = CreateNodesRequest(**await request.json()).dict()
     # await golem.start_head_process(tags=request_data['tags'])
+    await golem.set_node_tags(node_id=0,
+                              tags=request_data['tags'])
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
 
     return web.json_response(text=response, status=201)
