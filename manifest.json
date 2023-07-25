@@ -10,9 +10,9 @@
   "payload": [
     {
       "urls": [
-        "http://registry.golem.network/download/1873727908841816f9d521625ec3021950b15e4ea852aa53cc4c2110"
+        "http://registry.golem.network/download/{IMAGE_HASH}"
       ],
-      "hash": "sha3:{sha3}"
+      "hash": "sha3:{IMAGE_HASH}"
     }
   ],
   "compManifest": {
@@ -32,7 +32,16 @@
       "inet": {
         "out": {
           "protocols": ["https", "tcp"],
-          "urls": ["tcp://proxy.dev.golem.network:{SSH_TUNNEL_PORT}/", "https://pypi.dev.golem.network"]
+          "urls": [
+            "tcp://proxy.dev.golem.network:{SSH_TUNNEL_PORT}/",
+            "tcp://proxy.dev.golem.network:4000/",
+            "tcp://proxy.dev.golem.network:4001/",
+            "tcp://proxy.dev.golem.network:4002/",
+            "tcp://proxy.dev.golem.network:4003/",
+            "tcp://proxy.dev.golem.network:4004/",
+            "tcp://proxy.dev.golem.network:4005/",
+            "tcp://proxy.dev.golem.network:4006/",
+            "https://pypi.dev.golem.network"]
         }
       }
     }

@@ -40,11 +40,11 @@ class YagnaManager:
     async def shutdown(self):
         if self._yagna_process:
             try:
-                # self._yagna_process.terminate()
+                self._yagna_process.terminate()
                 await self._yagna_process.wait()
             except asyncio.CancelledError:
-                await self._yagna_process.wait()
-                # self._yagna_process.kill()
+                # await self._yagna_process.wait()
+                self._yagna_process.kill()
 
     ##
     # Private

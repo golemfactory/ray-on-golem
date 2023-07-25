@@ -19,8 +19,8 @@ from app.logger import get_logger
 from app.middlewares.error_handling import GolemRayException
 from app.models.cluster_node import ClusterNode
 from app.utils.negotiation_utils import negotiate
-from app.utils.utils import create_ssh_connection, create_reverse_ssh_to_golem_network, parse_manifest, \
-    get_or_create_yagna_appkey
+from app.utils.utils import create_ssh_connection, parse_manifest, \
+    get_or_create_yagna_appkey, create_reverse_ssh_to_golem_network
 from models.types import NodeState, Node
 
 logger = get_logger()
@@ -105,8 +105,6 @@ class GolemNodeProvider:
                                                        allocations=[self._allocation],
                                                        autostart=True)
         self._reverse_ssh_process = await create_reverse_ssh_to_golem_network()
-        head_node = self._add_local_head_node()
-        head_node.state = NodeState.running
 
     async def start_head_process(self, tags=None):
         """
@@ -117,12 +115,14 @@ class GolemNodeProvider:
         head_node = self._add_local_head_node(tags=tags)
         if head_node:
             if head_node.state == NodeState.pending:
-                process = subprocess.Popen(
-                    ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
-                process.wait()
-                if process:
-                    head_node.state = NodeState.running
-                    self._head_node_process = process
+                # TODO: Delete if sure that it won't be needed
+                #     process = subprocess.Popen(
+                #         ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
+                #     process.wait()
+                #     if process:
+                #         head_node.state = NodeState.running
+                #         self._head_node_process = process
+                head_node.state = NodeState.running
             elif head_node.state == NodeState.running:
                 raise GolemRayException(message='Head node is already running ray', status_code=StatusCode.BAD_REQUEST)
         else:
@@ -315,7 +315,7 @@ class GolemNodeProvider:
         if tags is None:
             tags = {}
         head_node = ClusterNode(node_id=0,
-                                internal_ip=IPv4Address('127.0.0.1'),
+                                internal_ip=IPv4Address('3.76.190.183'), # proxy.dev.golem.network
                                 tags=tags)
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)

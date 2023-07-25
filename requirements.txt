@@ -7,6 +7,7 @@ aiohttp_session==2.12.0
 cryptography==41.0.1
 # yapapi==0.10.0 # had to install with 'pip install...' by the time (dependencies not compatible)
 aiohttp-pydantic==1.12.2
+python-dotenv==1.0.0
 
 # client
 requests==2.31.0
