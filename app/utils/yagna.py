@@ -1,17 +1,19 @@
 import os
 import asyncio
 import subprocess
+import dotenv
 from asyncio.subprocess import Process
 
 from app.consts import StatusCode
 from app.logger import get_logger
 from app.middlewares.error_handling import GolemRayException
 
+dotenv.load_dotenv()
 logger = get_logger()
 
 
 class YagnaManager:
-    yagna_path = os.getenv("YAGNA_PATH")
+    yagna_path = os.getenv('YAGNA_PATH')
     run_command = [f'{yagna_path}', 'service', 'run']
     payment_fund_command = [f'{yagna_path}', 'payment', 'fund']
     yagna_running_string = 'yagna is already running'
