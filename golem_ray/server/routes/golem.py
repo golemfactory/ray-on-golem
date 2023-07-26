@@ -52,7 +52,7 @@ async def add_nodes(request: web.Request) -> web.Response:
 @routes.post('/head_nodes')
 async def add_head_nodes(request: web.Request) -> web.Response:
     golem: GolemManager = request.app['golem']
-    request_data = CreateNodesRequest(**await request.json()).dict()
+    request_data = CreateNodesRequest.parse_raw(await request.text()).dict()
     await golem.start_head_process(tags=request_data['tags'])
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
 

@@ -1,6 +1,6 @@
 import asyncio
 import os
-import subprocess
+from asyncio import subprocess
 from asyncio.subprocess import Process
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -39,7 +39,7 @@ class GolemManager:
         self._allocation = None
         self._network = None
         self._num_workers = None
-        self._head_node_process: subprocess.Popen | None = None
+        self._head_node_process: Process | None = None
         self._reverse_ssh_process: Process | None = None
         self._cluster_nodes: List[ClusterNode] = []
         self._golem = GolemNode(app_key=get_or_create_yagna_appkey())
@@ -63,7 +63,7 @@ class GolemManager:
         await self._golem.add_to_network(self._network)
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli", autoclose=True)
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
-        await self._allocation.get_data()
+        # await self._allocation.get_data()
 
     def get_nodes_response(self) -> List[Node]:
         """
@@ -208,7 +208,7 @@ class GolemManager:
 
         if self._reverse_ssh_process:
             self._reverse_ssh_process.terminate()
-            await asyncio.sleep(1)
+            await self._reverse_ssh_process.wait()
             logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
             self._reverse_ssh_process = None
 
@@ -244,11 +244,12 @@ class GolemManager:
     @staticmethod
     async def _add_authorized_key_to_local_node(key):
         """
-        Adds keys from providers to local machine"
+        Adds keys from providers to local machine
         :param key: ssh key
         :return:
         """
-        result = subprocess.run(['echo', f"{key}", ">>", "~/.ssh/authorized_keys"])
+        result = await subprocess.create_subprocess_exec('echo', f"{key}", ">>", "~/.ssh/authorized_keys")
+        await result.communicate()
         if result.returncode == 0:
             logger.info('-----ADDED PROVIDER KEY TO LOCAL')
         else:

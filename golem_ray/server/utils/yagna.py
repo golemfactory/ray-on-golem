@@ -69,12 +69,6 @@ class YagnaManager:
         if result.returncode == 0:
             await asyncio.sleep(2)
             return True
-            # stdout_output = stdout_output.decode('utf-8')
-            # if self.payment_fund_success_string in stdout_output:
-            #     return True
-            # else:
-            #     raise GolemRayException(message='Cant fund payment in yagna',
-            #                             status_code=StatusCode.SERVER_ERROR)
         else:
             raise GolemRayException(message='Cant check yagna status',
                                     status_code=StatusCode.SERVER_ERROR)

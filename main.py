@@ -33,12 +33,8 @@ async def golem_engine(app):
 
 
 def main():
-    logger = logging.getLogger('aiohttp')
+    logger = logging.getLogger('aiohttp') # add logging.config.dictConfig (search Default_config)
     app = web.Application(middlewares=[error_middleware])
-
-    fernet_key = fernet.Fernet.generate_key()
-    secret_key = base64.urlsafe_b64decode(fernet_key)
-    setup(app, EncryptedCookieStorage(secret_key))
 
     nodes_sub_app = web.Application(middlewares=[error_middleware])
     nodes_sub_app.router.add_routes(nodes_routes)

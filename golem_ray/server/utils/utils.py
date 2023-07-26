@@ -23,7 +23,7 @@ logger = get_logger()
 
 async def create_reverse_ssh_to_golem_network() -> Process:
     process = await subprocess.create_subprocess_shell(
-        rf"ssh -R *:{os.getenv('SSH_TUNNEL_PORT')}:127.0.0.1:6379 proxy@proxy.dev.golem.network")
+        rf"ssh -N -R *:{os.getenv('SSH_TUNNEL_PORT')}:127.0.0.1:6379 proxy@proxy.dev.golem.network")
     logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{os.getenv("SSH_TUNNEL_PORT")} created.')
 
     return process
@@ -89,12 +89,11 @@ async def parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
 
 
 def get_or_create_yagna_appkey():
-    if os.getenv('YAGNA_APPKEY') is None:
-        id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
-        yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
-        if yagna_app is None:
-            return check_output(["yagna", "server-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
-        else:
-            return yagna_app['key']
-    else:
+    if os.getenv('YAGNA_APPKEY'):
         return os.getenv('YAGNA_APPKEY')
+    id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
+    yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
+    if yagna_app is None:
+        return check_output(["yagna", "server-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
+    else:
+        return yagna_app['key']
