@@ -1,3 +1,4 @@
+import json
 from ipaddress import IPv4Address
 from typing import Any, List, Dict, Optional
 from types import ModuleType
@@ -76,12 +77,11 @@ class GolemNodeProvider(NodeProvider):
         count: int,
     ) -> dict[str, dict]:
         # created_nodes = self._golem_ray_client.create_nodes(cluster_id=self._cluster_id, count=count)
-        head_node = node_config.get("metadata", {}).get("labels", {}).get("component") == "ray-head"
+        # head_node = node_config.get("metadata", {}).get("labels", {}).get("component") == "ray-head"
         created_nodes = self._golem_ray_client.create_nodes(
             cluster_id="",
             count=count,
             tags=tags,
-            head_node=head_node,
         )
         return {node.node_id: node.dict() for node in created_nodes}
 

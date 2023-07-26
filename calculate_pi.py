@@ -18,7 +18,8 @@ SAMPLES = 1000000
 # becomes a Ray remote function.
 @ray.remote  # (resources={"num_cpus": 1})
 def pi4_sample():
-    # print(socket.gethostbyname(socket.gethostname()))
+    if random() < 0.1:
+        print(socket.gethostbyname(socket.gethostname()))
     in_count = 0
     for _ in range(SAMPLES):
         x, y = random(), random()
