@@ -37,7 +37,10 @@ class GolemRayClient:
 
         response = self.session.post(url, data=json_data, headers={'Content-type': 'application/json'})
 
-        print(json.dumps(response.json(), indent=2))
+        try:
+            print(json.dumps(response.json(), indent=2))
+        except:
+            print(f'{response.status_code = }')
         print("\\" + '=' * 100 + '\n')
 
         if response.status_code != HTTPStatus.CREATED:
@@ -180,13 +183,10 @@ class GolemRayClient:
             f"response status_code: {response.status_code}, text: {response.text}"
         )
 
-    def create_nodes(self, cluster_id: ClusterID, count: int, tags: Dict, head_node: bool = False) -> List[Node]:
+    def create_nodes(self, cluster_id: ClusterID, count: int, tags: Dict) -> List[Node]:
         # TODO: uncomment after server implements cluster_id
         # url = self._build_url(f"{cluster_id}/create_nodes")
-        if head_node:
-            url = self.golem_ray_url / "head_nodes"
-        else:
-            url = self.golem_ray_url / "nodes"
+        url = self.golem_ray_url / "nodes"
         data = CreateNodesRequest(count=count, tags=tags).dict()
         json_data = json.dumps(data)
 
@@ -195,7 +195,10 @@ class GolemRayClient:
 
         response = self.session.post(url, data=json_data, headers={'Content-type': 'application/json'})
 
-        print(json.dumps(response.json(), indent=2))
+        try:
+            print(json.dumps(response.json(), indent=2))
+        except:
+            print(f'{response.status_code = }')
         print("\\" + '=' * 100 + '\n')
 
         if response.status_code != HTTPStatus.CREATED:

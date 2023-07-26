@@ -2,7 +2,7 @@ cluster_name: golem-cluster
 
 min_workers: 3
 max_workers: 10
-upscaling_speed: 9999
+idle_timeout_minutes: 5
 
 provider:
   type: "external"
@@ -24,23 +24,13 @@ available_node_types:
     max_workers: 1
     resources: {"CPU": 1}
     node_config:
-      apiVersion: v1
-      kind: Pod
-      metadata:
-        generateName: ray-head-
-        labels:
-          component: ray-head
+      kind: Node
   ray.worker.default:
     min_workers: 3
     max_workers: 10
     resources: {"CPU": 3}
     node_config:
-      apiVersion: v1
-      kind: Pod
-      metadata:
-        generateName: ray-worker-
-        labels:
-          component: ray-worker
+      kind: Node
 
 initialization_commands: ["pip install pandas"]
 setup_commands: []
@@ -49,7 +39,7 @@ head_setup_commands: []
 worker_setup_commands: []
 
 head_start_ray_commands: ["ray start --head --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"]
-worker_start_ray_commands: []
+worker_start_ray_commands: ["ray start --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"]
 auth:
   ssh_user: 'test'
 

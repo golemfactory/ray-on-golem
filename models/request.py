@@ -13,7 +13,7 @@ class CreateClusterRequest(BaseModel):
     image_hash: str
     network: str
     budget: int
-    num_workers: int = 1
+    num_workers: int = 20
 
 
 class CreateNodesRequest(BaseModel):
