@@ -146,7 +146,6 @@ class GolemNodeProvider:
 
         start_worker_tasks = []
         for node in self._cluster_nodes:
-            # if node.internal_ip != self.HEAD_IP:
             if node.activity:
                 node.state = NodeState.pending
                 await self._start_worker_process(node.activity)
@@ -297,13 +296,14 @@ class GolemNodeProvider:
         :return:
         """
         for node in self._cluster_nodes:
-            print(
-                "Connect with:\n"
-                f"ssh "
-                f"-o StrictHostKeyChecking=no "
-                f"-o ProxyCommand='websocat asyncstdio: {node.connection_uri}/22 --binary "
-                f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
-            )
+            if node.node_id != 0:
+                print(
+                    "Connect with:\n"
+                    f"ssh "
+                    f"-o StrictHostKeyChecking=no "
+                    f"-o ProxyCommand='websocat asyncstdio: {node.connection_uri}/22 --binary "
+                    f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
+                )
 
     def _add_local_head_node(self, tags=None) -> ClusterNode:
         """
@@ -315,7 +315,7 @@ class GolemNodeProvider:
         if tags is None:
             tags = {}
         head_node = ClusterNode(node_id=0,
-                                internal_ip=IPv4Address('3.76.190.183'), # proxy.dev.golem.network
+                                internal_ip=IPv4Address('127.0.0.1'), # proxy.dev.golem.network
                                 tags=tags)
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)

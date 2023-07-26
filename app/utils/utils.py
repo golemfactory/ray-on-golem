@@ -24,8 +24,8 @@ logger = get_logger()
 
 async def create_reverse_ssh_to_golem_network() -> Process:
     process = await subprocess.create_subprocess_shell(
-        rf"ssh -R *:{os.getenv('SSH_TUNNEL_PORT')}:127.0.0.1:6380 proxy@proxy.dev.golem.network")
-    logger.info(f'Reverse ssh tunnel from 127.0.0.1:6380 to *:{os.getenv("SSH_TUNNEL_PORT")} created.')
+        rf"ssh -R *:{os.getenv('SSH_TUNNEL_PORT')}:127.0.0.1:6379 proxy@proxy.dev.golem.network")
+    logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{os.getenv("SSH_TUNNEL_PORT")} created.')
 
     return process
 

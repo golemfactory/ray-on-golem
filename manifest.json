@@ -34,13 +34,13 @@
           "protocols": ["https", "tcp"],
           "urls": [
             "tcp://proxy.dev.golem.network:{SSH_TUNNEL_PORT}/",
-            "tcp://proxy.dev.golem.network:4000/",
-            "tcp://proxy.dev.golem.network:4001/",
-            "tcp://proxy.dev.golem.network:4002/",
-            "tcp://proxy.dev.golem.network:4003/",
-            "tcp://proxy.dev.golem.network:4004/",
-            "tcp://proxy.dev.golem.network:4005/",
-            "tcp://proxy.dev.golem.network:4006/",
+            "tcp://proxy.dev.golem.network:3020/",
+            "tcp://proxy.dev.golem.network:3021/",
+            "tcp://proxy.dev.golem.network:3022/",
+            "tcp://proxy.dev.golem.network:3023/",
+            "tcp://proxy.dev.golem.network:3024/",
+            "tcp://proxy.dev.golem.network:3025/",
+            "tcp://proxy.dev.golem.network:3026/",
             "https://pypi.dev.golem.network"]
         }
       }

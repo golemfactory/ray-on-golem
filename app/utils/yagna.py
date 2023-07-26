@@ -1,3 +1,4 @@
+import os
 import asyncio
 import subprocess
 from asyncio.subprocess import Process
@@ -10,8 +11,9 @@ logger = get_logger()
 
 
 class YagnaManager:
-    run_command = ['yagna', 'service', 'run']
-    payment_fund_command = ['yagna', 'payment', 'fund']
+    yagna_path = os.getenv("YAGNA_PATH")
+    run_command = [f'{yagna_path}', 'service', 'run']
+    payment_fund_command = [f'{yagna_path}', 'payment', 'fund']
     yagna_running_string = 'yagna is already running'
     payment_fund_success_string = 'Received funds from the faucet'
     yagna_started_string = 'Server listening on'
@@ -48,7 +50,7 @@ class YagnaManager:
         return True
 
     async def _check_if_yagna_is_running(self):
-        process = await asyncio.create_subprocess_exec('yagna', 'net', 'status',
+        process = await asyncio.create_subprocess_exec(f'{self.yagna_path}', 'net', 'status',
                                                        stdout=subprocess.PIPE,
                                                        stderr=subprocess.PIPE)
         stdout_output, _ = await process.communicate()
@@ -77,7 +79,7 @@ class YagnaManager:
 
     async def _run_yagna_service(self):
         try:
-            process = await asyncio.create_subprocess_shell(cmd='yagna service run', stdout=subprocess.PIPE)
+            process = await asyncio.create_subprocess_shell(cmd=f'{self.yagna_path} service run', stdout=subprocess.PIPE)
             running = await self._wait_for_yagna()
             if running:
                 self._yagna_process = process
