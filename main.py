@@ -7,11 +7,11 @@ from aiohttp_session import setup
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 from cryptography import fernet
 
-from app.logger import get_logger
-from app.middlewares import error_middleware
-from app.routes.golem import routes as nodes_routes
-from app.utils.yagna import YagnaManager
-from app.views.golem import GolemNodeProvider
+from golem_ray.server.logger import get_logger
+from golem_ray.server.middlewares import error_middleware
+from golem_ray.server.routes.golem import routes as nodes_routes
+from golem_ray.server.utils.yagna import YagnaManager
+from golem_ray.server.views.golem import GolemNodeProvider
 
 dotenv.load_dotenv()
 logger = get_logger()

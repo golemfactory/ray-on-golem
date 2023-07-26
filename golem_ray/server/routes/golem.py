@@ -1,8 +1,6 @@
-import json
-
 from aiohttp import web
 
-from app.views.golem import GolemNodeProvider
+from golem_ray.server.views.golem import GolemNodeProvider
 from models.request import CreateClusterRequest, GetNodeRequest, CreateNodesRequest, DeleteNodesRequest, \
     SetNodeTagsRequest
 from models.response import GetNodesResponse, GetNodeResponse

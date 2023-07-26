@@ -4,9 +4,9 @@ import subprocess
 import dotenv
 from asyncio.subprocess import Process
 
-from app.consts import StatusCode
-from app.logger import get_logger
-from app.middlewares.error_handling import GolemRayException
+from golem_ray.server.consts import StatusCode
+from golem_ray.server.logger import get_logger
+from golem_ray.server.middlewares.error_handling import GolemRayException
 
 dotenv.load_dotenv()
 logger = get_logger()

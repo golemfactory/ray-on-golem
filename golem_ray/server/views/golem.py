@@ -14,12 +14,12 @@ from golem_core.core.market_api.pipeline import default_create_agreement, defaul
 from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
-from app.consts import StatusCode
-from app.logger import get_logger
-from app.middlewares.error_handling import GolemRayException
-from app.models.cluster_node import ClusterNode
-from app.utils.negotiation_utils import negotiate
-from app.utils.utils import create_ssh_connection, parse_manifest, \
+from golem_ray.server.consts import StatusCode
+from golem_ray.server.logger import get_logger
+from golem_ray.server.middlewares.error_handling import GolemRayException
+from golem_ray.server.models.cluster_node import ClusterNode
+from golem_ray.server.utils.negotiation_utils import negotiate
+from golem_ray.server.utils.utils import create_ssh_connection, parse_manifest, \
     get_or_create_yagna_appkey, create_reverse_ssh_to_golem_network
 from models.types import NodeState, Node
 
@@ -32,6 +32,7 @@ logger = get_logger()
 class GolemNodeProvider:
 
     def __init__(self):
+        self.ssh_tunnel_port = os.getenv('SSH_TUNNEL_PORT') or '3009'
         self.HEAD_IP = '192.168.0.2'
         self._proxy_ip = 'proxy.dev.golem.network'
         # self.HEAD_IP = '127.0.0.1'
@@ -255,8 +256,7 @@ class GolemNodeProvider:
         else:
             logger.info('-----FAILED ADDING PROVIDER KEY TO LOCAL')
 
-    @staticmethod
-    async def _create_payload(provider_config: dict, **kwargs):
+    async def _create_payload(self, provider_config: dict, **kwargs):
         """
         Creates payload from given image_hash and parses manifest.json file
         which is then used to create demand in golem network
@@ -265,8 +265,7 @@ class GolemNodeProvider:
         :return:
         """
         image_hash = provider_config.get('image_hash')
-        ssh_tunnel_port = os.getenv('SSH_TUNNEL_PORT')
-        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash, ssh_tunnel_port)
+        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash, self.ssh_tunnel_port)
 
         return payload, connection_timeout
 
@@ -315,7 +314,7 @@ class GolemNodeProvider:
         if tags is None:
             tags = {}
         head_node = ClusterNode(node_id=0,
-                                internal_ip=IPv4Address('127.0.0.1'), # proxy.dev.golem.network
+                                internal_ip=IPv4Address('127.0.0.1'),  # proxy.dev.golem.network
                                 tags=tags)
         head_node.state = NodeState.pending
         self._cluster_nodes.append(head_node)
@@ -340,7 +339,7 @@ class GolemNodeProvider:
         :return:
         """
         batch = await activity.execute_commands(
-            commands.Run(f'ray start --address {self._proxy_ip}:{os.getenv("SSH_TUNNEL_PORT")}'),
+            commands.Run(f'ray start --address {self._proxy_ip}:{self.ssh_tunnel_port}'),
         )
         try:
             await batch.wait(60)

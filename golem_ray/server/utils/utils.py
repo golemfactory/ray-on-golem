@@ -1,4 +1,3 @@
-import asyncio.subprocess
 import base64
 import json
 import os
@@ -6,8 +5,8 @@ from asyncio import subprocess
 from asyncio.subprocess import Process
 from datetime import timedelta
 from pathlib import Path
-from subprocess import check_output, Popen
-from typing import Tuple, Any, Awaitable, Callable, Coroutine
+from subprocess import check_output
+from typing import Tuple, Any, Awaitable, Callable
 from urllib.parse import urlparse
 
 from golem_core.core.activity_api import commands
@@ -15,7 +14,7 @@ from golem_core.core.activity_api.resources import Activity
 from golem_core.core.market_api import ManifestVmPayload
 from golem_core.core.network_api.resources import Network
 
-from app.logger import get_logger
+from golem_ray.server.logger import get_logger
 
 YAGNA_APPNAME = 'requestor-mainnet'
 
@@ -64,7 +63,7 @@ async def parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
        :arg image_hash:
        :arg text:
     """
-    with open(Path(__file__).parent.parent.parent.joinpath("manifest.json"), "rb") as manifest:
+    with open(Path(__file__).parent.parent.parent.parent.joinpath("manifest.json"), "rb") as manifest:
         manifest = manifest.read()
         manifest = (manifest
                     .decode('utf-8')
@@ -91,10 +90,10 @@ async def parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
 
 def get_or_create_yagna_appkey():
     if os.getenv('YAGNA_APPKEY') is None:
-        id_data = json.loads(check_output(["yagna", "app-key", "list", "--json"]))
+        id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
         yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
         if yagna_app is None:
-            return check_output(["yagna", "app-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
+            return check_output(["yagna", "server-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
         else:
             return yagna_app['key']
     else:
