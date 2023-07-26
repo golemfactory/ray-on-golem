@@ -4,9 +4,9 @@ import subprocess
 import dotenv
 from asyncio.subprocess import Process
 
-from app.consts import StatusCode
-from app.logger import get_logger
-from app.middlewares.error_handling import GolemRayException
+from golem_ray.server.consts import StatusCode
+from golem_ray.server.logger import get_logger
+from golem_ray.server.middlewares.error_handling import GolemRayException
 
 dotenv.load_dotenv()
 logger = get_logger()
@@ -69,12 +69,6 @@ class YagnaManager:
         if result.returncode == 0:
             await asyncio.sleep(2)
             return True
-            # stdout_output = stdout_output.decode('utf-8')
-            # if self.payment_fund_success_string in stdout_output:
-            #     return True
-            # else:
-            #     raise GolemRayException(message='Cant fund payment in yagna',
-            #                             status_code=StatusCode.SERVER_ERROR)
         else:
             raise GolemRayException(message='Cant check yagna status',
                                     status_code=StatusCode.SERVER_ERROR)

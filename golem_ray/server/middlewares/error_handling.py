@@ -1,6 +1,6 @@
 from aiohttp import web
 
-from app.consts import StatusCode
+from golem_ray.server.consts import StatusCode
 
 
 class GolemRayException(Exception):

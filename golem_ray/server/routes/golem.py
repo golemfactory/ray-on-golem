@@ -1,8 +1,6 @@
-import json
-
 from aiohttp import web
 
-from app.views.golem import GolemNodeProvider
+from golem_ray.server.views.golem import GolemManager
 from models.request import CreateClusterRequest, GetNodeRequest, CreateNodesRequest, DeleteNodesRequest, \
     SetNodeTagsRequest
 from models.response import GetNodesResponse, GetNodeResponse
@@ -14,7 +12,7 @@ golem_clusters = {}
 
 @routes.post('/create_cluster')
 async def create_demand(request: web.Request) -> web.Response:
-    golem: GolemNodeProvider = request.app['golem']
+    golem: GolemManager = request.app['golem']
     provider_config = CreateClusterRequest(**await request.json()).dict()
     await golem.create_cluster(provider_config=provider_config)
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
@@ -24,7 +22,7 @@ async def create_demand(request: web.Request) -> web.Response:
 
 @routes.get('/nodes')
 async def get_nodes(request):
-    golem: GolemNodeProvider = request.app['golem']
+    golem: GolemManager = request.app['golem']
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
 
     return web.json_response(text=response)
@@ -32,7 +30,7 @@ async def get_nodes(request):
 
 @routes.get('/nodes/{node_id}')
 async def get_node(request):
-    golem: GolemNodeProvider = request.app['golem']
+    golem: GolemManager = request.app['golem']
     node_id = GetNodeRequest(node_id=request.match_info['node_id']).node_id
     response = GetNodeResponse(node=golem.get_node_response_by_id(int(node_id))).json()
 
@@ -41,7 +39,7 @@ async def get_node(request):
 
 @routes.post('/nodes')
 async def add_nodes(request: web.Request) -> web.Response:
-    golem: GolemNodeProvider = request.app['golem']
+    golem: GolemManager = request.app['golem']
     request_data = CreateNodesRequest(**await request.json()).dict()
     count: int = request_data.get('count')
     tags: dict = request_data.get('tags')
@@ -53,8 +51,8 @@ async def add_nodes(request: web.Request) -> web.Response:
 
 @routes.post('/head_nodes')
 async def add_head_nodes(request: web.Request) -> web.Response:
-    golem: GolemNodeProvider = request.app['golem']
-    request_data = CreateNodesRequest(**await request.json()).dict()
+    golem: GolemManager = request.app['golem']
+    request_data = CreateNodesRequest.parse_raw(await request.text()).dict()
     await golem.start_head_process(tags=request_data['tags'])
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
 
@@ -63,7 +61,7 @@ async def add_head_nodes(request: web.Request) -> web.Response:
 
 @routes.delete('/node/{node_id}')
 async def delete_node(request):
-    golem: GolemNodeProvider = request.app['golem']
+    golem: GolemManager = request.app['golem']
     node_id = int(request.match_info['node_id'])
     await golem.stop_worker(node_id)
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
@@ -73,7 +71,7 @@ async def delete_node(request):
 
 @routes.delete('/nodes')
 async def delete_nodes(request):
-    golem: GolemNodeProvider = request.app['golem']
+    golem: GolemManager = request.app['golem']
     request_data = DeleteNodesRequest(**await request.json()).dict()
     await golem.stop_workers_by_ids(request_data.get('node_ids'))
     response = GetNodesResponse(nodes=golem.get_nodes_response()).json()
@@ -83,7 +81,7 @@ async def delete_nodes(request):
 
 @routes.patch('/set_node_tags/{node_id}')
 async def set_node_tags(request):
-    golem: GolemNodeProvider = request.app['golem']
+    golem: GolemManager = request.app['golem']
     node_id = int(request.match_info['node_id'])
     request_data = SetNodeTagsRequest(**await request.json()).dict()
     await golem.set_node_tags(node_id=node_id,
