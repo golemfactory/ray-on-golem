@@ -13,7 +13,7 @@ logger = get_logger()
 
 
 class YagnaManager:
-    yagna_path = os.getenv('YAGNA_PATH')
+    yagna_path = os.getenv('YAGNA_PATH') or 'yagna'
     run_command = [f'{yagna_path}', 'service', 'run']
     payment_fund_command = [f'{yagna_path}', 'payment', 'fund']
     yagna_running_string = 'yagna is already running'
