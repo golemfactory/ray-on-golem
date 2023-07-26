@@ -129,10 +129,20 @@ class GolemManager:
 
     async def start_workers(self, count: int, tags: Dict = None):
         """
-        Creates {count} worker nodes on providers. No ray instances is running at the moment.
+        Creates {count} nodes. First node is always head.
+        All nodes besides head runs on providers from golem network.
         :param tags: tags given by ray
-        :param count: Quantity of workers that should be started
+        :param count: Quantity of nodes that should be started
         """
+        if tags is None:
+            tags = {}
+
+        if len(self._cluster_nodes) == 0:
+            head_node = self._add_local_head_node(tags=tags)
+            head_node.state = NodeState.running
+            if count == 1:
+                return
+
         nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
         if count + nodes_with_ray_on_count > self._num_workers + 1:
             raise GolemRayException(message="Max workers limit exceeded", status_code=StatusCode.BAD_REQUEST)
@@ -146,7 +156,6 @@ class GolemManager:
         start_worker_tasks = []
         for node in self._cluster_nodes:
             if node.activity:
-                node.state = NodeState.pending
                 await self._start_worker_process(node.activity)
                 node.state = NodeState.running
 
@@ -313,9 +322,9 @@ class GolemManager:
         if tags is None:
             tags = {}
         head_node = ClusterNode(node_id=0,
-                                internal_ip=IPv4Address('127.0.0.1'),  # proxy.dev.golem.network
+                                internal_ip=IPv4Address('127.0.0.1'),
                                 tags=tags)
-        head_node.state = NodeState.pending
+        head_node.state = NodeState.running  # head node is running after ray up
         self._cluster_nodes.append(head_node)
 
         return head_node
@@ -355,7 +364,6 @@ class GolemManager:
         :param connection_timeout: Currently not used
         :return:
         """
-        node_id = 1
         try:
             async with async_timeout.timeout(int(150)):
                 chain = Chain(
@@ -369,14 +377,15 @@ class GolemManager:
                     Limit(self._num_workers))
 
                 async for activity, ip, connection_uri in chain:
+                    node_id = len(self._cluster_nodes)
                     cluster_node = ClusterNode(node_id=node_id,
                                                activity=activity,
                                                internal_ip=IPv4Address(ip),
                                                connection_uri=connection_uri,
-                                               tags=tags)
+                                               tags=tags,
+                                               state=NodeState.pending)
                     self._cluster_nodes.append(cluster_node)
                     logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
-                    node_id += 1
 
         except asyncio.TimeoutError:
             raise GolemRayException(message="Creating activities timeout reached", status_code=StatusCode.SERVER_ERROR)
