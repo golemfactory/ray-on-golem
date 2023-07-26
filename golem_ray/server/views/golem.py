@@ -29,13 +29,11 @@ logger = get_logger()
 # "ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
 
 
-class GolemNodeProvider:
+class GolemManager:
 
     def __init__(self):
         self.ssh_tunnel_port = os.getenv('SSH_TUNNEL_PORT') or '3009'
-        self.HEAD_IP = '192.168.0.2'
         self._proxy_ip = 'proxy.dev.golem.network'
-        # self.HEAD_IP = '127.0.0.1'
         self._loop = None
         self._demand = None
         self._allocation = None

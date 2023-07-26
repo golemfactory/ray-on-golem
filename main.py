@@ -11,7 +11,7 @@ from golem_ray.server.logger import get_logger
 from golem_ray.server.middlewares import error_middleware
 from golem_ray.server.routes.golem import routes as nodes_routes
 from golem_ray.server.utils.yagna import YagnaManager
-from golem_ray.server.views.golem import GolemNodeProvider
+from golem_ray.server.views.golem import GolemManager
 
 dotenv.load_dotenv()
 logger = get_logger()
@@ -22,13 +22,13 @@ async def golem_engine(app):
     await yagna_manager.run()
     app['yagna'] = yagna_manager
 
-    golem_provider = GolemNodeProvider()
-    app['golem'] = golem_provider
+    golem_manager = GolemManager()
+    app['golem'] = golem_manager
 
-    async with golem_provider.golem:
-        await golem_provider.init()
+    async with golem_manager.golem:
+        await golem_manager.init()
         yield  # before yield called on startup, after yield called on cleanup
-        await golem_provider.shutdown()
+        await golem_manager.shutdown()
         await yagna_manager.shutdown()
 
 
