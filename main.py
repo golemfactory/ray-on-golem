@@ -1,15 +1,21 @@
+import asyncio
 import base64
 import logging
 
+import dotenv
 from aiohttp import web
 from aiohttp_session import setup
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 from cryptography import fernet
 
+from app.logger import get_logger
 from app.middlewares import error_middleware
 from app.routes.golem import routes as nodes_routes
 from app.utils.yagna import YagnaManager
 from app.views.golem import GolemNodeProvider
+
+dotenv.load_dotenv()
+logger = get_logger()
 
 
 async def golem_engine(app):
@@ -20,11 +26,12 @@ async def golem_engine(app):
     golem_provider = GolemNodeProvider()
     app['golem'] = golem_provider
 
-    async with golem_provider.golem:
-        await golem_provider.init()
-        yield  # before yield called on startup, after yield called on cleanup
-        await golem_provider.shutdown()
-        await yagna_manager.shutdown()
+    async with yagna_manager:
+        async with golem_provider.golem:
+            await golem_provider.init()
+            yield  # before yield called on startup, after yield called on cleanup
+            await golem_provider.shutdown()
+            await asyncio.sleep(3)
 
 
 def main():

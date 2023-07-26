@@ -21,6 +21,12 @@ class YagnaManager:
         self._is_running = False
         self._yagna_process: Process | None = None
 
+    async def __aenter__(self) -> 'YagnaManager':
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.shutdown()
+
     ##
     # Public
     async def run(self) -> None:
@@ -37,6 +43,7 @@ class YagnaManager:
                 self._yagna_process.terminate()
                 await self._yagna_process.wait()
             except asyncio.CancelledError:
+                # await self._yagna_process.wait()
                 self._yagna_process.kill()
 
     ##
@@ -44,8 +51,7 @@ class YagnaManager:
     async def _wait_for_yagna(self):
         while True:
             await asyncio.sleep(25)
-            is_running = await self._check_if_yagna_is_running()
-            if is_running:
+            if await self._check_if_yagna_is_running():
                 break
 
         return True
