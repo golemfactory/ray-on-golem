@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import logging
 
@@ -26,12 +25,11 @@ async def golem_engine(app):
     golem_provider = GolemNodeProvider()
     app['golem'] = golem_provider
 
-    async with yagna_manager:
-        async with golem_provider.golem:
-            await golem_provider.init()
-            yield  # before yield called on startup, after yield called on cleanup
-            await golem_provider.shutdown()
-            await asyncio.sleep(3)
+    async with golem_provider.golem:
+        await golem_provider.init()
+        yield  # before yield called on startup, after yield called on cleanup
+        await golem_provider.shutdown()
+        await yagna_manager.shutdown()
 
 
 def main():
