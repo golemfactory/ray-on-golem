@@ -1,11 +1,9 @@
 import base64
-import json
 import os
 from asyncio import subprocess
 from asyncio.subprocess import Process
 from datetime import timedelta
 from pathlib import Path
-from subprocess import check_output
 from typing import Tuple, Any, Awaitable, Callable
 from urllib.parse import urlparse
 
@@ -88,12 +86,3 @@ async def parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
         return payload, offer_scorer, connection_timeout
 
 
-def get_or_create_yagna_appkey():
-    if os.getenv('YAGNA_APPKEY'):
-        return os.getenv('YAGNA_APPKEY')
-    id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
-    yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
-    if yagna_app is None:
-        return check_output(["yagna", "server-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
-    else:
-        return yagna_app['key']

@@ -11,7 +11,8 @@ from models.urls import GolemRayURLs
 from models.validation import (CreateNodesRequest, CreateClusterRequest, DeleteNodesRequest,
                                SetNodeTagsRequest, SingleNodeRequest, CreateNodesResponse,
                                GetNodesResponse, CreateClusterResponse, IsRunningResponse,
-                               IsTerminatedResponse, GetNodeTagsResponse, GetNodeIpAddressResponse)
+                               IsTerminatedResponse, GetNodeTagsResponse, GetNodeIpAddressResponse,
+                               NonTerminatedNodesRequest)
 
 
 class GolemRayClient:
@@ -49,8 +50,9 @@ class GolemRayClient:
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeID]:
         url = GolemRayURLs.Nodes.GET_NODES
+        request_data = NonTerminatedNodesRequest(tags=tag_filters)
 
-        response = self.session.post(url, data=tag_filters)
+        response = self.session.post(url, data=request_data)
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(

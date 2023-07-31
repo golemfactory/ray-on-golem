@@ -4,7 +4,7 @@ from asyncio import subprocess
 from asyncio.subprocess import Process
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from uuid import uuid4
 
 import async_timeout
@@ -18,10 +18,12 @@ from golem_ray.server.consts import StatusCode
 from golem_ray.server.logger import get_logger
 from golem_ray.server.middlewares.error_handling import GolemRayException
 from golem_ray.server.models.cluster_node import ClusterNode
+from golem_ray.server.services.yagna import get_or_create_yagna_appkey
 from golem_ray.server.utils.negotiation_utils import negotiate
 from golem_ray.server.utils.utils import create_ssh_connection, parse_manifest, \
-    get_or_create_yagna_appkey, create_reverse_ssh_to_golem_network
+    create_reverse_ssh_to_golem_network
 from models.types import NodeState, Node
+from models.validation import CreateClusterRequest
 
 logger = get_logger()
 
@@ -29,7 +31,7 @@ logger = get_logger()
 # "ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
 
 
-class GolemManager:
+class GolemService:
 
     def __init__(self):
         self.ssh_tunnel_port = os.getenv('SSH_TUNNEL_PORT') or '3009'
@@ -89,7 +91,7 @@ class GolemManager:
                     external_ip=node.external_ip,
                     tags=node.tags)
 
-    async def create_cluster(self, provider_config: Dict):
+    async def create_cluster(self, provider_config: CreateClusterRequest):
         """
         Manages creating cluster, creates payload from given data and creates demand basing on payload
         Local node is being created without ray instance.
@@ -98,104 +100,23 @@ class GolemManager:
         if self._demand:
             logger.info('Cluster was created already.')
             return
-        self._num_workers = provider_config.get('num_workers', 4)
-        payload, connection_timeout = await self._create_payload(provider_config=provider_config)
+        self._num_workers = provider_config.num_workers
+        payload, connection_timeout = await self._create_payload(image_hash=provider_config.image_hash)
         self._demand = await self._golem.create_demand(payload,
                                                        allocations=[self._allocation],
                                                        autostart=True)
         self._reverse_ssh_process = await create_reverse_ssh_to_golem_network()
 
-    async def start_head_process(self, tags=None):
-        """
-        Runs ray head node on local machine
-        """
-        if tags is None:
-            tags = {}
-        head_node = self._add_local_head_node(tags=tags)
-        if head_node:
-            if head_node.state == NodeState.pending:
-                # TODO: Delete if sure that it won't be needed
-                #     process = subprocess.Popen(
-                #         ['ray', 'start', '--head', '--node-ip-address', '127.0.0.1', '--disable-usage-stats'])
-                #     process.wait()
-                #     if process:
-                #         head_node.state = NodeState.running
-                #         self._head_node_process = process
-                head_node.state = NodeState.running
-            elif head_node.state == NodeState.running:
-                raise GolemRayException(message='Head node is already running ray', status_code=StatusCode.BAD_REQUEST)
-        else:
-            raise GolemRayException(message='Head node on local doesnt exist', status_code=StatusCode.BAD_REQUEST)
 
-    async def start_workers(self, count: int, tags: Dict = None):
-        """
-        Creates {count} nodes. First node is always head.
-        All nodes besides head runs on providers from golem network.
-        :param tags: tags given by ray
-        :param count: Quantity of nodes that should be started
-        """
-        if tags is None:
-            tags = {}
-
-        if len(self._cluster_nodes) == 0:
-            head_node = self._add_local_head_node(tags=tags)
-            head_node.state = NodeState.running
-            if count == 1:
-                return
-
-        nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
-        if count + nodes_with_ray_on_count > self._num_workers + 1:
-            raise GolemRayException(message="Max workers limit exceeded", status_code=StatusCode.BAD_REQUEST)
-
-        await self._create_activities(tags=tags)
+    async def get_providers(self, tags: Dict, current_nodes_count: int) -> List[Tuple[int, ClusterNode]]:
+        new_nodes = await self._create_activities(tags=tags, current_nodes_count=current_nodes_count)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()
         self._print_ws_connection_data()
 
-        start_worker_tasks = []
-        for node in self._cluster_nodes:
-            if node.activity:
-                await self._start_worker_process(node.activity)
-                node.state = NodeState.running
+        return new_nodes
 
-        if start_worker_tasks:
-            await asyncio.gather(*start_worker_tasks)
-
-    async def stop_worker(self, node_id: int):
-        """
-        Stops selected worker with {node_id} id.
-        :param node_id: id of node where you want to stop ray
-        """
-        node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
-        if not node or not node.state.value != NodeState.running:
-            raise GolemRayException(message=f"Node with id: {node_id} is not running ray!",
-                                    status_code=StatusCode.BAD_REQUEST)
-        if node_id != 0:
-            await self._stop_node(node)
-            self._cluster_nodes.remove(node)
-
-    async def stop_workers_by_ids(self, workers_ids: List[int]):
-        """
-        Stops selected workers ray instances basing on id list
-        :param workers_ids: list of workers id you want to stop ray on
-        """
-        nodes_to_stop = [node for node in self._cluster_nodes if node.node_id in workers_ids and node.node_id != 0]
-        for node in nodes_to_stop:
-            await self._stop_node(node)
-            self._cluster_nodes.remove(node)
-
-    async def set_node_tags(self, node_id: int, tags: Dict):
-        """
-        Updates selected cluster_node tags
-
-        :param node_id: node_id to update
-        :param tags: ray tags as dict
-        :return:
-        """
-        node = next((obj for obj in self._cluster_nodes if obj.node_id == node_id), None)
-        if node:
-            node.tags.update(tags)
 
     async def shutdown(self) -> None:
         """
@@ -264,7 +185,7 @@ class GolemManager:
         else:
             logger.info('-----FAILED ADDING PROVIDER KEY TO LOCAL')
 
-    async def _create_payload(self, provider_config: dict, **kwargs):
+    async def _create_payload(self, image_hash: str, **kwargs):
         """
         Creates payload from given image_hash and parses manifest.json file
         which is then used to create demand in golem network
@@ -272,30 +193,9 @@ class GolemManager:
         :param kwargs:
         :return:
         """
-        image_hash = provider_config.get('image_hash')
         payload, offer_scorer, connection_timeout = await parse_manifest(image_hash, self.ssh_tunnel_port)
 
         return payload, connection_timeout
-
-    @staticmethod
-    async def _stop_node(node: ClusterNode):
-        """
-        Stops ray process on selected node
-        :param node: node to stop ray on
-        :return:
-        """
-        if node and node.state == NodeState.running:
-            batch = await node.activity.execute_commands(
-                commands.Run(f'ray stop'),
-            )
-            try:
-                await batch.wait(60)
-                node.state = NodeState.pending
-                await node.activity.destroy()
-            except Exception:
-                print(batch.events)
-                print(f"Failed to stop a worker process with id: {node.node_id}")
-                raise
 
     def _print_ws_connection_data(self) -> None:
         """
@@ -312,51 +212,7 @@ class GolemManager:
                     f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
                 )
 
-    def _add_local_head_node(self, tags=None) -> ClusterNode:
-        """
-        Adds ClusterNode with node_id=0 (head_node) to list of nodes.
-
-        :param tags: dict - contains ray tags
-        :return:
-        """
-        if tags is None:
-            tags = {}
-        head_node = ClusterNode(node_id=0,
-                                internal_ip=IPv4Address('127.0.0.1'),
-                                tags=tags)
-        head_node.state = NodeState.running  # head node is running after ray up
-        self._cluster_nodes.append(head_node)
-
-        return head_node
-
-    async def _stop_local_head_node(self) -> None:
-        self._get_head_node()
-        head_node = self._get_head_node()
-        if head_node and head_node.state == NodeState.running:
-            process = await asyncio.create_subprocess_shell(
-                'ray stop')
-            await process.wait()
-            if process and head_node:
-                self._cluster_nodes.remove(head_node)
-            self._head_node_process = None
-
-    async def _start_worker_process(self, activity):
-        """
-        Starts ray worker process on external providers
-        :param activity: Activity object from golem
-        :return:
-        """
-        batch = await activity.execute_commands(
-            commands.Run(f'ray start --address {self._proxy_ip}:{self.ssh_tunnel_port}'),
-        )
-        try:
-            await batch.wait(60)
-        except Exception:
-            print(batch.events)
-            print("Failed to start a worker process")
-            raise
-
-    async def _create_activities(self, connection_timeout=None, tags: Dict = None):
+    async def _create_activities(self,  current_nodes_count: int, tags: Dict = None) -> List[Tuple[int, ClusterNode]]:
         """
         This functions manages demands, negotiations, agreements, creates activities
         and creates ssh connection to nodes.
@@ -365,6 +221,8 @@ class GolemManager:
         :return:
         """
         try:
+            new_nodes = []
+            node_id = current_nodes_count
             async with async_timeout.timeout(int(150)):
                 chain = Chain(
                     self._demand.initial_proposals(),
@@ -377,15 +235,17 @@ class GolemManager:
                     Limit(self._num_workers))
 
                 async for activity, ip, connection_uri in chain:
-                    node_id = len(self._cluster_nodes)
                     cluster_node = ClusterNode(node_id=node_id,
                                                activity=activity,
                                                internal_ip=IPv4Address(ip),
                                                connection_uri=connection_uri,
                                                tags=tags,
                                                state=NodeState.pending)
-                    self._cluster_nodes.append(cluster_node)
+                    new_nodes.append((node_id, cluster_node))
+                    node_id += 1
                     logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
+
+                return new_nodes
 
         except asyncio.TimeoutError:
             raise GolemRayException(message="Creating activities timeout reached", status_code=StatusCode.SERVER_ERROR)

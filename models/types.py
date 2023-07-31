@@ -4,7 +4,7 @@ from typing import Dict
 
 from pydantic.main import BaseModel
 
-NodeID = str
+NodeID = int
 ClusterID = str
 
 

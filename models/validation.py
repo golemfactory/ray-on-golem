@@ -18,7 +18,11 @@ class CreateClusterRequest(BaseModel):
     image_hash: str
     network: str
     budget: int
-    num_workers: int = 20
+    num_workers: int = 4
+
+
+class NonTerminatedNodesRequest(BaseModel):
+    tags: Dict
 
 
 class CreateNodesRequest(BaseModel):

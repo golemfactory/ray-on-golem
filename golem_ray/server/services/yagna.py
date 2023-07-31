@@ -1,12 +1,16 @@
+import json
 import os
 import asyncio
 import subprocess
+from subprocess import check_output
+
 import dotenv
 from asyncio.subprocess import Process
 
 from golem_ray.server.consts import StatusCode
 from golem_ray.server.logger import get_logger
 from golem_ray.server.middlewares.error_handling import GolemRayException
+from golem_ray.server.utils.utils import YAGNA_APPNAME
 
 dotenv.load_dotenv()
 logger = get_logger()
@@ -83,3 +87,14 @@ class YagnaManager:
 
         except asyncio.TimeoutError:
             logger.error("Can't run yagna service.")
+
+
+def get_or_create_yagna_appkey():
+    if os.getenv('YAGNA_APPKEY'):
+        return os.getenv('YAGNA_APPKEY')
+    id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
+    yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
+    if yagna_app is None:
+        return check_output(["yagna", "server-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
+    else:
+        return yagna_app['key']

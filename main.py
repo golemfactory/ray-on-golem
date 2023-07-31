@@ -1,17 +1,14 @@
-import base64
 import logging
 
 import dotenv
 from aiohttp import web
-from aiohttp_session import setup
-from aiohttp_session.cookie_storage import EncryptedCookieStorage
-from cryptography import fernet
 
 from golem_ray.server.logger import get_logger
 from golem_ray.server.middlewares import error_middleware
 from golem_ray.server.routes.golem import routes as nodes_routes
-from golem_ray.server.utils.yagna import YagnaManager
-from golem_ray.server.views.golem import GolemManager
+from golem_ray.server.services.ray import RayService
+from golem_ray.server.services.yagna import YagnaManager
+from golem_ray.server.services.golem import GolemService
 
 dotenv.load_dotenv()
 logger = get_logger()
@@ -22,13 +19,16 @@ async def golem_engine(app):
     await yagna_manager.run()
     app['yagna'] = yagna_manager
 
-    golem_manager = GolemManager()
-    app['golem'] = golem_manager
+    golem_service = GolemService()
+    app['golem'] = golem_service
 
-    async with golem_manager.golem:
-        await golem_manager.init()
+    ray_service = RayService(golem_service)
+    app['ray'] = ray_service
+
+    async with golem_service.golem:
+        await golem_service.init()
         yield  # before yield called on startup, after yield called on cleanup
-        await golem_manager.shutdown()
+        await golem_service.shutdown()
         await yagna_manager.shutdown()
 
 
