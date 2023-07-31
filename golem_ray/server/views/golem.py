@@ -137,30 +137,16 @@ class GolemManager:
         if tags is None:
             tags = {}
 
-        if len(self._cluster_nodes) == 0:
+        if tags.get("ray-node-type") == "head":
             head_node = self._add_local_head_node(tags=tags)
             head_node.state = NodeState.running
-            if count == 1:
-                return
+            return
 
-        nodes_with_ray_on_count = sum([1 for x in self._cluster_nodes if x.state == NodeState.running])
-        if count + nodes_with_ray_on_count > self._num_workers + 1:
-            raise GolemRayException(message="Max workers limit exceeded", status_code=StatusCode.BAD_REQUEST)
-
-        await self._create_activities(tags=tags)
+        await self._create_activities(count=count, tags=tags)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()
         self._print_ws_connection_data()
-
-        start_worker_tasks = []
-        for node in self._cluster_nodes:
-            if node.activity:
-                await self._start_worker_process(node.activity)
-                node.state = NodeState.running
-
-        if start_worker_tasks:
-            await asyncio.gather(*start_worker_tasks)
 
     async def stop_worker(self, node_id: int):
         """
@@ -356,7 +342,7 @@ class GolemManager:
             print("Failed to start a worker process")
             raise
 
-    async def _create_activities(self, connection_timeout=None, tags: Dict = None):
+    async def _create_activities(self, count: int, connection_timeout=None, tags: Dict = None):
         """
         This functions manages demands, negotiations, agreements, creates activities
         and creates ssh connection to nodes.
@@ -374,7 +360,7 @@ class GolemManager:
                     Map(default_create_activity),
                     Map(create_ssh_connection(self._network)),
                     Buffer(1),
-                    Limit(self._num_workers))
+                    Limit(count))
 
                 async for activity, ip, connection_uri in chain:
                     node_id = len(self._cluster_nodes)

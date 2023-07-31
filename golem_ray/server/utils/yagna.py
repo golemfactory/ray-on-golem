@@ -53,8 +53,8 @@ class YagnaManager:
 
     async def _check_if_yagna_is_running(self):
         process = await asyncio.create_subprocess_exec(f'{self.yagna_path}', 'net', 'status',
-                                                       stdout=subprocess.PIPE,
-                                                       stderr=subprocess.PIPE)
+                                                       stdout=asyncio.subprocess.DEVNULL,
+                                                       stderr=asyncio.subprocess.DEVNULL)
         stdout_output, _ = await process.communicate()
         if process.returncode == 0:
             return True
@@ -63,8 +63,8 @@ class YagnaManager:
 
     async def _run_yagna_payment_fund(self):
         result = await asyncio.create_subprocess_exec(*self.payment_fund_command,
-                                                      stdout=subprocess.PIPE,
-                                                      stderr=subprocess.PIPE)
+                                                      stdout=asyncio.subprocess.DEVNULL,
+                                                      stderr=asyncio.subprocess.DEVNULL)
         stdout_output, _ = await result.communicate()
         if result.returncode == 0:
             await asyncio.sleep(2)
@@ -75,7 +75,11 @@ class YagnaManager:
 
     async def _run_yagna_service(self):
         try:
-            process = await asyncio.create_subprocess_shell(cmd=f'{self.yagna_path} service run', stdout=subprocess.PIPE)
+            process = await asyncio.create_subprocess_shell(
+                cmd=f'{self.yagna_path} service run',
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
             running = await self._wait_for_yagna()
             if running:
                 self._yagna_process = process
