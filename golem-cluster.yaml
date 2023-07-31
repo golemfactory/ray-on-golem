@@ -12,7 +12,7 @@ provider:
     golem_ray_url: "http://localhost:8080"
     image_hash: "0ce63e86c7c7afeee38c2a7282e0f778089eea727d7bc65c82549976"
     network: "goerli"
-    budget: 1000
+    budget: 10
 
 file_mounts:
   {
@@ -38,9 +38,15 @@ setup_commands: []
 head_setup_commands: []
 worker_setup_commands: []
 
-head_start_ray_commands: ["ray start --head --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"]
-worker_start_ray_commands: ["ray start --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"]
+head_start_ray_commands: [
+  "ray start --head --node-ip-address  --dashboard-port 0.0.0.0 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
+]
+worker_start_ray_commands: [
+  "ray start --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "touch /tmp/dupa.txt",
+]
 auth:
   ssh_user: 'test'
+  ssh_private_key: '/home/filip/.ssh/id_rsa.pub'
 
 cluster_synced_files: []

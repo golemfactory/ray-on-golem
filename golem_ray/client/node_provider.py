@@ -59,13 +59,14 @@ class GolemNodeProvider(NodeProvider):
         node = self._golem_ray_client.fetch_node(node_id)
         return node.tags
 
-    def external_ip(self, node_id: NodeID) -> IPv4Address:
-        node = self._golem_ray_client.fetch_node(node_id)
-        return node.external_ip
+    def external_ip(self, node_id: NodeID) -> str:
+        return self.internal_ip(node_id)
+        # node = self._golem_ray_client.fetch_node(node_id)
+        # return str(node.external_ip)
 
-    def internal_ip(self, node_id: NodeID) -> IPv4Address:
+    def internal_ip(self, node_id: NodeID) -> str:
         node = self._golem_ray_client.fetch_node(node_id)
-        return node.internal_ip
+        return str(node.internal_ip)
 
     def set_node_tags(self, node_id: NodeID, tags: dict) -> None:
         self._golem_ray_client.set_node_tags(node_id, tags)

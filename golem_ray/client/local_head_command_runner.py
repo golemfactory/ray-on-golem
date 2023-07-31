@@ -116,10 +116,10 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         #     raise InvalidLocalHeadArg('port_forward', port_forward)
         # if run_env != 'auto':
         #     raise InvalidLocalHeadArg('run_env', run_env)
-        if ssh_options_override_ssh_key:
-            raise InvalidLocalHeadArg('ssh_options_override_ssh_key', ssh_options_override_ssh_key)
-        if shutdown_after_run:
-            raise InvalidLocalHeadArg('shutdown_after_run', shutdown_after_run)
+        # if ssh_options_override_ssh_key:
+        #     raise InvalidLocalHeadArg('ssh_options_override_ssh_key', ssh_options_override_ssh_key)
+        # if shutdown_after_run:
+        #     raise InvalidLocalHeadArg('shutdown_after_run', shutdown_after_run)
 
         if cmd:
             if environment_variables:
