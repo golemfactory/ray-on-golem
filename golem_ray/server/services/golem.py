@@ -1,7 +1,9 @@
 import asyncio
+import base64
 import os
 from asyncio import subprocess
 from asyncio.subprocess import Process
+from datetime import timedelta
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import List, Dict, Tuple
@@ -10,6 +12,7 @@ from uuid import uuid4
 import async_timeout
 from golem_core.core.activity_api import commands
 from golem_core.core.golem_node import GolemNode
+from golem_core.core.market_api import ManifestVmPayload
 from golem_core.core.market_api.pipeline import default_create_agreement, default_create_activity
 from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
@@ -18,11 +21,10 @@ from golem_ray.server.consts import StatusCode
 from golem_ray.server.logger import get_logger
 from golem_ray.server.middlewares.error_handling import GolemRayException
 from golem_ray.server.models.cluster_node import ClusterNode
+from golem_ray.server.services.ssh import SSHService
 from golem_ray.server.services.yagna import get_or_create_yagna_appkey
 from golem_ray.server.utils.negotiation_utils import negotiate
-from golem_ray.server.utils.utils import create_ssh_connection, parse_manifest, \
-    create_reverse_ssh_to_golem_network
-from models.types import NodeState, Node
+from models.types import NodeState
 from models.validation import CreateClusterRequest
 
 logger = get_logger()
@@ -67,30 +69,6 @@ class GolemService:
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
         # await self._allocation.get_data()
 
-    def get_nodes_response(self) -> List[Node]:
-        """
-        Prepares ClusterNode instances data to pydantic Node class object
-        """
-        return [Node(node_id=cluster_node.node_id,
-                     state=cluster_node.state,
-                     internal_ip=cluster_node.internal_ip,
-                     external_ip=cluster_node.external_ip,
-                     tags=cluster_node.tags)
-                for cluster_node in self._cluster_nodes]
-
-    def get_node_response_by_id(self, node_id: int) -> Node:
-        """
-        Prepares single ClusterNode instance data to pydantic Node class Object
-        """
-        node = next((cluster_node for cluster_node in self._cluster_nodes if cluster_node.node_id == node_id), None)
-        if not node:
-            raise GolemRayException(message=f"No node with {node_id} id", status_code=StatusCode.BAD_REQUEST)
-        return Node(node_id=node.node_id,
-                    state=node.state,
-                    internal_ip=node.internal_ip,
-                    external_ip=node.external_ip,
-                    tags=node.tags)
-
     async def create_cluster(self, provider_config: CreateClusterRequest):
         """
         Manages creating cluster, creates payload from given data and creates demand basing on payload
@@ -105,18 +83,18 @@ class GolemService:
         self._demand = await self._golem.create_demand(payload,
                                                        allocations=[self._allocation],
                                                        autostart=True)
-        self._reverse_ssh_process = await create_reverse_ssh_to_golem_network()
+        self._reverse_ssh_process = await self._create_reverse_ssh_to_golem_network()
 
-
-    async def get_providers(self, tags: Dict, current_nodes_count: int) -> List[Tuple[int, ClusterNode]]:
-        new_nodes = await self._create_activities(tags=tags, current_nodes_count=current_nodes_count)
+    async def get_providers(self, tags: Dict,
+                            count: int,
+                            current_nodes_count: int) -> List[Tuple[int, ClusterNode]]:
+        new_nodes = await self._create_activities(tags=tags, count=count, current_nodes_count=current_nodes_count)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()
         self._print_ws_connection_data()
 
         return new_nodes
-
 
     async def shutdown(self) -> None:
         """
@@ -133,9 +111,6 @@ class GolemService:
             await asyncio.gather(*tasks)
             logger.info(f'-----{len(tasks)} activities stopped')
 
-        await self._stop_local_head_node()
-        logger.info(f'-----Ray on local machine stopped')
-
         if self._reverse_ssh_process:
             self._reverse_ssh_process.terminate()
             await self._reverse_ssh_process.wait()
@@ -143,16 +118,18 @@ class GolemService:
             self._reverse_ssh_process = None
 
     # Private
+    @staticmethod
+    async def _create_reverse_ssh_to_golem_network() -> Process:
+        """
+        Creates reverse tunnel to golem network
 
-    def _get_head_node(self) -> ClusterNode | None:
+        :return: shell subprocess which runs reverse tunnel
         """
-        Returns head node (ClusterNode obj) or None if not exists
-        :return:
-        """
-        head_node = next((x for x in self._cluster_nodes if x.node_id == 0), None)
-        if head_node:
-            return head_node
-        return None
+        process = await subprocess.create_subprocess_shell(
+            rf"ssh -N -R *:{os.getenv('SSH_TUNNEL_PORT')}:127.0.0.1:6379 proxy@proxy.dev.golem.network")
+        logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{os.getenv("SSH_TUNNEL_PORT")} created.')
+
+        return process
 
     @staticmethod
     async def _add_authorized_key(activity, key):
@@ -193,7 +170,7 @@ class GolemService:
         :param kwargs:
         :return:
         """
-        payload, offer_scorer, connection_timeout = await parse_manifest(image_hash, self.ssh_tunnel_port)
+        payload, offer_scorer, connection_timeout = await self._parse_manifest(image_hash, self.ssh_tunnel_port)
 
         return payload, connection_timeout
 
@@ -203,7 +180,7 @@ class GolemService:
         :return:
         """
         for node in self._cluster_nodes:
-            if node.node_id != 0:
+            if node.activity:
                 print(
                     "Connect with:\n"
                     f"ssh "
@@ -212,7 +189,10 @@ class GolemService:
                     f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
                 )
 
-    async def _create_activities(self,  current_nodes_count: int, tags: Dict = None) -> List[Tuple[int, ClusterNode]]:
+    async def _create_activities(self,
+                                 count: int,
+                                 current_nodes_count: int,
+                                 tags: Dict = None) -> List[Tuple[int, ClusterNode]]:
         """
         This functions manages demands, negotiations, agreements, creates activities
         and creates ssh connection to nodes.
@@ -230,9 +210,9 @@ class GolemService:
                     Map(negotiate),
                     Map(default_create_agreement),
                     Map(default_create_activity),
-                    Map(create_ssh_connection(self._network)),
+                    Map(SSHService.create_ssh_connection(self._network)),
                     Buffer(1),
-                    Limit(self._num_workers))
+                    Limit(count))
 
                 async for activity, ip, connection_uri in chain:
                     cluster_node = ClusterNode(node_id=node_id,
@@ -287,3 +267,34 @@ class GolemService:
                     await self._add_authorized_key(cluster_node.activity, other_activity_key)
                 else:
                     await self._add_authorized_key_to_local_node(other_activity_key)
+
+    @staticmethod
+    async def _parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
+        """Parses manifest file and replaces image_hash used.
+           Decoding is needed in order to work.
+           :arg image_hash:
+           :arg text:
+        """
+        with open(Path(__file__).parent.parent.parent.parent.joinpath("manifest.json"), "rb") as manifest:
+            manifest = manifest.read()
+            manifest = (manifest
+                        .decode('utf-8')
+                        .replace('{IMAGE_HASH}', image_hash)
+                        .replace('{SSH_TUNNEL_PORT}', ssh_tunnel_port)
+                        )
+            manifest = base64.b64encode(manifest.encode('utf-8')).decode("utf-8")
+
+            params = {
+                "manifest": manifest,
+                "capabilities": ['vpn', 'inet', 'manifest-support'],
+                "min_mem_gib": 0,
+                "min_cpu_threads": 0,
+                "min_storage_gib": 0,
+            }
+            # strategy = DEFAULT_SCORING_STRATEGY
+            # connection_timeout = DEFAULT_CONNECTION_TIMEOUT
+            connection_timeout = timedelta(seconds=150)
+            offer_scorer = None
+            payload = ManifestVmPayload(**params)
+
+            return payload, offer_scorer, connection_timeout

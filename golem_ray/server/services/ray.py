@@ -4,7 +4,7 @@ from typing import Dict, List
 from golem_ray.server.middlewares.error_handling import RayException
 from golem_ray.server.models.cluster_node import ClusterNode
 from golem_ray.server.services.golem import GolemService
-from models.types import NodeID, NodeState
+from models.types import NodeID, NodeState, Node
 
 
 class RayService:
@@ -14,9 +14,18 @@ class RayService:
         self._cluster_nodes: Dict[int, ClusterNode] = {}
         self._num_workers = 2
 
-    @property
-    def golem_service(self):
-        return self._golem_service
+    def get_all_nodes_ids(self) -> List[NodeID]:
+        return list(self._cluster_nodes.keys())
+
+    def get_all_nodes_dict(self) -> Dict:
+        return {k: Node(
+            node_id=v.node_id,
+            state=v.state,
+            tags=v.tags,
+            internal_ip=v.internal_ip,
+            external_ip=v.external_ip
+        )
+            for (k, v) in self._cluster_nodes.items()}
 
     def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeID]:
         matched_ids = []
@@ -63,7 +72,9 @@ class RayService:
         if count + len(self._cluster_nodes) > self._num_workers + 1:
             raise RayException(message=RayException.NODES_COUNT_EXCEEDED)
 
-        new_nodes = await self._golem_service.get_providers(tags=tags, current_nodes_count=len(self._cluster_nodes))
+        new_nodes = await self._golem_service.get_providers(tags=tags,
+                                                            count=count,
+                                                            current_nodes_count=len(self._cluster_nodes))
         self._cluster_nodes.update(new_nodes)
 
         return self._cluster_nodes
@@ -75,7 +86,7 @@ class RayService:
             await self._terminate_single_node(node_id)
             self._cluster_nodes.pop(node_id, None)
 
-    async def _terminate_single_node(self, node_id: NodeID):
+    async def _terminate_single_node(self, node_id: NodeID) -> None:
         node = self._cluster_nodes.get(node_id)
         if node:
             try:

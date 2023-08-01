@@ -1,19 +1,20 @@
+import asyncio
 import json
 import os
-import asyncio
 import subprocess
+from asyncio.subprocess import Process
 from subprocess import check_output
 
 import dotenv
-from asyncio.subprocess import Process
 
 from golem_ray.server.consts import StatusCode
 from golem_ray.server.logger import get_logger
 from golem_ray.server.middlewares.error_handling import GolemRayException
-from golem_ray.server.utils.utils import YAGNA_APPNAME
 
 dotenv.load_dotenv()
 logger = get_logger()
+
+YAGNA_APPNAME = 'requestor-mainnet'
 
 
 class YagnaManager:
@@ -79,7 +80,8 @@ class YagnaManager:
 
     async def _run_yagna_service(self):
         try:
-            process = await asyncio.create_subprocess_shell(cmd=f'{self.yagna_path} service run', stdout=subprocess.PIPE)
+            process = await asyncio.create_subprocess_shell(cmd=f'{self.yagna_path} service run',
+                                                            stdout=subprocess.PIPE)
             running = await self._wait_for_yagna()
             if running:
                 self._yagna_process = process

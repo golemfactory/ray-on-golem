@@ -40,8 +40,7 @@ class SetNodeTagsRequest(BaseModel):
 
 
 class CreateClusterResponse(BaseModel):
-    nodes: List[Node]
-    pass
+    nodes: List[NodeID]
 
 
 class CreateNodesResponse(BaseModel):

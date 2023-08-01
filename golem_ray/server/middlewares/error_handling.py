@@ -33,8 +33,8 @@ async def error_middleware(request, handler):
         response = await handler(request)
         if response.status != 404:
             return response
-        message = response.message
-        status_code = StatusCode.OK.value
+        message = 'not found'
+        status_code = StatusCode.NOT_FOUND.value
     except web.HTTPException as ex:
         if ex.status != 404:
             raise
@@ -43,5 +43,8 @@ async def error_middleware(request, handler):
     except GolemRayException as ex:
         message = ex.message
         status_code = ex.status_code
+    except RayException as ex:
+        message = ex.message
+        status_code = 400
 
     return web.json_response({"error": message}, status=status_code)

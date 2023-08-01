@@ -1,3 +1,4 @@
+import json
 from http import HTTPStatus
 from ipaddress import IPv4Address
 from typing import List, Dict
@@ -14,6 +15,7 @@ from models.validation import (CreateNodesRequest, CreateClusterRequest, DeleteN
                                IsTerminatedResponse, GetNodeTagsResponse, GetNodeIpAddressResponse,
                                NonTerminatedNodesRequest)
 
+golem_ray_urls = GolemRayURLs()
 
 class GolemRayClient:
 
@@ -24,14 +26,14 @@ class GolemRayClient:
         self._deleted_nodes: set[NodeID] = set()
 
     def get_running_or_create_cluster(self, image_hash: str, network: str, budget: int) -> None:
-        url = GolemRayURLs.CREATE_CLUSTER
+        url = golem_ray_urls.CREATE_CLUSTER
         request_data = CreateClusterRequest(
             image_hash=image_hash,
             network=network,
             budget=budget,
         )
 
-        response = self.session.post(url, data=request_data)
+        response = self.session.post(url, data=request_data.json())
 
         if response.status_code != HTTPStatus.CREATED:
             raise GolemRayClientException(
@@ -49,10 +51,10 @@ class GolemRayClient:
             )
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeID]:
-        url = GolemRayURLs.Nodes.GET_NODES
+        url = golem_ray_urls.GET_NODES
         request_data = NonTerminatedNodesRequest(tags=tag_filters)
 
-        response = self.session.post(url, data=request_data)
+        response = self.session.post(url, data=request_data.json())
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(
@@ -72,9 +74,9 @@ class GolemRayClient:
             return parsed_response.nodes
 
     def is_running(self, node_id: NodeID) -> bool:
-        url = GolemRayURLs.Nodes.IS_RUNNING
+        url = golem_ray_urls.IS_RUNNING
 
-        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id))
+        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id).json())
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(
@@ -94,9 +96,9 @@ class GolemRayClient:
             return parsed_response.is_running
 
     def is_terminated(self, node_id: NodeID) -> bool:
-        url = GolemRayURLs.Nodes.IS_TERMINATED
+        url = golem_ray_urls.IS_TERMINATED
 
-        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id))
+        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id).json())
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(
@@ -116,9 +118,9 @@ class GolemRayClient:
             return parsed_response.is_terminated
 
     def get_node_tags(self, node_id) -> dict:
-        url = GolemRayURLs.Nodes.NODE_TAGS
+        url = golem_ray_urls.NODE_TAGS
 
-        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id))
+        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id).json())
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(
@@ -138,9 +140,9 @@ class GolemRayClient:
             return parsed_response.tags
 
     def get_node_internal_ip(self, node_id: NodeID) -> IPv4Address:
-        url = GolemRayURLs.Nodes.INTERNAL_IP
+        url = golem_ray_urls.INTERNAL_IP
 
-        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id))
+        response = self.session.post(url, data=SingleNodeRequest(node_id=node_id).json())
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(
@@ -160,10 +162,10 @@ class GolemRayClient:
             return parsed_response.ip_address
 
     def set_node_tags(self, node_id: NodeID, tags: dict) -> None:
-        url = GolemRayURLs.Nodes.SET_NODE_TAGS
+        url = golem_ray_urls.SET_NODE_TAGS
         request_data = SetNodeTagsRequest(node_id=node_id, tags=tags)
 
-        response = self.session.post(url, data=request_data)
+        response = self.session.post(url, data=request_data.json())
 
         if response.status_code != HTTPStatus.OK:
             raise GolemRayClientException(
@@ -175,10 +177,10 @@ class GolemRayClient:
         return self.terminate_nodes([node_id])
 
     def terminate_nodes(self, node_ids: List[NodeID]) -> None:
-        url = GolemRayURLs.Nodes.TERMINATE_NODES
+        url = golem_ray_urls.TERMINATE_NODES
         request_data = DeleteNodesRequest(node_ids=node_ids)
 
-        response = self.session.post(url, data=request_data)
+        response = self.session.post(url, data=request_data.json())
 
         if response.status_code == HTTPStatus.NO_CONTENT:
             self._deleted_nodes.update(set(node_ids))
@@ -190,10 +192,10 @@ class GolemRayClient:
         )
 
     def create_nodes(self, cluster_id: ClusterID, count: int, tags: Dict) -> dict[str, dict]:
-        url = GolemRayURLs.Nodes.CREATE_NODES
+        url = golem_ray_urls.CREATE_NODES
         request_data = CreateNodesRequest(count=count, tags=tags)
 
-        response = self.session.post(url, data=request_data)
+        response = self.session.post(url, data=request_data.json())
 
         if response.status_code != HTTPStatus.CREATED:
             raise GolemRayClientException(
