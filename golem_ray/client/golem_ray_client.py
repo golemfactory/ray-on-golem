@@ -1,4 +1,3 @@
-import json
 from http import HTTPStatus
 from ipaddress import IPv4Address
 from typing import List, Dict
@@ -16,6 +15,7 @@ from models.validation import (CreateNodesRequest, CreateClusterRequest, DeleteN
                                NonTerminatedNodesRequest)
 
 golem_ray_urls = GolemRayURLs()
+
 
 class GolemRayClient:
 

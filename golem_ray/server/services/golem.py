@@ -17,7 +17,6 @@ from golem_core.core.market_api.pipeline import default_create_agreement, defaul
 from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
-from golem_ray.server.consts import StatusCode
 from golem_ray.server.logger import get_logger
 from golem_ray.server.middlewares.error_handling import GolemRayException
 from golem_ray.server.models.cluster_node import ClusterNode
@@ -228,7 +227,7 @@ class GolemService:
                 return new_nodes
 
         except asyncio.TimeoutError:
-            raise GolemRayException(message="Creating activities timeout reached", status_code=StatusCode.SERVER_ERROR)
+            raise GolemRayException(message="Creating activities timeout reached")
 
     async def _add_my_key(self):
         """
@@ -275,6 +274,7 @@ class GolemService:
            :arg image_hash:
            :arg text:
         """
+        # TODO: refactor parent.parent...parent - define ROOT_DIR
         with open(Path(__file__).parent.parent.parent.parent.joinpath("manifest.json"), "rb") as manifest:
             manifest = manifest.read()
             manifest = (manifest
