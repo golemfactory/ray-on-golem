@@ -5,9 +5,9 @@ from typing import List, Dict, Set, TypeVar
 import requests
 from pydantic.error_wrappers import ValidationError
 from typing_extensions import Type
+from yarl import URL
 
-from golem_ray.client.exceptions import GolemRayClientException
-from golem_ray.exceptions import GolemRayValidationException
+from golem_ray.client.exceptions import GolemRayClientException, GolemRayClientValidationException
 from golem_ray.server.consts import urls
 from golem_ray.server.models import SingleNodeRequestData, CreateClusterRequestData, \
     NonTerminatedNodesRequestData, CreateNodesRequestData, DeleteNodesRequestData, SetNodeTagsRequestData, \
@@ -23,14 +23,15 @@ class GolemRayClient:
         self.session = requests.Session()
         self._cluster_id = None
         self._deleted_nodes: Set[NodeID] = set()
-        self.BASE_URL = base_url
+        self.BASE_URL: URL = base_url
 
     def _request(self,
-                 url,
+                 url_suffix: str,
                  response_model: Type[ResponseModelType],
                  request_data,
                  error_message) -> ResponseModelType:
 
+        url = self.BASE_URL.with_path(str(url_suffix))
         response = self.session.post(url, data=request_data.json())
 
         if response.status_code != HTTPStatus.OK:
@@ -43,27 +44,26 @@ class GolemRayClient:
             parsed_response = response_model.parse_raw(response.text)
             return parsed_response
         except ValidationError:
-            raise GolemRayValidationException(
+            raise GolemRayClientValidationException(
                 error_message="Couldn't validate response data",
                 response=response,
                 expected=response_model
             )
 
     def get_running_or_create_cluster(self, image_hash: str, network: str, budget: int) -> None:
-        url = self.BASE_URL / urls.CREATE_CLUSTER
+        url_suffix = urls.CREATE_CLUSTER
         request_data = CreateClusterRequestData(
             image_hash=image_hash,
             network=network,
             budget=budget,
         )
-
-        self._request(url,
+        self._request(url_suffix,
                       response_model=CreateClusterResponseData,
                       request_data=request_data,
                       error_message="Couldn't create cluster")
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeID]:
-        url = self.BASE_URL / urls.GET_NODES
+        url = urls.GET_NODES
         request_data = NonTerminatedNodesRequestData(tags=tag_filters)
 
         response: GetNodesResponseData = (
@@ -75,7 +75,7 @@ class GolemRayClient:
         return response.nodes
 
     def is_running(self, node_id: NodeID) -> bool:
-        url = self.BASE_URL / urls.IS_RUNNING
+        url = urls.IS_RUNNING
 
         response: IsRunningResponseData = (
             self._request(url,
@@ -86,7 +86,7 @@ class GolemRayClient:
         return response.is_running
 
     def is_terminated(self, node_id: NodeID) -> bool:
-        url = self.BASE_URL / urls.IS_TERMINATED
+        url = urls.IS_TERMINATED
 
         response: IsTerminatedResponseData = (
             self._request(url,
@@ -97,7 +97,7 @@ class GolemRayClient:
         return response.is_terminated
 
     def get_node_tags(self, node_id) -> Dict:
-        url = self.BASE_URL / urls.NODE_TAGS
+        url = urls.NODE_TAGS
 
         response: GetNodeTagsResponseData = (
             self._request(url,
@@ -108,7 +108,7 @@ class GolemRayClient:
         return response.tags
 
     def get_node_internal_ip(self, node_id: NodeID) -> IPv4Address:
-        url = self.BASE_URL / urls.INTERNAL_IP
+        url = urls.INTERNAL_IP
 
         response: GetNodeIpAddressResponseData = (
             self._request(url,
@@ -119,7 +119,7 @@ class GolemRayClient:
         return response.ip_address
 
     def set_node_tags(self, node_id: NodeID, tags: Dict) -> None:
-        url = self.BASE_URL / urls.SET_NODE_TAGS
+        url = urls.SET_NODE_TAGS
         request_data = SetNodeTagsRequestData(node_id=node_id, tags=tags)
 
         response = self._request(url,
@@ -131,7 +131,7 @@ class GolemRayClient:
         self.terminate_nodes([node_id])
 
     def terminate_nodes(self, node_ids: List[NodeID]) -> None:
-        url = self.BASE_URL / urls.TERMINATE_NODES
+        url = urls.TERMINATE_NODES
         request_data = DeleteNodesRequestData(node_ids=node_ids)
 
         self._request(url,
@@ -140,7 +140,7 @@ class GolemRayClient:
                       error_message="Couldn't terminate nodes")
 
     def create_nodes(self, cluster_id: ClusterID, count: int, tags: Dict) -> Dict[str, Dict]:
-        url = self.BASE_URL / urls.CREATE_NODES
+        url = urls.CREATE_NODES
         request_data = CreateNodesRequestData(count=count, tags=tags)
 
         response: CreateNodesResponseData \

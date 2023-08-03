@@ -9,24 +9,16 @@ from ray.autoscaler.node_provider import NodeProvider
 
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
-from golem_ray.server.consts.config import ROOT_DIR
+from golem_ray.server.consts import ROOT_DIR, BASE_URL
 from golem_ray.server.models import NodeID
 
 dotenv.load_dotenv(ROOT_DIR)
-
-
-def get_envs():
-    base_url = os.getenv('BASE_URL', "localhost:8080")
-
-    return base_url
-
 
 class GolemNodeProvider(NodeProvider):
 
     def __init__(self, provider_config, cluster_name):
         super().__init__(provider_config, cluster_name)
-        base_url = get_envs()
-        self._golem_ray_client = GolemRayClient(base_url=base_url)
+        self._golem_ray_client = GolemRayClient(base_url=BASE_URL)
 
         image_hash = provider_config["parameters"]["image_hash"]
         network = provider_config["parameters"].get("network", "goerli")

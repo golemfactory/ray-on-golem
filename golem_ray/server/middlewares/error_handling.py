@@ -2,8 +2,6 @@ from http import HTTPStatus
 
 from aiohttp import web
 
-from golem_ray.exceptions import GolemRayValidationException
-
 
 class GolemRayException(Exception):
     message = None
@@ -58,7 +56,7 @@ async def error_middleware(request, handler):
             raise
         message = ex.reason
         status_code = ex.status_code
-    except (GolemRayException, GolemRayValidationException) as ex:
+    except GolemRayException as ex:
         message = ex.message
         status_code = HTTPStatus.BAD_REQUEST
 

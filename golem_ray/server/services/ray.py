@@ -4,7 +4,7 @@ from typing import Dict, List
 from golem_ray.server.middlewares import NodeNotFound, NodesCountExceeded, NodesNotFound, \
     DestroyActivityError
 from golem_ray.server.models import CreateClusterRequestData, NodeID, NodeState, Node, ClusterNode
-from golem_ray.server.services.golem.golem import GolemService
+from golem_ray.server.services import GolemService
 
 
 class RayService:

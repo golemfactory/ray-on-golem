@@ -6,7 +6,7 @@ from asyncio.subprocess import Process
 from subprocess import check_output
 from typing import Optional
 
-
+from golem_ray.server.consts import YAGNA_APPKEY
 from golem_ray.server.middlewares.error_handling import CheckYagnaStatusError
 
 logger = logging.getLogger('__main__.' + __name__)
@@ -16,8 +16,8 @@ class YagnaManager:
     YAGNA_APPNAME = 'golem-ray'
 
     def __init__(self, yagna_path: str):
-        self.yagna_path = yagna_path
-        self.yagna_appkey = self.get_or_create_yagna_appkey()
+        self.yagna_path: str = yagna_path
+        self.yagna_appkey: str = self.get_or_create_yagna_appkey()
         self.run_command = [yagna_path, 'service', 'run']
         self.net_status_command = [yagna_path, 'net', 'status']
         self.payment_fund_command = [yagna_path, 'payment', 'fund']
@@ -83,10 +83,9 @@ class YagnaManager:
         except asyncio.TimeoutError:
             logger.error("Can't run yagna service.")
 
-    # TODO: tworzenie klucza golem-ray jeśli go nie ma
     def get_or_create_yagna_appkey(self):
-        if self.yagna_path:
-            return self.yagna_appkey
+        if YAGNA_APPKEY:
+            return YAGNA_APPKEY
         id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
         yagna_app = next((app for app in id_data if app['name'] == self.YAGNA_APPNAME), None)
         if yagna_app is None:

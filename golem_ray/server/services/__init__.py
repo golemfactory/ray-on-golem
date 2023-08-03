@@ -1,3 +1,3 @@
-from golem.golem import *
+from .golem.golem import *
 from .ray import *
-from yagna import *
+from .yagna import *

@@ -15,8 +15,8 @@ class GolemRayClientException(Exception):
 
 
 class GolemRayClientValidationException(Exception):
-    def __init__(self, message: str, response: requests.Response, expected: Type[BaseModel]):
-        error_message = f"{message}: \n" \
-                        f"{response.json() = }\n" \
-                        f"expected {expected}"
+    def __init__(self, error_message: str, response: requests.Response, expected: Type[BaseModel]):
+        message = f"{error_message}: \n" \
+                  f"{response.json() = }\n" \
+                  f"expected {expected}"
         super().__init__(error_message)

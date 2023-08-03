@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import json
 import logging
 import os
 from asyncio import subprocess
@@ -181,6 +183,7 @@ class GolemService:
         :return:
         """
         manifest = get_manifest(image_hash, self.gcs_reverse_tunnel_port)
+        manifest = base64.b64encode(json.dumps(manifest).encode('utf-8')).decode("utf-8")
 
         params = {
             "manifest": manifest,
