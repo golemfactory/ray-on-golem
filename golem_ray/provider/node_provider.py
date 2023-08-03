@@ -1,4 +1,3 @@
-import os
 from ipaddress import IPv4Address
 from types import ModuleType
 from typing import Any, List, Dict, Optional
@@ -13,6 +12,7 @@ from golem_ray.server.consts import ROOT_DIR, BASE_URL
 from golem_ray.server.models import NodeID
 
 dotenv.load_dotenv(ROOT_DIR)
+
 
 class GolemNodeProvider(NodeProvider):
 

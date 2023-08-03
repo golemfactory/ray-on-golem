@@ -6,7 +6,7 @@ from aiohttp import web
 class GolemRayException(Exception):
     message = None
 
-    def __init__(self, additional_message):
+    def __init__(self, additional_message=None):
         if additional_message:
             self.message += "\n" + additional_message
         super().__init__(self.message)
