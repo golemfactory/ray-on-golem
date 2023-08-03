@@ -1,34 +1,31 @@
 import asyncio
 import json
+import logging
 import os
 import subprocess
 from asyncio.subprocess import Process
 from subprocess import check_output
+from typing import Optional
 
 import dotenv
 
-from golem_ray.server.consts import StatusCode
-from golem_ray.server.logger import get_logger
-from golem_ray.server.middlewares.error_handling import GolemRayException
+from golem_ray.server.middlewares.error_handling import CheckYagnaStatusError
 
 dotenv.load_dotenv()
-logger = get_logger()
+logger = logging.getLogger('__main__.' + __name__)
 
 YAGNA_APPNAME = 'requestor-mainnet'
 
 
 class YagnaManager:
-    yagna_path = os.getenv('YAGNA_PATH') or 'yagna'
-    run_command = [f'{yagna_path}', 'service', 'run']
-    payment_fund_command = [f'{yagna_path}', 'payment', 'fund']
-    yagna_running_string = 'yagna is already running'
-    payment_fund_success_string = 'Received funds from the faucet'
-    yagna_started_string = 'Server listening on'
-    timeout = 60  # in seconds
 
-    def __init__(self):
+    def __init__(self, yagna_path: str):
+        yagna_path = yagna_path
+        self.run_command = [yagna_path, 'service', 'run']
+        self.net_status_command = [yagna_path, 'net', 'status']
+        self.payment_fund_command = [yagna_path, 'payment', 'fund']
         self._is_running = False
-        self._yagna_process: Process | None = None
+        self._yagna_process: Optional[Process] = None
 
     ##
     # Public
@@ -57,7 +54,7 @@ class YagnaManager:
         return True
 
     async def _check_if_yagna_is_running(self):
-        process = await asyncio.create_subprocess_exec(f'{self.yagna_path}', 'net', 'status',
+        process = await asyncio.create_subprocess_exec(*self.net_status_command,
                                                        stdout=subprocess.PIPE,
                                                        stderr=subprocess.PIPE)
         stdout_output, _ = await process.communicate()
@@ -75,13 +72,12 @@ class YagnaManager:
             await asyncio.sleep(2)
             return True
         else:
-            raise GolemRayException(message='Cant check yagna status',
-                                    status_code=StatusCode.SERVER_ERROR)
+            raise CheckYagnaStatusError
 
     async def _run_yagna_service(self):
         try:
-            process = await asyncio.create_subprocess_shell(cmd=f'{self.yagna_path} service run',
-                                                            stdout=subprocess.PIPE)
+            process = await asyncio.create_subprocess_exec(*self.run_command,
+                                                           stdout=subprocess.PIPE)
             running = await self._wait_for_yagna()
             if running:
                 self._yagna_process = process
@@ -91,6 +87,7 @@ class YagnaManager:
             logger.error("Can't run yagna service.")
 
 
+# TODO: wspolny config envow j.w. (opcjonalny) + tworzenie klucza golem-ray jeśli go nie ma
 def get_or_create_yagna_appkey():
     if os.getenv('YAGNA_APPKEY'):
         return os.getenv('YAGNA_APPKEY')

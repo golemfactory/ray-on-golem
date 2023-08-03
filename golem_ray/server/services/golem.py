@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import logging
 import os
 from asyncio import subprocess
 from asyncio.subprocess import Process
@@ -13,20 +14,17 @@ import async_timeout
 from golem_core.core.activity_api import commands
 from golem_core.core.golem_node import GolemNode
 from golem_core.core.market_api import ManifestVmPayload
-from golem_core.core.market_api.pipeline import default_create_agreement, default_create_activity
+from golem_core.core.market_api.pipeline import default_create_agreement, default_create_activity, default_negotiate
 from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
-from golem_ray.server.logger import get_logger
-from golem_ray.server.middlewares.error_handling import GolemRayException
-from golem_ray.server.models.cluster_node import ClusterNode
+from golem_ray.server.consts.config import MANIFEST_DIR
+from golem_ray.server.middlewares.error_handling import CreateActivitiesTimeout, DestroyActivityError, ManifestNotFound
 from golem_ray.server.services.ssh import SSHService
 from golem_ray.server.services.yagna import get_or_create_yagna_appkey
-from golem_ray.server.utils.negotiation_utils import negotiate
-from models.types import NodeState
-from models.validation import CreateClusterRequest
+from golem_ray.server.models.models import CreateClusterRequestData, NodeState, ClusterNode
 
-logger = get_logger()
+logger = logging.getLogger('__main__.' + __name__)
 
 
 # "ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
@@ -34,8 +32,8 @@ logger = get_logger()
 
 class GolemService:
 
-    def __init__(self):
-        self.ssh_tunnel_port = os.getenv('SSH_TUNNEL_PORT') or '3009'
+    def __init__(self, gcs_reverse_tunnel_port):
+        self.gcs_reverse_tunnel_port = gcs_reverse_tunnel_port
         self._proxy_ip = 'proxy.dev.golem.network'
         self._loop = None
         self._demand = None
@@ -68,7 +66,7 @@ class GolemService:
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
         # await self._allocation.get_data()
 
-    async def create_cluster(self, provider_config: CreateClusterRequest):
+    async def create_cluster(self, provider_config: CreateClusterRequestData):
         """
         Manages creating cluster, creates payload from given data and creates demand basing on payload
         Local node is being created without ray instance.
@@ -95,6 +93,13 @@ class GolemService:
 
         return new_nodes
 
+    @staticmethod
+    async def destroy_activity(node: ClusterNode):
+        try:
+            await node.activity.destroy()
+        except Exception:
+            raise DestroyActivityError
+
     async def shutdown(self) -> None:
         """
         Terminates all activities and ray on head node.
@@ -117,15 +122,15 @@ class GolemService:
             self._reverse_ssh_process = None
 
     # Private
-    @staticmethod
-    async def _create_reverse_ssh_to_golem_network() -> Process:
+    async def _create_reverse_ssh_to_golem_network(self) -> Process:
         """
         Creates reverse tunnel to golem network
 
         :return: shell subprocess which runs reverse tunnel
         """
-        process = await subprocess.create_subprocess_shell(
-            rf"ssh -N -R *:{os.getenv('SSH_TUNNEL_PORT')}:127.0.0.1:6379 proxy@proxy.dev.golem.network")
+        text_command = "ssh -N -R *:{port}:127.0.0.1:6379 proxy@proxy.dev.golem.network"
+        process = await subprocess.create_subprocess_shell(text_command.format(
+            port=self.gcs_reverse_tunnel_port))
         logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{os.getenv("SSH_TUNNEL_PORT")} created.')
 
         return process
@@ -206,7 +211,7 @@ class GolemService:
                 chain = Chain(
                     self._demand.initial_proposals(),
                     # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
-                    Map(negotiate),
+                    Map(self._negotiate),
                     Map(default_create_agreement),
                     Map(default_create_activity),
                     Map(SSHService.create_ssh_connection(self._network)),
@@ -227,7 +232,7 @@ class GolemService:
                 return new_nodes
 
         except asyncio.TimeoutError:
-            raise GolemRayException(message="Creating activities timeout reached")
+            raise CreateActivitiesTimeout
 
     async def _add_my_key(self):
         """
@@ -268,14 +273,21 @@ class GolemService:
                     await self._add_authorized_key_to_local_node(other_activity_key)
 
     @staticmethod
+    async def _negotiate(proposal):
+        return await asyncio.wait_for(default_negotiate(proposal), timeout=10)
+
+    @staticmethod
     async def _parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
         """Parses manifest file and replaces image_hash used.
            Decoding is needed in order to work.
            :arg image_hash:
            :arg text:
         """
-        # TODO: refactor parent.parent...parent - define ROOT_DIR
-        with open(Path(__file__).parent.parent.parent.parent.joinpath("manifest.json"), "rb") as manifest:
+        try:
+            manifest = open(MANIFEST_DIR, "rb")
+        except FileNotFoundError:
+            raise ManifestNotFound
+        else:
             manifest = manifest.read()
             manifest = (manifest
                         .decode('utf-8')

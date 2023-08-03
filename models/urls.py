@@ -9,6 +9,7 @@ dotenv.load_dotenv(Path(__file__).parent / '.env')
 
 class GolemRayURLs:
     def __init__(self):
+        # TODO: przeniesc do constow, tworzenie urla w requestach, base url jako argument (nie w zmiennej, definiowane gdzies na gorze klienta)
         self.BASE_URL = URL(os.getenv("WEB_SERVER_URL", 'http://localhost:8080'))
         self.CREATE_CLUSTER = self.BASE_URL / 'create_cluster'
         self.GET_NODES = self.BASE_URL / ''
