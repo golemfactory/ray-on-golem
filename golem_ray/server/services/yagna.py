@@ -1,27 +1,23 @@
 import asyncio
 import json
 import logging
-import os
 import subprocess
 from asyncio.subprocess import Process
 from subprocess import check_output
 from typing import Optional
 
-import dotenv
 
-from golem_ray.server.consts.config import ROOT_DIR
 from golem_ray.server.middlewares.error_handling import CheckYagnaStatusError
 
-dotenv.load_dotenv(ROOT_DIR.joinpath('.env'))
 logger = logging.getLogger('__main__.' + __name__)
-
-YAGNA_APPNAME = 'requestor-mainnet'
 
 
 class YagnaManager:
+    YAGNA_APPNAME = 'golem-ray'
 
     def __init__(self, yagna_path: str):
-        yagna_path = yagna_path
+        self.yagna_path = yagna_path
+        self.yagna_appkey = self.get_or_create_yagna_appkey()
         self.run_command = [yagna_path, 'service', 'run']
         self.net_status_command = [yagna_path, 'net', 'status']
         self.payment_fund_command = [yagna_path, 'payment', 'fund']
@@ -87,14 +83,13 @@ class YagnaManager:
         except asyncio.TimeoutError:
             logger.error("Can't run yagna service.")
 
-
-# TODO: wspolny config envow j.w. (opcjonalny) + tworzenie klucza golem-ray jeśli go nie ma
-def get_or_create_yagna_appkey():
-    if os.getenv('YAGNA_APPKEY'):
-        return os.getenv('YAGNA_APPKEY')
-    id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
-    yagna_app = next((app for app in id_data if app['name'] == YAGNA_APPNAME), None)
-    if yagna_app is None:
-        return check_output(["yagna", "server-key", "create", YAGNA_APPNAME]).decode('utf-8').strip('"\n')
-    else:
-        return yagna_app['key']
+    # TODO: tworzenie klucza golem-ray jeśli go nie ma
+    def get_or_create_yagna_appkey(self):
+        if self.yagna_path:
+            return self.yagna_appkey
+        id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
+        yagna_app = next((app for app in id_data if app['name'] == self.YAGNA_APPNAME), None)
+        if yagna_app is None:
+            return check_output(["yagna", "server-key", "create", self.YAGNA_APPNAME]).decode('utf-8').strip('"\n')
+        else:
+            return yagna_app['key']

@@ -2,52 +2,47 @@ from http import HTTPStatus
 
 from aiohttp import web
 
+from golem_ray.exceptions import GolemRayValidationException
 
-class RayException(Exception):
-    def __init__(self, message: str, additional_message=None):
+
+class GolemRayException(Exception):
+    message = None
+
+    def __init__(self, additional_message):
         if additional_message:
-            message += "\n" + additional_message
-        super().__init__(message)
-        self.message = message
+            self.message += "\n" + additional_message
+        super().__init__(self.message)
 
 
-class NodeNotFound(RayException):
+class NodeNotFound(GolemRayException):
+    message = "Node with given id not found"
+
+
+class NodesNotFound(GolemRayException):
+    message = "Nodes with given ids not found"
+
     def __init__(self, additional_message):
-        super().__init__(message="Node with given id not found",
-                         additional_message=additional_message)
+        super().__init__(additional_message=additional_message)
 
 
-class NodesNotFound(RayException):
-    def __init__(self, additional_message):
-        super().__init__(message="Nodes with given ids not found",
-                         additional_message=additional_message)
+class CreateActivitiesTimeout(GolemRayException):
+    message = "Creating activities timeout reached"
 
 
-class CreateActivitiesTimeout(RayException):
-    def __init__(self):
-        super().__init__(message="Creating activities timeout reached")
+class DestroyActivityError(GolemRayException):
+    message = "Can't destroy activity"
 
 
-class DestroyActivityError(RayException):
-    def __init__(self, additional_message=None):
-        super().__init__(message="Can't destroy activity",
-                         additional_message=additional_message)
+class NodesCountExceeded(GolemRayException):
+    message = "Can't create more nodes"
 
 
-class NodesCountExceeded(RayException):
-
-    def __init__(self):
-        super().__init__(message="Can't create more nodes")
+class CheckYagnaStatusError(GolemRayException):
+    message = "Can't check yagna status"
 
 
-class CheckYagnaStatusError(RayException):
-    def __init__(self):
-        super().__init__(message="Can't check yagna status")
-
-
-class ManifestNotFound(RayException):
-    def __init__(self):
-        super().__init__(message="Manifest file not found")
+class ManifestNotFound(GolemRayException):
+    message = "Manifest file not found"
 
 
 @web.middleware
@@ -63,7 +58,7 @@ async def error_middleware(request, handler):
             raise
         message = ex.reason
         status_code = ex.status_code
-    except RayException as ex:
+    except (GolemRayException, GolemRayValidationException) as ex:
         message = ex.message
         status_code = HTTPStatus.BAD_REQUEST
 

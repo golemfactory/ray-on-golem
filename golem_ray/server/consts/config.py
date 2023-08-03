@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 _UTILS_DIR = "utils"
@@ -6,7 +7,7 @@ MANIFEST_DIR = Path(__file__).parent.joinpath(_UTILS_DIR).joinpath(_MANIFEST_FIL
 
 ROOT_DIR = Path(__file__).parents[3]
 
-DICT_CONFIG = {
+LOGGER_DICT_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
     'loggers': {
@@ -18,3 +19,7 @@ DICT_CONFIG = {
         },
     }
 }
+
+YAGNA_PATH = os.getenv('YAGNA_PATH', 'yagna')
+GCS_REVERSE_TUNNEL_PORT = os.getenv('GCS_REVERSE_TUNNEL_PORT', 3009)
+PROXY_IP = os.getenv('PROXY_IP', 'proxy.dev.golem.network')

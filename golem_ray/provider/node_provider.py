@@ -10,7 +10,7 @@ from ray.autoscaler.node_provider import NodeProvider
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
 from golem_ray.server.consts.config import ROOT_DIR
-from golem_ray.server.models.models import NodeID
+from golem_ray.server.models import NodeID
 
 dotenv.load_dotenv(ROOT_DIR)
 
@@ -30,7 +30,7 @@ class GolemNodeProvider(NodeProvider):
 
         image_hash = provider_config["parameters"]["image_hash"]
         network = provider_config["parameters"].get("network", "goerli")
-        budget = provider_config["parameters"].get("budget", 1_000)
+        budget = provider_config["parameters"].get("budget", 100)
         self._golem_ray_client.get_running_or_create_cluster(image_hash, network, budget)
 
     def get_command_runner(
@@ -54,21 +54,21 @@ class GolemNodeProvider(NodeProvider):
     def is_terminated(self, node_id: NodeID) -> bool:
         return self._golem_ray_client.is_terminated(node_id)
 
-    def node_tags(self, node_id: NodeID) -> dict:
+    def node_tags(self, node_id: NodeID) -> Dict:
         return self._golem_ray_client.get_node_tags(node_id)
 
     def internal_ip(self, node_id: NodeID) -> IPv4Address:
         return self._golem_ray_client.get_node_internal_ip(node_id)
 
-    def set_node_tags(self, node_id: NodeID, tags: dict) -> None:
+    def set_node_tags(self, node_id: NodeID, tags: Dict) -> None:
         self._golem_ray_client.set_node_tags(node_id, tags)
 
     def create_node(
             self,
-            node_config: dict[str, Any],
-            tags: dict[str, str],
+            node_config: Dict[str, Any],
+            tags: Dict[str, str],
             count: int,
-    ) -> dict[str, dict]:
+    ) -> Dict[str, Dict]:
         return self._golem_ray_client.create_nodes(
             cluster_id="",
             count=count,

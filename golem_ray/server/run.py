@@ -1,37 +1,28 @@
 import logging
-import os
 from logging.config import dictConfig
 
 import dotenv
 from aiohttp import web
 
-from golem_ray.server.consts.config import DICT_CONFIG, ROOT_DIR
-from golem_ray.server.middlewares import error_middleware
-from golem_ray.server.services.golem import GolemService
-from golem_ray.server.services.ray import RayService
-from golem_ray.server.services.yagna import YagnaManager
-from golem_ray.server.views.golem_ray import routes as nodes_routes
+from consts import YAGNA_PATH, GCS_REVERSE_TUNNEL_PORT, LOGGER_DICT_CONFIG, ROOT_DIR, PROXY_IP
+from middlewares import error_middleware
+from services import GolemService, RayService, YagnaManager
+from views import routes as nodes_routes
 
-logging.config.dictConfig(DICT_CONFIG)
+logging.config.dictConfig(LOGGER_DICT_CONFIG)
 logger = logging.getLogger(__name__)
 
 dotenv.load_dotenv(ROOT_DIR.joinpath('.env'))
 
 
-def get_envs():
-    yagna_path = os.getenv('YAGNA_PATH', 'yagna')
-    gcs_reverse_tunnel_port = os.getenv('GCS_REVERSE_TUNNEL_PORT', 3009)
-
-    return yagna_path, gcs_reverse_tunnel_port
-
-
 async def golem_engine(app):
-    yagna_path, gcs_reverse_tunnel_port = get_envs()
-    yagna_manager = YagnaManager(yagna_path=yagna_path)
+    yagna_manager = YagnaManager(yagna_path=YAGNA_PATH)
     await yagna_manager.run()
     app['yagna'] = yagna_manager
 
-    golem_service = GolemService(gcs_reverse_tunnel_port=gcs_reverse_tunnel_port)
+    golem_service = GolemService(gcs_reverse_tunnel_port=GCS_REVERSE_TUNNEL_PORT,
+                                 yagna_appkey=yagna_manager.yagna_appkey,
+                                 proxy_ip=PROXY_IP)
     app['golem'] = golem_service
 
     ray_service = RayService(golem_service)

@@ -1,18 +1,18 @@
 from aiohttp import web
 
-from golem_ray.server.consts.urls import GolemRayURLs
-from golem_ray.server.models.models import SingleNodeRequestData, CreateClusterRequestData, \
+from consts import urls
+from models import SingleNodeRequestData, CreateClusterRequestData, \
     NonTerminatedNodesRequestData, CreateNodesRequestData, DeleteNodesRequestData, SetNodeTagsRequestData, \
     CreateNodesResponseData, GetNodesResponseData, IsRunningResponseData, IsTerminatedResponseData, \
     GetNodeTagsResponseData, GetNodeIpAddressResponseData
-from golem_ray.server.services.ray import RayService
+from services import RayService
 
 routes = web.RouteTableDef()
 
 golem_clusters = {}
 
 
-@routes.post(GolemRayURLs.CREATE_CLUSTER)
+@routes.post(urls.CREATE_CLUSTER)
 async def create_demand(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     provider_config = CreateClusterRequestData.parse_raw(await request.text())
@@ -22,7 +22,7 @@ async def create_demand(request: web.Request) -> web.Response:
     return web.Response(text=response.json())
 
 
-@routes.post(GolemRayURLs.GET_NODES)
+@routes.post(urls.GET_NODES)
 async def non_terminated_nodes_ids(request):
     ray_service: RayService = request.app['ray']
     request_data = NonTerminatedNodesRequestData.parse_raw(await request.text())
@@ -32,7 +32,7 @@ async def non_terminated_nodes_ids(request):
     return web.Response(text=response.json())
 
 
-@routes.post(GolemRayURLs.IS_RUNNING)
+@routes.post(urls.IS_RUNNING)
 async def is_node_running(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
@@ -42,17 +42,17 @@ async def is_node_running(request: web.Request) -> web.Response:
     return web.Response(text=response.json())
 
 
-@routes.post(GolemRayURLs.IS_TERMINATED)
+@routes.post(urls.IS_TERMINATED)
 async def is_node_terminated(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
     is_terminated = ray_service.is_node_terminated(request_data.node_id)
-    response = IsTerminatedResponseData(is_terminated= is_terminated)
+    response = IsTerminatedResponseData(is_terminated=is_terminated)
 
     return web.Response(text=response.json())
 
 
-@routes.post(GolemRayURLs.NODE_TAGS)
+@routes.post(urls.NODE_TAGS)
 async def get_node_tags(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
@@ -62,7 +62,7 @@ async def get_node_tags(request: web.Request) -> web.Response:
     return web.Response(text=response.json())
 
 
-@routes.post(GolemRayURLs.INTERNAL_IP)
+@routes.post(urls.INTERNAL_IP)
 async def get_node_internal_ip(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
@@ -72,7 +72,7 @@ async def get_node_internal_ip(request: web.Request) -> web.Response:
     return web.Response(text=response.json())
 
 
-@routes.post(GolemRayURLs.SET_NODE_TAGS)
+@routes.post(urls.SET_NODE_TAGS)
 async def set_node_tags(request):
     ray_service: RayService = request.app['ray']
     request_data = SetNodeTagsRequestData.parse_raw(await request.text())
@@ -82,7 +82,7 @@ async def set_node_tags(request):
     return web.Response()
 
 
-@routes.post(GolemRayURLs.CREATE_NODES)
+@routes.post(urls.CREATE_NODES)
 async def create_nodes(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = CreateNodesRequestData.parse_raw(await request.text())
@@ -92,7 +92,7 @@ async def create_nodes(request: web.Request) -> web.Response:
     return web.Response(text=response.json())
 
 
-@routes.post(GolemRayURLs.TERMINATE_NODES)
+@routes.post(urls.TERMINATE_NODES)
 async def terminate_nodes(request):
     ray_service: RayService = request.app['ray']
     request_data = DeleteNodesRequestData.parse_raw(await request.text())

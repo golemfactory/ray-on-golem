@@ -20,7 +20,7 @@ class Node(BaseModel):
     state: NodeState
     tags: Dict
     internal_ip: IPv4Address
-    external_ip: IPv4Address | None
+    external_ip: Optional[IPv4Address]
 
 
 class ClusterNode(BaseModel):

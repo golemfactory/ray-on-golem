@@ -1,10 +1,10 @@
 from ipaddress import IPv4Address
 from typing import Dict, List
 
-from golem_ray.server.middlewares.error_handling import NodeNotFound, NodesCountExceeded, NodesNotFound, \
+from golem_ray.server.middlewares import NodeNotFound, NodesCountExceeded, NodesNotFound, \
     DestroyActivityError
-from golem_ray.server.models.models import CreateClusterRequestData, NodeID, NodeState, Node, ClusterNode
-from golem_ray.server.services.golem import GolemService
+from golem_ray.server.models import CreateClusterRequestData, NodeID, NodeState, Node, ClusterNode
+from golem_ray.server.services.golem.golem import GolemService
 
 
 class RayService:
@@ -27,7 +27,7 @@ class RayService:
         )
             for (k, v) in self._cluster_nodes.items()}
 
-    async def create_cluster_on_golem(self, provider_config: CreateClusterRequestData):
+    async def create_cluster_on_golem(self, provider_config: CreateClusterRequestData) -> None:
         await self._golem_service.create_cluster(provider_config=provider_config)
 
     def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeID]:
@@ -41,39 +41,39 @@ class RayService:
         node = self._cluster_nodes.get(node_id)
         if node:
             return node.state == NodeState.running
-        raise NodeNotFound(additional_message=f"Node id: {node_id}")
+        raise NodeNotFound
 
     def is_node_terminated(self, node_id: NodeID) -> bool:
         node = self._cluster_nodes.get(node_id)
         if node:
             return node.state not in [NodeState.pending, NodeState.running]
-        raise NodeNotFound(additional_message=f"Node id: {node_id}")
+        raise NodeNotFound
 
     def get_node_tags(self, node_id: NodeID) -> Dict:
         node = self._cluster_nodes.get(node_id)
         if node:
             return node.tags
-        raise NodeNotFound(additional_message=f"Node id: {node_id}")
+        raise NodeNotFound
 
     def get_node_internal_ip(self, node_id: NodeID) -> IPv4Address:
         node = self._cluster_nodes.get(node_id)
         if node:
             return node.internal_ip
-        raise NodeNotFound(additional_message=f"Node id: {node_id}")
+        raise NodeNotFound
 
     def set_node_tags(self, node_id: NodeID, tags: Dict) -> None:
         node = self._cluster_nodes.get(node_id)
         if node:
             node.tags.update(tags)
             return
-        raise NodeNotFound(additional_message=f"Node id: {node_id}")
+        raise NodeNotFound
 
     async def create_nodes(self, count: int, tags: Dict) -> Dict:
         if tags is None:
             tags = {}
 
         if count + len(self._cluster_nodes) > self._num_workers + 1:
-            raise NodesCountExceeded()
+            raise NodesCountExceeded
 
         new_nodes = await self._golem_service.get_providers(tags=tags,
                                                             count=count,
@@ -93,7 +93,7 @@ class RayService:
         node = self._cluster_nodes.get(node_id)
         if node:
             await self._golem_service.destroy_activity(node)
-        raise DestroyActivityError(additional_message=f"Node id: {node_id}")
+        raise DestroyActivityError
 
     @staticmethod
     def _are_dicts_equal(dict1: Dict[str, str], dict2: Dict[str, str]) -> bool:

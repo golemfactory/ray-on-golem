@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import logging
 import os
 from asyncio import subprocess
@@ -7,22 +6,23 @@ from asyncio.subprocess import Process
 from datetime import timedelta
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from uuid import uuid4
 
 import async_timeout
 from golem_core.core.activity_api import commands
 from golem_core.core.golem_node import GolemNode
-from golem_core.core.market_api import ManifestVmPayload
+from golem_core.core.market_api import ManifestVmPayload, Demand
 from golem_core.core.market_api.pipeline import default_create_agreement, default_create_activity, default_negotiate
+from golem_core.core.network_api import Network
+from golem_core.core.payment_api import Allocation
 from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
-from golem_ray.server.consts.config import MANIFEST_DIR
-from golem_ray.server.middlewares.error_handling import CreateActivitiesTimeout, DestroyActivityError, ManifestNotFound
+from golem_ray.server.middlewares.error_handling import CreateActivitiesTimeout, DestroyActivityError
+from golem_ray.server.models import CreateClusterRequestData, NodeState, ClusterNode
+from golem_ray.server.services.golem.manifest import get_manifest
 from golem_ray.server.services.ssh import SSHService
-from golem_ray.server.services.yagna import get_or_create_yagna_appkey
-from golem_ray.server.models.models import CreateClusterRequestData, NodeState, ClusterNode
 
 logger = logging.getLogger('__main__.' + __name__)
 
@@ -32,19 +32,18 @@ logger = logging.getLogger('__main__.' + __name__)
 
 class GolemService:
 
-    def __init__(self, gcs_reverse_tunnel_port):
+    def __init__(self, gcs_reverse_tunnel_port: str, yagna_appkey: str, proxy_ip: str):
         self.gcs_reverse_tunnel_port = gcs_reverse_tunnel_port
-        self._proxy_ip = 'proxy.dev.golem.network'
-        self._loop = None
-        self._demand = None
-        self._allocation = None
-        self._network = None
-        self._num_workers = None
-        self._head_node_process: Process | None = None
-        self._reverse_ssh_process: Process | None = None
+        self._proxy_ip = proxy_ip
+        self._demand: Optional[Demand] = None
+        self._allocation: Optional[Allocation] = None
+        self._network: Optional[Network] = None
+        self._num_workers: Optional[int] = None
+        self._head_node_process: Optional[Process] = None
+        self._reverse_ssh_process: Optional[Process] = None
         self._cluster_nodes: List[ClusterNode] = []
-        self._golem = GolemNode(app_key=get_or_create_yagna_appkey())
-        self._payment_manager: DefaultPaymentManager | None = None
+        self._golem = GolemNode(app_key=yagna_appkey)
+        self._payment_manager: Optional[DefaultPaymentManager] = None
 
     # Public api
     @property
@@ -76,7 +75,7 @@ class GolemService:
             logger.info('Cluster was created already.')
             return
         self._num_workers = provider_config.num_workers
-        payload, connection_timeout = await self._create_payload(image_hash=provider_config.image_hash)
+        payload, offer_score, connection_timeout = await self._create_payload(image_hash=provider_config.image_hash)
         self._demand = await self._golem.create_demand(payload,
                                                        allocations=[self._allocation],
                                                        autostart=True)
@@ -85,6 +84,13 @@ class GolemService:
     async def get_providers(self, tags: Dict,
                             count: int,
                             current_nodes_count: int) -> List[Tuple[int, ClusterNode]]:
+        """
+        Creates activities (demand providers) in golem network
+        :param tags: tags from ray
+        :param count: number of nodes to create
+        :param current_nodes_count: current count of running nodes
+        :return:
+        """
         new_nodes = await self._create_activities(tags=tags, count=count, current_nodes_count=current_nodes_count)
         await self._network.refresh_nodes()
         await self._add_my_key()
@@ -166,7 +172,7 @@ class GolemService:
         else:
             logger.info('-----FAILED ADDING PROVIDER KEY TO LOCAL')
 
-    async def _create_payload(self, image_hash: str, **kwargs):
+    async def _create_payload(self, image_hash: str) -> Tuple[ManifestVmPayload, None, timedelta]:
         """
         Creates payload from given image_hash and parses manifest.json file
         which is then used to create demand in golem network
@@ -174,9 +180,22 @@ class GolemService:
         :param kwargs:
         :return:
         """
-        payload, offer_scorer, connection_timeout = await self._parse_manifest(image_hash, self.ssh_tunnel_port)
+        manifest = get_manifest(image_hash, self.gcs_reverse_tunnel_port)
 
-        return payload, connection_timeout
+        params = {
+            "manifest": manifest,
+            "capabilities": ['vpn', 'inet', 'manifest-support'],
+            "min_mem_gib": 0,
+            "min_cpu_threads": 0,
+            "min_storage_gib": 0,
+        }
+        # strategy = DEFAULT_SCORING_STRATEGY
+        # connection_timeout = DEFAULT_CONNECTION_TIMEOUT
+        connection_timeout = timedelta(seconds=150)
+        offer_scorer = None
+        payload = ManifestVmPayload(**params)
+
+        return payload, offer_scorer, connection_timeout
 
     def _print_ws_connection_data(self) -> None:
         """
@@ -275,38 +294,3 @@ class GolemService:
     @staticmethod
     async def _negotiate(proposal):
         return await asyncio.wait_for(default_negotiate(proposal), timeout=10)
-
-    @staticmethod
-    async def _parse_manifest(image_hash: str, ssh_tunnel_port: str, text=None):
-        """Parses manifest file and replaces image_hash used.
-           Decoding is needed in order to work.
-           :arg image_hash:
-           :arg text:
-        """
-        try:
-            manifest = open(MANIFEST_DIR, "rb")
-        except FileNotFoundError:
-            raise ManifestNotFound
-        else:
-            manifest = manifest.read()
-            manifest = (manifest
-                        .decode('utf-8')
-                        .replace('{IMAGE_HASH}', image_hash)
-                        .replace('{SSH_TUNNEL_PORT}', ssh_tunnel_port)
-                        )
-            manifest = base64.b64encode(manifest.encode('utf-8')).decode("utf-8")
-
-            params = {
-                "manifest": manifest,
-                "capabilities": ['vpn', 'inet', 'manifest-support'],
-                "min_mem_gib": 0,
-                "min_cpu_threads": 0,
-                "min_storage_gib": 0,
-            }
-            # strategy = DEFAULT_SCORING_STRATEGY
-            # connection_timeout = DEFAULT_CONNECTION_TIMEOUT
-            connection_timeout = timedelta(seconds=150)
-            offer_scorer = None
-            payload = ManifestVmPayload(**params)
-
-            return payload, offer_scorer, connection_timeout
