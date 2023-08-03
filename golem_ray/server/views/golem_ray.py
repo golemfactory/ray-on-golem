@@ -19,14 +19,15 @@ async def create_demand(request: web.Request) -> web.Response:
     await ray_service.create_cluster_on_golem(provider_config=provider_config)
     response = GetNodesResponseData(nodes=ray_service.get_all_nodes_ids())
 
-    return web.Response(text=response.json()) 
+    return web.Response(text=response.json())
 
 
 @routes.post(GolemRayURLs.GET_NODES)
 async def non_terminated_nodes_ids(request):
     ray_service: RayService = request.app['ray']
     request_data = NonTerminatedNodesRequestData.parse_raw(await request.text())
-    response = GetNodesResponseData(nodes=ray_service.get_non_terminated_nodes_ids(tags_to_match=request_data.tags))
+    nodes = ray_service.get_non_terminated_nodes_ids(tags_to_match=request_data.tags)
+    response = GetNodesResponseData(nodes=nodes)
 
     return web.Response(text=response.json())
 
@@ -35,7 +36,8 @@ async def non_terminated_nodes_ids(request):
 async def is_node_running(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
-    response = IsRunningResponseData(is_terminated=ray_service.is_node_running(request_data.node_id))
+    is_running = ray_service.is_node_running(request_data.node_id)
+    response = IsRunningResponseData(is_running=is_running)
 
     return web.Response(text=response.json())
 
@@ -44,7 +46,8 @@ async def is_node_running(request: web.Request) -> web.Response:
 async def is_node_terminated(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
-    response = IsTerminatedResponseData(is_terminated=ray_service.is_node_terminated(request_data.node_id))
+    is_terminated = ray_service.is_node_terminated(request_data.node_id)
+    response = IsTerminatedResponseData(is_terminated= is_terminated)
 
     return web.Response(text=response.json())
 
@@ -53,7 +56,8 @@ async def is_node_terminated(request: web.Request) -> web.Response:
 async def get_node_tags(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
-    response = GetNodeTagsResponseData(tags=ray_service.get_node_tags(request_data.node_id))
+    node_tags = ray_service.get_node_tags(request_data.node_id)
+    response = GetNodeTagsResponseData(tags=node_tags)
 
     return web.Response(text=response.json())
 
@@ -62,7 +66,8 @@ async def get_node_tags(request: web.Request) -> web.Response:
 async def get_node_internal_ip(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
     request_data = SingleNodeRequestData.parse_raw(await request.text())
-    response = GetNodeIpAddressResponseData(ip_address=ray_service.get_node_internal_ip(request_data.node_id))
+    ip_address = ray_service.get_node_internal_ip(request_data.node_id)
+    response = GetNodeIpAddressResponseData(ip_address=ip_address)
 
     return web.Response(text=response.json())
 

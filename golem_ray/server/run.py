@@ -5,7 +5,7 @@ from logging.config import dictConfig
 import dotenv
 from aiohttp import web
 
-from golem_ray.server.consts.config import DICT_CONFIG
+from golem_ray.server.consts.config import DICT_CONFIG, ROOT_DIR
 from golem_ray.server.middlewares import error_middleware
 from golem_ray.server.services.golem import GolemService
 from golem_ray.server.services.ray import RayService
@@ -15,7 +15,7 @@ from golem_ray.server.views.golem_ray import routes as nodes_routes
 logging.config.dictConfig(DICT_CONFIG)
 logger = logging.getLogger(__name__)
 
-dotenv.load_dotenv()
+dotenv.load_dotenv(ROOT_DIR.joinpath('.env'))
 
 
 def get_envs():

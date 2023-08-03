@@ -9,9 +9,10 @@ from typing import Optional
 
 import dotenv
 
+from golem_ray.server.consts.config import ROOT_DIR
 from golem_ray.server.middlewares.error_handling import CheckYagnaStatusError
 
-dotenv.load_dotenv()
+dotenv.load_dotenv(ROOT_DIR.joinpath('.env'))
 logger = logging.getLogger('__main__.' + __name__)
 
 YAGNA_APPNAME = 'requestor-mainnet'
