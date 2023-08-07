@@ -7,7 +7,7 @@ idle_timeout_minutes: 5
 provider:
   type: "external"
   use_internal_ips: true
-  module: "golem_ray.client.node_provider.GolemNodeProvider"
+  module: "golem_ray.provider.node_provider.GolemNodeProvider"
   parameters:
     golem_ray_url: "http://localhost:8080"
     image_hash: "0ce63e86c7c7afeee38c2a7282e0f778089eea727d7bc65c82549976"

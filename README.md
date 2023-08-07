@@ -14,7 +14,7 @@ yagna service run
 ```
 Run Server
 ```bash
-python main.py
+python run.py
 ```
 Start ray
 ```bash
