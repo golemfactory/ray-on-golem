@@ -8,13 +8,18 @@ LOGGER_DICT_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
     'loggers': {
-        '': {
-            'level': 'INFO',
+        "root": {
+            "handlers": ["console"],
+            "level": "INFO"
         },
-        'another.module': {
-            'level': 'INFO',
-        },
-    }
+    },
+    "handlers": {
+        "console": {
+            # "formatter": "std_out",
+            "class": "logging.StreamHandler",
+            "level": "DEBUG"
+        }
+    },
 }
 
 YAGNA_PATH = os.getenv('YAGNA_PATH', 'yagna')
@@ -22,7 +27,6 @@ GCS_REVERSE_TUNNEL_PORT = os.getenv('GCS_REVERSE_TUNNEL_PORT', 3009)
 PROXY_IP = os.getenv('PROXY_IP', 'proxy.dev.golem.network')
 YAGNA_APPKEY = os.getenv('YAGNA_APPKEY')
 BASE_URL = URL(os.getenv('BASE_URL', 'http://localhost:8080'))
-
 
 URL_CREATE_CLUSTER = '/create_cluster'
 URL_GET_NODES = '/'

@@ -9,7 +9,7 @@ from typing import Optional
 from golem_ray.server.config import YAGNA_APPKEY
 from golem_ray.server.exceptions import CheckYagnaStatusError
 
-logger = logging.getLogger('__main__.' + __name__)
+logger = logging.getLogger('yagna-service')
 
 
 class YagnaManager:

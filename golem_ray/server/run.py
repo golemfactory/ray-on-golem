@@ -9,7 +9,7 @@ from middlewares import error_middleware
 from services import GolemService, RayService, YagnaManager
 from views import routes as nodes_routes
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 async def golem_engine(app):

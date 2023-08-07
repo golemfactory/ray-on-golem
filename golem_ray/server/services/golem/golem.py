@@ -2,7 +2,6 @@ import asyncio
 import base64
 import json
 import logging
-import os
 from asyncio import subprocess
 from asyncio.subprocess import Process
 from datetime import timedelta
@@ -43,7 +42,7 @@ class GolemService:
         self._num_workers: Optional[int] = None
         self._head_node_process: Optional[Process] = None
         self._reverse_ssh_process: Optional[Process] = None
-        self._cluster_nodes: List[ClusterNode] = []
+        self._cluster_nodes: Dict[int, ClusterNode] = {}
         self._golem = GolemNode(app_key=yagna_appkey)
         self._payment_manager: Optional[DefaultPaymentManager] = None
 
@@ -51,6 +50,10 @@ class GolemService:
     @property
     def golem(self):
         return self._golem
+
+    @property
+    def cluster_nodes(self):
+        return self._cluster_nodes
 
     @property
     def payment_manager(self) -> DefaultPaymentManager:
@@ -85,7 +88,7 @@ class GolemService:
 
     async def get_providers(self, tags: Dict,
                             count: int,
-                            current_nodes_count: int) -> List[Tuple[int, ClusterNode]]:
+                            ) -> List[Tuple[int, ClusterNode]]:
         """
         Creates activities (demand providers) in golem network
         :param tags: tags from ray
@@ -93,7 +96,7 @@ class GolemService:
         :param current_nodes_count: current count of running nodes
         :return:
         """
-        new_nodes = await self._create_activities(tags=tags, count=count, current_nodes_count=current_nodes_count)
+        new_nodes = await self._create_activities(tags=tags, count=count)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()
@@ -118,12 +121,12 @@ class GolemService:
         await self.payment_manager.terminate_agreements()
         await self.payment_manager.wait_for_invoices()
 
-        tasks = [node.activity.destroy() for node in self._cluster_nodes if node.activity]
+        tasks = [node.activity.destroy() for node in self._cluster_nodes.values() if node.activity]
         if tasks:
             await asyncio.gather(*tasks)
             logger.info(f'-----{len(tasks)} activities stopped')
 
-        if self._reverse_ssh_process:
+        if self._reverse_ssh_process and self._reverse_ssh_process.returncode is None:
             self._reverse_ssh_process.terminate()
             await self._reverse_ssh_process.wait()
             logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
@@ -139,7 +142,7 @@ class GolemService:
         text_command = "ssh -N -R *:{port}:127.0.0.1:6379 proxy@proxy.dev.golem.network"
         process = await subprocess.create_subprocess_shell(text_command.format(
             port=self.gcs_reverse_tunnel_port))
-        logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{os.getenv("SSH_TUNNEL_PORT")} created.')
+        logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{self.gcs_reverse_tunnel_port} created.')
 
         return process
 
@@ -205,7 +208,7 @@ class GolemService:
         Prints command which allows to manually ssh on providers machines
         :return:
         """
-        for node in self._cluster_nodes:
+        for node in self._cluster_nodes.values():
             if node.activity:
                 print(
                     "Connect with:\n"
@@ -217,8 +220,7 @@ class GolemService:
 
     async def _create_activities(self,
                                  count: int,
-                                 current_nodes_count: int,
-                                 tags: Dict = None) -> List[Tuple[int, ClusterNode]]:
+                                 tags: Dict = None) -> None:
         """
         This functions manages demands, negotiations, agreements, creates activities
         and creates ssh connection to nodes.
@@ -227,8 +229,6 @@ class GolemService:
         :return:
         """
         try:
-            new_nodes = []
-            node_id = current_nodes_count
             async with async_timeout.timeout(int(150)):
                 chain = Chain(
                     self._demand.initial_proposals(),
@@ -241,17 +241,16 @@ class GolemService:
                     Limit(count))
 
                 async for activity, ip, connection_uri in chain:
+                    node_id = len(self._cluster_nodes)
                     cluster_node = ClusterNode(node_id=node_id,
                                                activity=activity,
                                                internal_ip=IPv4Address(ip),
                                                connection_uri=connection_uri,
                                                tags=tags,
                                                state=NodeState.pending)
-                    new_nodes.append((node_id, cluster_node))
-                    node_id += 1
+                    self._cluster_nodes[node_id] = cluster_node
                     logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
 
-                return new_nodes
 
         except asyncio.TimeoutError:
             raise CreateActivitiesTimeout
@@ -263,7 +262,8 @@ class GolemService:
         with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
             my_key = f.readline().strip()
 
-        tasks = [self._add_authorized_key(value.activity, my_key) for value in self._cluster_nodes if value.activity]
+        tasks = [self._add_authorized_key(value.activity, my_key) for value in self._cluster_nodes.values() if
+                 value.activity]
         await asyncio.gather(*tasks)
 
     async def _add_other_keys(self):
@@ -271,7 +271,7 @@ class GolemService:
         Adds all providers key to other providers machines
         """
         keys = {}
-        for cluster_node in self._cluster_nodes:
+        for cluster_node in self._cluster_nodes.values():
             if cluster_node.activity:
                 batch = await cluster_node.activity.execute_commands(
                     commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
@@ -281,8 +281,8 @@ class GolemService:
                 key = batch.events[-1].stdout.strip()
                 keys[cluster_node.node_id] = key
 
-        for cluster_node in self._cluster_nodes:
-            other_nodes: List[ClusterNode] = [node for node in self._cluster_nodes if
+        for cluster_node in self._cluster_nodes.values():
+            other_nodes: List[ClusterNode] = [node for node in self._cluster_nodes.values() if
                                               node.node_id != cluster_node.node_id]
 
             for other_node in other_nodes:
