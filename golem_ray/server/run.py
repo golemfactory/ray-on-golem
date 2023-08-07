@@ -1,21 +1,22 @@
 import logging
+import os
 from logging.config import dictConfig
 
-import dotenv
 from aiohttp import web
 
-from consts import YAGNA_PATH, GCS_REVERSE_TUNNEL_PORT, LOGGER_DICT_CONFIG, ROOT_DIR, PROXY_IP
+from config import YAGNA_PATH, GCS_REVERSE_TUNNEL_PORT, LOGGER_DICT_CONFIG, PROXY_IP
 from middlewares import error_middleware
 from services import GolemService, RayService, YagnaManager
 from views import routes as nodes_routes
 
-logging.config.dictConfig(LOGGER_DICT_CONFIG)
 logger = logging.getLogger(__name__)
-
-dotenv.load_dotenv(ROOT_DIR.joinpath('.env'))
 
 
 async def golem_engine(app):
+    try:
+        os.mkdir('/tmp/golem')
+    except OSError:
+        pass
     yagna_manager = YagnaManager(yagna_path=YAGNA_PATH)
     await yagna_manager.run()
     app['yagna'] = yagna_manager
@@ -36,6 +37,7 @@ async def golem_engine(app):
 
 
 def main():
+    logging.config.dictConfig(LOGGER_DICT_CONFIG)
     app = web.Application(middlewares=[error_middleware])
 
     app.add_routes(nodes_routes)

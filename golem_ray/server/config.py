@@ -1,14 +1,9 @@
 import os
-from pathlib import Path
 
+import dotenv
 from yarl import URL
 
-_UTILS_DIR = "utils"
-_MANIFEST_FILE_NAME = "manifest.json"
-MANIFEST_DIR = Path(__file__).parent.joinpath(_UTILS_DIR).joinpath(_MANIFEST_FILE_NAME)
-
-ROOT_DIR = Path(__file__).parents[3]
-
+dotenv.load_dotenv()
 LOGGER_DICT_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -17,7 +12,7 @@ LOGGER_DICT_CONFIG = {
             'level': 'INFO',
         },
         'another.module': {
-            'level': 'DEBUG',
+            'level': 'INFO',
         },
     }
 }
@@ -27,3 +22,14 @@ GCS_REVERSE_TUNNEL_PORT = os.getenv('GCS_REVERSE_TUNNEL_PORT', 3009)
 PROXY_IP = os.getenv('PROXY_IP', 'proxy.dev.golem.network')
 YAGNA_APPKEY = os.getenv('YAGNA_APPKEY')
 BASE_URL = URL(os.getenv('BASE_URL', 'http://localhost:8080'))
+
+
+URL_CREATE_CLUSTER = '/create_cluster'
+URL_GET_NODES = '/'
+URL_IS_RUNNING = '/is_running'
+URL_IS_TERMINATED = '/is_terminated'
+URL_NODE_TAGS = '/tags'
+URL_INTERNAL_IP = '/internal_ip'
+URL_SET_NODE_TAGS = '/set_tags'
+URL_CREATE_NODES = '/create_nodes'
+URL_TERMINATE_NODES = '/terminate'

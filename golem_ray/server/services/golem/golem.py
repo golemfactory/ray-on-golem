@@ -21,7 +21,7 @@ from golem_core.core.payment_api import Allocation
 from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
-from golem_ray.server.middlewares.error_handling import CreateActivitiesTimeout, DestroyActivityError
+from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
 from golem_ray.server.models import CreateClusterRequestData, NodeState, ClusterNode
 from golem_ray.server.services.golem.manifest import get_manifest
 from golem_ray.server.services.ssh import SSHService

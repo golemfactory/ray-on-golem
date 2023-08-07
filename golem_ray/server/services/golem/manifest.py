@@ -13,7 +13,7 @@ def get_manifest(image_hash, gcp_tunnel_port):
                 "urls": [
                     f"http://registry.golem.network/download/{image_hash}"
                 ],
-                "hash": "sha3:{IMAGE_HASH}"
+                "hash": f"sha3:{image_hash}"
             }
         ],
         "compManifest": {

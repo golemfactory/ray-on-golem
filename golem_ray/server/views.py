@@ -1,10 +1,7 @@
 from aiohttp import web
 
-from consts import urls
-from models import SingleNodeRequestData, CreateClusterRequestData, \
-    NonTerminatedNodesRequestData, CreateNodesRequestData, DeleteNodesRequestData, SetNodeTagsRequestData, \
-    CreateNodesResponseData, GetNodesResponseData, IsRunningResponseData, IsTerminatedResponseData, \
-    GetNodeTagsResponseData, GetNodeIpAddressResponseData
+import config
+import models
 from services import RayService
 
 routes = web.RouteTableDef()
@@ -12,91 +9,91 @@ routes = web.RouteTableDef()
 golem_clusters = {}
 
 
-@routes.post(urls.CREATE_CLUSTER)
+@routes.post(config.URL_CREATE_CLUSTER)
 async def create_demand(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
-    provider_config = CreateClusterRequestData.parse_raw(await request.text())
+    provider_config = models.CreateClusterRequestData.parse_raw(await request.text())
     await ray_service.create_cluster_on_golem(provider_config=provider_config)
-    response = GetNodesResponseData(nodes=ray_service.get_all_nodes_ids())
+    response = models.GetNodesResponseData(nodes=ray_service.get_all_nodes_ids())
 
     return web.Response(text=response.json())
 
 
-@routes.post(urls.GET_NODES)
+@routes.post(config.URL_GET_NODES)
 async def non_terminated_nodes_ids(request):
     ray_service: RayService = request.app['ray']
-    request_data = NonTerminatedNodesRequestData.parse_raw(await request.text())
+    request_data = models.NonTerminatedNodesRequestData.parse_raw(await request.text())
     nodes = ray_service.get_non_terminated_nodes_ids(tags_to_match=request_data.tags)
-    response = GetNodesResponseData(nodes=nodes)
+    response = models.GetNodesResponseData(nodes=nodes)
 
     return web.Response(text=response.json())
 
 
-@routes.post(urls.IS_RUNNING)
+@routes.post(config.URL_IS_RUNNING)
 async def is_node_running(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
-    request_data = SingleNodeRequestData.parse_raw(await request.text())
+    request_data = models.SingleNodeRequestData.parse_raw(await request.text())
     is_running = ray_service.is_node_running(request_data.node_id)
-    response = IsRunningResponseData(is_running=is_running)
+    response = models.IsRunningResponseData(is_running=is_running)
 
     return web.Response(text=response.json())
 
 
-@routes.post(urls.IS_TERMINATED)
+@routes.post(config.URL_IS_TERMINATED)
 async def is_node_terminated(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
-    request_data = SingleNodeRequestData.parse_raw(await request.text())
+    request_data = models.SingleNodeRequestData.parse_raw(await request.text())
     is_terminated = ray_service.is_node_terminated(request_data.node_id)
-    response = IsTerminatedResponseData(is_terminated=is_terminated)
+    response = models.IsTerminatedResponseData(is_terminated=is_terminated)
 
     return web.Response(text=response.json())
 
 
-@routes.post(urls.NODE_TAGS)
+@routes.post(config.URL_NODE_TAGS)
 async def get_node_tags(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
-    request_data = SingleNodeRequestData.parse_raw(await request.text())
+    request_data = models.SingleNodeRequestData.parse_raw(await request.text())
     node_tags = ray_service.get_node_tags(request_data.node_id)
-    response = GetNodeTagsResponseData(tags=node_tags)
+    response = models.GetNodeTagsResponseData(tags=node_tags)
 
     return web.Response(text=response.json())
 
 
-@routes.post(urls.INTERNAL_IP)
+@routes.post(config.URL_INTERNAL_IP)
 async def get_node_internal_ip(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
-    request_data = SingleNodeRequestData.parse_raw(await request.text())
+    request_data = models.SingleNodeRequestData.parse_raw(await request.text())
     ip_address = ray_service.get_node_internal_ip(request_data.node_id)
-    response = GetNodeIpAddressResponseData(ip_address=ip_address)
+    response = models.GetNodeIpAddressResponseData(ip_address=ip_address)
 
     return web.Response(text=response.json())
 
 
-@routes.post(urls.SET_NODE_TAGS)
+@routes.post(config.URL_SET_NODE_TAGS)
 async def set_node_tags(request):
     ray_service: RayService = request.app['ray']
-    request_data = SetNodeTagsRequestData.parse_raw(await request.text())
+    request_data = models.SetNodeTagsRequestData.parse_raw(await request.text())
     ray_service.set_node_tags(node_id=request_data.node_id,
                               tags=request_data.tags)
 
     return web.Response()
 
 
-@routes.post(urls.CREATE_NODES)
+@routes.post(config.URL_CREATE_NODES)
 async def create_nodes(request: web.Request) -> web.Response:
     ray_service: RayService = request.app['ray']
-    request_data = CreateNodesRequestData.parse_raw(await request.text())
+    request_data = models.CreateNodesRequestData.parse_raw(await request.text())
     await ray_service.create_nodes(request_data.count, request_data.tags)
-    response = CreateNodesResponseData(nodes=ray_service.get_all_nodes_dict())
+    response = models.CreateNodesResponseData(nodes=ray_service.get_all_nodes_dict())
 
     return web.Response(text=response.json())
 
 
-@routes.post(urls.TERMINATE_NODES)
+@routes.post(config.URL_TERMINATE_NODES)
 async def terminate_nodes(request):
     ray_service: RayService = request.app['ray']
-    request_data = DeleteNodesRequestData.parse_raw(await request.text())
+    request_data = models.DeleteNodesRequestData.parse_raw(await request.text())
     await ray_service.terminate_nodes(request_data.node_ids)
-    response = GetNodesResponseData(nodes=ray_service.get_all_nodes_ids())
+    response = models.GetNodesResponseData(nodes=ray_service.get_all_nodes_ids())
 
     return web.Response(text=response.json())

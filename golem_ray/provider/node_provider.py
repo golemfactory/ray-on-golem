@@ -2,21 +2,18 @@ from ipaddress import IPv4Address
 from types import ModuleType
 from typing import Any, List, Dict, Optional
 
-import dotenv
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
-from golem_ray.server.consts import ROOT_DIR, BASE_URL
+from golem_ray.server.config import BASE_URL
 from golem_ray.server.models import NodeID
-
-dotenv.load_dotenv(ROOT_DIR)
 
 
 class GolemNodeProvider(NodeProvider):
 
-    def __init__(self, provider_config, cluster_name):
+    def __init__(self, provider_config: dict, cluster_name: str):
         super().__init__(provider_config, cluster_name)
         self._golem_ray_client = GolemRayClient(base_url=BASE_URL)
 

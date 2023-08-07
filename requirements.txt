@@ -5,11 +5,15 @@ golem-api-python==0.1.1
 aiohttp==3.8.4
 aiohttp_session==2.12.0
 cryptography==41.0.1
-# yapapi==0.10.0 # had to install with 'pip install...' by the time (dependencies not compatible)
 aiohttp-pydantic==1.12.2
 python-dotenv==1.0.0
+yarl~=1.9.2
 
 # client
 requests==2.31.0
 pydantic==1.10.9
 spacy==3.5.3
+
+pandas~=2.0.3
+setuptools~=68.0.0
+click~=8.1.3

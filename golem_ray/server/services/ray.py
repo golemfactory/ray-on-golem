@@ -1,8 +1,7 @@
 from ipaddress import IPv4Address
 from typing import Dict, List
 
-from golem_ray.server.middlewares import NodeNotFound, NodesCountExceeded, NodesNotFound, \
-    DestroyActivityError
+from golem_ray.server.exceptions import NodeNotFound, NodesNotFound, DestroyActivityError, NodesCountExceeded
 from golem_ray.server.models import CreateClusterRequestData, NodeID, NodeState, Node, ClusterNode
 from golem_ray.server.services import GolemService
 
