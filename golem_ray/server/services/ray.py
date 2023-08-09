@@ -100,3 +100,6 @@ class RayService:
                 return False
 
         return True
+
+    async def get_node_proxy_command(self, node_id: NodeID) -> str:
+        return self._golem_service.get_node_proxy_command(node_id)

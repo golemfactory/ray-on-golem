@@ -103,3 +103,6 @@ class GetNodeIpAddressResponseData(BaseModel):
 
 class EmptyResponseData(BaseModel):
     pass
+
+class GetNodeProxyCommandResponseData(BaseModel):
+    proxy_command: str

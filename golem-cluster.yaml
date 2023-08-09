@@ -43,10 +43,10 @@ head_start_ray_commands: [
 ]
 worker_start_ray_commands: [
   "ray start --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
-  "touch /tmp/dupa.txt",
+  "touch /tmp/ray-out.txt",
 ]
 auth:
-  ssh_user: 'test'
-  ssh_private_key: '/home/filip/.ssh/id_rsa.pub'
+  ssh_user: 'root'
+  ssh_private_key: '~/.ssh/id_rsa.pub'
 
 cluster_synced_files: []

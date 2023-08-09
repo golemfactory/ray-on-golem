@@ -218,6 +218,13 @@ class GolemService:
                     f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
                 )
 
+    def get_node_proxy_command(self, node_id: int) -> str:
+        node = self._cluster_nodes.get(node_id)
+        command = (f'websocat asyncstdio: {node.connection_uri}/22 --binary '
+                   f'-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"')
+
+        return command
+
     async def _create_activities(self,
                                  count: int,
                                  tags: Dict = None) -> None:

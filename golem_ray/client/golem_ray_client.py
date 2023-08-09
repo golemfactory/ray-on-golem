@@ -11,7 +11,6 @@ import golem_ray.server.config as config
 import golem_ray.server.models as models
 from golem_ray.client.exceptions import GolemRayClientException, GolemRayClientValidationException
 
-
 ResponseModelType = TypeVar('ResponseModelType')
 
 
@@ -148,3 +147,14 @@ class GolemRayClient:
                             error_message="Couldn't create node")
 
         return response.nodes
+
+    def get_node_proxy_command(self, node_id: str) -> str:
+        url = config.URL_GET_NODE_PROXY_COMMAND
+
+        response: models.GetNodeProxyCommandResponseData \
+            = self._request(url,
+                            response_model=models.GetNodeProxyCommandResponseData,
+                            request_data=models.SingleNodeRequestData(node_id=node_id),
+                            error_message="Couldn't get node proxy command")
+
+        return response.proxy_command
