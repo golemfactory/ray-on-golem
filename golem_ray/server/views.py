@@ -99,11 +99,11 @@ async def terminate_nodes(request):
     return web.Response(text=response.json())
 
 
-@routes.post(config.URL_GET_NODE_PROXY_COMMAND)
+@routes.post(config.URL_GET_NODE_SSH_PORT)
 async def get_node_proxy_command(request):
     ray_service: RayService = request.app['ray']
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
-    proxy_command = await ray_service.get_node_proxy_command(node_id=request_data.node_id)
-    response = models.GetNodeProxyCommandResponseData(proxy_command=proxy_command)
+    port = await ray_service.get_node_ssh_port(node_id=request_data.node_id)
+    response = models.GetNodePortResponseData(port=port)
 
     return web.Response(text=response.json())

@@ -9,13 +9,13 @@ provider:   # The cloud provider-specific configuration properties.
   module: "golem_ray.provider.node_provider.GolemNodeProvider"
   parameters:
     golem_ray_url: "http://localhost:8080" # Url of golem webserver that has connection with golem network
-    image_hash: "0ce63e86c7c7afeee38c2a7282e0f778089eea727d7bc65c82549976" # Hash of the image to run on nodes
+    image_hash: "18d1abd97ade626e5657a7e194ac85be0037ebff31dc924114a28d0b" # Hash of the image to run on nodes
     network: "goerli" # Golem network on which we will launch nodes
     budget: 10 # Maximum amount of GML that's going to be spent
 
 file_mounts: # The files or directories to copy to the head and worker nodes
   {
-      "/tmp/golem": "/tmp/golem"
+#      "/tmp/golem": "/tmp/golem"
   }
 
 available_node_types: # Tells the autoscaler the allowed node types and the resources they provide
@@ -23,26 +23,30 @@ available_node_types: # Tells the autoscaler the allowed node types and the reso
     min_workers: 0 # The minimum number of worker nodes of this type to launch
     max_workers: 1 # The maximum number of worker nodes of this type to launch
     resources: {"CPU": 1} # The node type's CPU and GPU resources
+    node_config:
+      kind: node
   ray.worker.default:
     min_workers: 3
     max_workers: 10
     resources: {"CPU": 3}
+    node_config:
+      kind: node
 
-initialization_commands: ["pip install pandas"] # List of commands that will be run before `setup_commands`
+initialization_commands: [] # List of commands that will be run before `setup_commands`
 setup_commands: [] # List of shell commands to run to set up nodes
 
 head_setup_commands: [] # Custom commands that will be run on the head node after common setup.
 worker_setup_commands: [] # Custom commands that will be run on worker nodes after common setup.
 
 head_start_ray_commands: [ # Command to start ray on the head node. You don't need to change this.
-  "ray start --head --node-ip-address  --dashboard-port 0.0.0.0 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
+  "ray start --head --dashboard-port 0.0.0.0 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
 ]
 worker_start_ray_commands: [# Command to start ray on worker nodes. You don't need to change this.
   "ray start --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
   "touch /tmp/dupa.txt",
 ]
 auth:  # Authentication credentials that Ray will use to launch nodes
-  ssh_user: 'test'
-  ssh_private_key: '/home/filip/.ssh/id_rsa.pub'
+  ssh_user: 'root'
+  ssh_private_key: '~/.ssh/id_rsa.pub'
 
 cluster_synced_files: [] # A list of paths to the files or directories to copy from the head node to the worker nodes

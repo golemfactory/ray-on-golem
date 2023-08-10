@@ -148,13 +148,13 @@ class GolemRayClient:
 
         return response.nodes
 
-    def get_node_proxy_command(self, node_id: str) -> str:
-        url = config.URL_GET_NODE_PROXY_COMMAND
+    def get_node_port(self, node_id: str) -> int:
+        url = config.URL_GET_NODE_SSH_PORT
 
-        response: models.GetNodeProxyCommandResponseData \
+        response: models.GetNodePortResponseData \
             = self._request(url,
-                            response_model=models.GetNodeProxyCommandResponseData,
+                            response_model=models.GetNodePortResponseData,
                             request_data=models.SingleNodeRequestData(node_id=node_id),
                             error_message="Couldn't get node proxy command")
 
-        return response.proxy_command
+        return response.port

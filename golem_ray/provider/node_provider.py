@@ -32,7 +32,7 @@ class GolemNodeProvider(NodeProvider):
             use_internal_ip: bool,
             docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
-        proxy_command = self._golem_ray_client.get_node_proxy_command(node_id)
+        node_port = self._golem_ray_client.get_node_port(node_id)
         command_runner = SSHProviderCommandRunner(log_prefix,
                                                   node_id,
                                                   self,
@@ -40,7 +40,7 @@ class GolemNodeProvider(NodeProvider):
                                                   cluster_name,
                                                   process_runner,
                                                   True)
-        command_runner.set_proxy_command(proxy_command)
+        command_runner.set_ssh_port(node_port)
 
         return command_runner
 

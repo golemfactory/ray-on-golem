@@ -23,7 +23,7 @@ from golem_core.pipeline import Chain, Map, Buffer, Limit
 from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
 from golem_ray.server.models import CreateClusterRequestData, NodeState, ClusterNode
 from golem_ray.server.services.golem.manifest import get_manifest
-from golem_ray.server.services.ssh import SSHService
+from golem_ray.server.services.ssh import SSHService, Proxy
 
 logger = logging.getLogger('__main__.' + __name__)
 
@@ -35,6 +35,7 @@ class GolemService:
 
     def __init__(self, gcs_reverse_tunnel_port: str, yagna_appkey: str, proxy_ip: str):
         self.gcs_reverse_tunnel_port = gcs_reverse_tunnel_port
+        self._yagna_appkey = yagna_appkey
         self._proxy_ip = proxy_ip
         self._demand: Optional[Demand] = None
         self._allocation: Optional[Allocation] = None
@@ -45,6 +46,7 @@ class GolemService:
         self._cluster_nodes: Dict[int, ClusterNode] = {}
         self._golem = GolemNode(app_key=yagna_appkey)
         self._payment_manager: Optional[DefaultPaymentManager] = None
+        self._ssh_proxy_port: int = 2222
 
     # Public api
     @property
@@ -218,12 +220,10 @@ class GolemService:
                     f"-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"' root@{uuid4().hex} "
                 )
 
-    def get_node_proxy_command(self, node_id: int) -> str:
+    def get_node_ssh_port(self, node_id: int) -> int:
         node = self._cluster_nodes.get(node_id)
-        command = (f'websocat asyncstdio: {node.connection_uri}/22 --binary '
-                   f'-H=Authorization:\"Bearer {self._golem._api_config.app_key}\"')
 
-        return command
+        return node.ssh_proxy.local_port
 
     async def _create_activities(self,
                                  count: int,
@@ -255,12 +255,23 @@ class GolemService:
                                                connection_uri=connection_uri,
                                                tags=tags,
                                                state=NodeState.pending)
+                    await self._create_ssh_proxy_to_node(cluster_node)
                     self._cluster_nodes[node_id] = cluster_node
                     logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
 
 
         except asyncio.TimeoutError:
             raise CreateActivitiesTimeout
+
+    async def _create_ssh_proxy_to_node(self, cluster_node: ClusterNode) -> None:
+        port = self._ssh_proxy_port + len(self._cluster_nodes)
+        proxy = Proxy(
+            ws_url=cluster_node.connection_uri + "/22",
+            local_address="127.0.0.1",
+            local_port=str(port),
+            yagna_appkey=self._yagna_appkey)
+        cluster_node.ssh_proxy = proxy
+        asyncio.create_task(proxy.run())
 
     async def _add_my_key(self):
         """

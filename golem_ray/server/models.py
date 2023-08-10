@@ -1,9 +1,11 @@
 from enum import Enum
 from ipaddress import IPv4Address
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from golem_core.core.activity_api import Activity
 from pydantic import BaseModel
+
+# from golem_ray.server.services.ssh import Proxy
 
 NodeID = int
 ClusterID = str
@@ -31,6 +33,7 @@ class ClusterNode(BaseModel):
     state: Optional[NodeState]
     connection_uri: Optional[str]
     tags: Dict = {}
+    ssh_proxy: Optional[Any]
 
     class Config:
         arbitrary_types_allowed = True
@@ -104,5 +107,6 @@ class GetNodeIpAddressResponseData(BaseModel):
 class EmptyResponseData(BaseModel):
     pass
 
-class GetNodeProxyCommandResponseData(BaseModel):
-    proxy_command: str
+
+class GetNodePortResponseData(BaseModel):
+    port: int

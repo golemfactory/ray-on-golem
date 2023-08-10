@@ -101,5 +101,5 @@ class RayService:
 
         return True
 
-    async def get_node_proxy_command(self, node_id: NodeID) -> str:
-        return self._golem_service.get_node_proxy_command(node_id)
+    async def get_node_ssh_port(self, node_id: NodeID) -> int:
+        return self._golem_service.get_node_ssh_port(node_id)

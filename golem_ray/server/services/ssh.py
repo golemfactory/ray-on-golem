@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from golem_core.core.activity_api import commands
 from golem_core.core.activity_api.resources import Activity
 from golem_core.core.network_api.resources import Network
+from yapapi.contrib.service.socket_proxy import ProxyServer
 
 
 class SSHService:
@@ -35,3 +36,25 @@ class SSHService:
             return activity, ip, connection_uri
 
         return _create_ssh_connection
+
+
+class Proxy:
+    def __init__(self, ws_url, local_address, local_port, yagna_appkey):
+        self.ws_url = ws_url
+        self.local_address = local_address
+        self.local_port = local_port
+        self.yagna_appkey = yagna_appkey
+
+    async def run(self):
+        class ProxyServerWrapper(ProxyServer):
+            @property
+            def app_key(other_self):
+                return self.yagna_appkey
+
+            @property
+            def instance_ws(other_self):
+                return self.ws_url
+
+        proxy_server = ProxyServerWrapper(None, None, None, self.local_address, self.local_port)
+        print(f"PROXY STARTED {self.local_address}:{self.local_port} <-> {self.ws_url}")
+        await proxy_server.run()
