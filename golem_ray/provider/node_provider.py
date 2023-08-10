@@ -2,12 +2,11 @@ from ipaddress import IPv4Address
 from types import ModuleType
 from typing import Any, List, Dict, Optional
 
-from ray.autoscaler._private.command_runner import SSHCommandRunner, SSHOptions
-# from ray.autoscaler._private.command_runner import SSHCommandRunner
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
 from golem_ray.client.golem_ray_client import GolemRayClient
+from golem_ray.provider.ssh_command_runner import SSHProviderCommandRunner
 from golem_ray.server.config import BASE_URL
 from golem_ray.server.models import NodeID
 
@@ -34,17 +33,15 @@ class GolemNodeProvider(NodeProvider):
             docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
         proxy_command = self._golem_ray_client.get_node_proxy_command(node_id)
-        command_runner = SSHCommandRunner(log_prefix,
-                                          node_id,
-                                          self,
-                                          auth_config,
-                                          cluster_name,
-                                          process_runner,
-                                          True)
-        command_runner.ssh_proxy_command = proxy_command
-        command_runner.ssh_options = SSHOptions(None, None, ProxyCommand=proxy_command)
+        command_runner = SSHProviderCommandRunner(log_prefix,
+                                                  node_id,
+                                                  self,
+                                                  auth_config,
+                                                  cluster_name,
+                                                  process_runner,
+                                                  True)
+        command_runner.set_proxy_command(proxy_command)
 
-        # return LocalHeadCommandRunner(log_prefix, cluster_name, process_runner)
         return command_runner
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeID]:
