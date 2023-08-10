@@ -1,9 +1,7 @@
 # golem-ray
 Setup project
 ```bach
-pip install -r requirements.txt
-python setup.py develop
-
+poetry install
 Create an .env file basing on .env.example
 ```
 Run yagna
