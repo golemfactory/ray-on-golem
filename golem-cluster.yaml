@@ -9,7 +9,8 @@ provider:   # The cloud provider-specific configuration properties.
   module: "golem_ray.provider.node_provider.GolemNodeProvider"
   parameters:
     golem_ray_url: "http://localhost:8080" # Url of golem webserver that has connection with golem network
-    image_hash: "18d1abd97ade626e5657a7e194ac85be0037ebff31dc924114a28d0b" # Hash of the image to run on nodes
+    image_hash: "4efb6857f41a4fcf7f547228bc8bed2ae6afa48c1f4dff8395394c9b" # Hash of the image to run on nodes
+    # 18d1abd97ade626e5657a7e194ac85be0037ebff31dc924114a28d0b - old # TODO: resolve before merging to main
     network: "goerli" # Golem network on which we will launch nodes
     budget: 10 # Maximum amount of GML that's going to be spent
 
@@ -33,7 +34,9 @@ available_node_types: # Tells the autoscaler the allowed node types and the reso
       kind: node
 
 initialization_commands: [] # List of commands that will be run before `setup_commands`
-setup_commands: [] # List of shell commands to run to set up nodes
+setup_commands: [# List of shell commands to run to set up nodes
+  "echo 'export BASE_URL=http://proxy.dev.golem.network:3009' >> ~/.bashrc"
+]
 
 head_setup_commands: [] # Custom commands that will be run on the head node after common setup.
 worker_setup_commands: [] # Custom commands that will be run on worker nodes after common setup.

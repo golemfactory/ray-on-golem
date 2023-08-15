@@ -10,7 +10,7 @@ class RayService:
 
     def __init__(self, golem_service: GolemService):
         self._golem_service = golem_service
-        self._num_workers = 2
+        self._num_workers = 15
 
     def get_all_nodes_ids(self) -> List[NodeID]:
         return list(self._golem_service.cluster_nodes.keys())

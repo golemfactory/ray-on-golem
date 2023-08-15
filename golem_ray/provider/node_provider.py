@@ -2,6 +2,7 @@ from ipaddress import IPv4Address
 from types import ModuleType
 from typing import Any, List, Dict, Optional
 
+from ray.autoscaler._private.command_runner import SSHCommandRunner
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
@@ -22,6 +23,12 @@ class GolemNodeProvider(NodeProvider):
         budget = provider_config["parameters"].get("budget", 100)
         self._golem_ray_client.get_running_or_create_cluster(image_hash, network, budget)
 
+    @staticmethod
+    def _is_running_on_localhost():
+        if 'localhost' in str(BASE_URL):
+            return True
+        return False
+
     def get_command_runner(
             self,
             log_prefix: str,
@@ -32,15 +39,24 @@ class GolemNodeProvider(NodeProvider):
             use_internal_ip: bool,
             docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
-        node_port = self._golem_ray_client.get_node_port(node_id)
-        command_runner = SSHProviderCommandRunner(log_prefix,
-                                                  node_id,
-                                                  self,
-                                                  auth_config,
-                                                  cluster_name,
-                                                  process_runner,
-                                                  True)
-        command_runner.set_ssh_port(node_port)
+        if self._is_running_on_localhost():
+            node_port = self._golem_ray_client.get_node_port(node_id)
+            command_runner = SSHProviderCommandRunner(log_prefix,
+                                                      node_id,
+                                                      self,
+                                                      auth_config,
+                                                      cluster_name,
+                                                      process_runner,
+                                                      True)
+            command_runner.set_ssh_port(node_port)
+        else:
+            command_runner = SSHCommandRunner(log_prefix,
+                                              node_id,
+                                              self,
+                                              auth_config,
+                                              cluster_name,
+                                              process_runner,
+                                              True)
 
         return command_runner
 

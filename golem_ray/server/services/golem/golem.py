@@ -101,7 +101,7 @@ class GolemService:
         new_nodes = await self._create_activities(tags=tags, count=count)
         await self._network.refresh_nodes()
         await self._add_my_key()
-        await self._add_other_keys()
+        await self._add_other_keys() # TODO: Fix adding other keys
         self._print_ws_connection_data()
 
         return new_nodes
@@ -141,15 +141,16 @@ class GolemService:
 
         :return: shell subprocess which runs reverse tunnel
         """
-        text_command = "ssh -N -R *:{port}:127.0.0.1:6379 proxy@proxy.dev.golem.network"
+        text_command = "ssh -N -R *:{port}:127.0.0.1:8080 proxy@proxy.dev.golem.network"
         process = await subprocess.create_subprocess_shell(text_command.format(
             port=self.gcs_reverse_tunnel_port))
-        logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{self.gcs_reverse_tunnel_port} created.')
+        logger.info(f'Reverse ssh tunnel from 127.0.0.1:8080 to *:{self.gcs_reverse_tunnel_port} created.')
 
         return process
 
     @staticmethod
     async def _add_authorized_key(activity, key):
+        # TODO: Creating temporary key for ray cluster instance
         """
         Adds local machine ssh key to providers machine
         :param activity: Activity object from golem
