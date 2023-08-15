@@ -1,10 +1,14 @@
+import platform
 from ipaddress import IPv4Address
 from types import ModuleType
 from typing import Any, List, Dict, Optional
 
+import ray
+import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
+from golem_ray.client.exceptions import GolemNodeProviderException
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
 from golem_ray.server.config import BASE_URL
@@ -17,10 +21,32 @@ class GolemNodeProvider(NodeProvider):
         super().__init__(provider_config, cluster_name)
         self._golem_ray_client = GolemRayClient(base_url=BASE_URL)
 
-        image_hash = provider_config["parameters"]["image_hash"]
+        image_hash = self._get_image_hash(provider_config)
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 100)
         self._golem_ray_client.get_running_or_create_cluster(image_hash, network, budget)
+
+    @staticmethod
+    def _get_image_hash(provider_config: dict) -> str:
+        python_version = platform.python_version()
+        ray_version = ray.__version__
+        if "image_tag" in provider_config["parameters"]:
+            image_tag = provider_config["parameters"]["image_tag"]
+            tag_python_version = image_tag.split('-')[0].lsplit("py")
+            tag_ray_version = image_tag.split('-')[1].lsplit("ray")
+            if (python_version, ray_version) != (tag_python_version, tag_ray_version):
+                print("WARNING: "
+                      f"Version of python and ray on your machine {(python_version, ray_version) = }"
+                      f"does not match tag version {(tag_python_version, tag_ray_version) = }")
+        else:
+            image_tag = f"py{python_version}-ray{ray_version}"
+
+        response = requests.get(
+            f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
+        )
+        if response.status_code == 200:
+            return response.json()["sha3"]
+        raise GolemNodeProviderException(f"Image tag {image_tag } does not exist")
 
     def get_command_runner(
             self,
