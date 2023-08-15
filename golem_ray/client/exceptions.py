@@ -4,6 +4,10 @@ import requests
 from pydantic.main import BaseModel
 
 
+class GolemNodeProviderException(Exception):
+    pass
+
+
 class GolemRayClientException(Exception):
     def __init__(self, message: str,
                  response: requests.Response):
@@ -20,4 +24,4 @@ class GolemRayClientValidationException(Exception):
         message = f"{error_message}: \n" \
                   f"Response json: {response_json}\n" \
                   f"expected {expected}"
-        super().__init__(error_message)
+        super().__init__(message)
