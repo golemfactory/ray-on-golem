@@ -1,5 +1,4 @@
 import hashlib
-import shlex
 import subprocess
 from getpass import getuser
 from typing import Dict
@@ -117,7 +116,6 @@ class SSHProviderCommandRunner(SSHCommandRunner):
                 )
         else:
             return self._run_helper(final_cmd, with_output, exit_on_fail, silent=silent)
-
 
     def run_rsync_up(self, source, target, options=None):
         self._set_ssh_ip_if_required()

@@ -101,7 +101,7 @@ class GolemService:
         new_nodes = await self._create_activities(tags=tags, count=count)
         await self._network.refresh_nodes()
         await self._add_my_key()
-        await self._add_other_keys() # TODO: Fix adding other keys
+        await self._add_other_keys()  # TODO: Fix adding other keys
         self._print_ws_connection_data()
 
         return new_nodes
@@ -257,8 +257,14 @@ class GolemService:
                                                tags=tags,
                                                state=NodeState.pending)
                     await self._create_ssh_proxy_to_node(cluster_node)
-                    self._cluster_nodes[node_id] = cluster_node
-                    logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
+                    port = cluster_node.ssh_proxy.local_port
+                    process = await asyncio.create_subprocess_shell(
+                        f'scp -P {port}  ~/bootstrap.yaml root@127.0.0.1:~/bootstrap.yaml') # TODO: fix lack of bootstrap on providers
+                    await process.wait()
+                    found = next((x for x in self.cluster_nodes.values() if x.internal_ip == ip), None)
+                    if not found:
+                        self._cluster_nodes[node_id] = cluster_node
+                        logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
 
 
         except asyncio.TimeoutError:
@@ -290,23 +296,25 @@ class GolemService:
         Adds all providers key to other providers machines
         """
         keys = {}
-        for cluster_node in self._cluster_nodes.values():
+        cluster_nodes = list(self._cluster_nodes.values())
+        for cluster_node in cluster_nodes:
             if cluster_node.activity:
                 batch = await cluster_node.activity.execute_commands(
-                    commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
+                    # commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
+                    commands.Run(
+                        'if [ ! -f /root/.ssh/id_rsa ]; then ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa; fi'),
                     commands.Run('cat /root/.ssh/id_rsa.pub'),
                 )
-                await batch.wait()
+                await batch.wait(20)
                 key = batch.events[-1].stdout.strip()
+                logger.info(f"{cluster_node.node_id} - key: {key}")
                 keys[cluster_node.node_id] = key
 
-        for cluster_node in self._cluster_nodes.values():
-            other_nodes: List[ClusterNode] = [node for node in self._cluster_nodes.values() if
+        for cluster_node in cluster_nodes:
+            other_nodes: List[ClusterNode] = [node for node in cluster_nodes if
                                               node.node_id != cluster_node.node_id]
 
             for other_node in other_nodes:
-                if other_node.node_id == 0:
-                    continue
                 other_activity_key = keys[other_node.node_id]
                 if cluster_node.activity:
                     await self._add_authorized_key(cluster_node.activity, other_activity_key)

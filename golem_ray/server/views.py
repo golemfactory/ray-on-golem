@@ -1,3 +1,5 @@
+import asyncio
+
 from aiohttp import web
 
 import config
@@ -7,6 +9,8 @@ from services import RayService
 routes = web.RouteTableDef()
 
 golem_clusters = {}
+
+modification_lock = asyncio.Lock()
 
 
 @routes.post(config.URL_CREATE_CLUSTER)

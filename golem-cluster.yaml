@@ -29,7 +29,7 @@ available_node_types: # Tells the autoscaler the allowed node types and the reso
   ray.worker.default:
     min_workers: 3
     max_workers: 10
-    resources: {"CPU": 3}
+    resources: {"CPU": 1}
     node_config:
       kind: node
 
@@ -42,10 +42,10 @@ head_setup_commands: [] # Custom commands that will be run on the head node afte
 worker_setup_commands: [] # Custom commands that will be run on worker nodes after common setup.
 
 head_start_ray_commands: [ # Command to start ray on the head node. You don't need to change this.
-  "ray start --head --dashboard-port 0.0.0.0 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
+  "ray start --node-ip-address 192.168.0.3 --head --dashboard-port 0.0.0.0 --dashboard-port 8266"
 ]
 worker_start_ray_commands: [# Command to start ray on worker nodes. You don't need to change this.
-  "ray start --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
   "touch /tmp/dupa.txt",
 ]
 auth:  # Authentication credentials that Ray will use to launch nodes
