@@ -35,17 +35,17 @@ available_node_types: # Tells the autoscaler the allowed node types and the reso
 
 initialization_commands: [] # List of commands that will be run before `setup_commands`
 setup_commands: [# List of shell commands to run to set up nodes
-  "echo 'export BASE_URL=http://proxy.dev.golem.network:3009' >> ~/.bashrc"
+  "echo 'export BASE_URL=http://proxy.dev.golem.network:3010' >> ~/.bashrc"
 ]
 
 head_setup_commands: [] # Custom commands that will be run on the head node after common setup.
 worker_setup_commands: [] # Custom commands that will be run on worker nodes after common setup.
 
 head_start_ray_commands: [ # Command to start ray on the head node. You don't need to change this.
-  "ray start --node-ip-address 192.168.0.3 --head --dashboard-port 0.0.0.0 --dashboard-port 8266"
+  "ray start --node-ip-address 192.168.0.3 --head --dashboard-port 0.0.0.0 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
 ]
 worker_start_ray_commands: [# Command to start ray on worker nodes. You don't need to change this.
-  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "ray start --address 192.168.0.3:6379 --dashboard-port 8266",
   "touch /tmp/dupa.txt",
 ]
 auth:  # Authentication credentials that Ray will use to launch nodes

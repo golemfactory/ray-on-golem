@@ -1,4 +1,5 @@
 import hashlib
+import os
 import subprocess
 from getpass import getuser
 from typing import Dict
@@ -22,9 +23,12 @@ class SSHProviderCommandRunner(SSHCommandRunner):
     ):
         ssh_control_hash = hashlib.md5(cluster_name.encode()).hexdigest()
         ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()
-        ssh_control_path = "/tmp/ray_ssh_{}/{}".format(
-            ssh_user_hash[:HASH_MAX_LENGTH], ssh_control_hash[:HASH_MAX_LENGTH]
-        )
+        ssh_control_path_dir = "/tmp/ray_ssh_{}/".format(ssh_user_hash[:HASH_MAX_LENGTH])
+        ssh_control_path = ssh_control_path_dir + ssh_control_hash[:HASH_MAX_LENGTH]
+        # ssh_control_path = "/tmp/ray_ssh_{}/{}".format(
+        #     ssh_user_hash[:HASH_MAX_LENGTH], ssh_control_hash[:HASH_MAX_LENGTH]
+        # )
+
 
         self.cluster_name = cluster_name
         self.log_prefix = log_prefix
@@ -43,6 +47,11 @@ class SSHProviderCommandRunner(SSHCommandRunner):
             self.ssh_control_path,
             ProxyCommand=self.ssh_proxy_command,
         )
+
+        try:
+            os.makedirs(self.ssh_control_path, mode=0o700, exist_ok=True)
+        except OSError as e:
+            cli_logger.warning("{}", str(e))
 
     def set_ssh_port(self, ssh_port: int):
         self.ssh_ip = '127.0.0.1'

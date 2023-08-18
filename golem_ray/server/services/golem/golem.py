@@ -257,10 +257,10 @@ class GolemService:
                                                tags=tags,
                                                state=NodeState.pending)
                     await self._create_ssh_proxy_to_node(cluster_node)
-                    port = cluster_node.ssh_proxy.local_port
-                    process = await asyncio.create_subprocess_shell(
-                        f'scp -P {port}  ~/bootstrap.yaml root@127.0.0.1:~/bootstrap.yaml') # TODO: fix lack of bootstrap on providers
-                    await process.wait()
+                    # port = cluster_node.ssh_proxy.local_port
+                    # # process = await asyncio.create_subprocess_shell(
+                    # #     f'scp -P {port}  ~/bootstrap.yaml root@127.0.0.1:~/ray_bootstrap_config.yaml') # TODO: fix lack of bootstrap on providers
+                    # # await process.wait()
                     found = next((x for x in self.cluster_nodes.values() if x.internal_ip == ip), None)
                     if not found:
                         self._cluster_nodes[node_id] = cluster_node
