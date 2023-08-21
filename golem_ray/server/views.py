@@ -29,7 +29,6 @@ async def non_terminated_nodes_ids(request):
     request_data = models.NonTerminatedNodesRequestData.parse_raw(await request.text())
     nodes = ray_service.get_non_terminated_nodes_ids(tags_to_match=request_data.tags)
     response = models.GetNodesResponseData(nodes=nodes)
-
     return web.Response(text=response.json())
 
 

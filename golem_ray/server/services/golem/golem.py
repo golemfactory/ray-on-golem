@@ -81,7 +81,7 @@ class GolemService:
         if self._demand:
             logger.info('Cluster was created already.')
             return
-        self._num_workers = provider_config.num_workers
+        self._num_workers = provider_config.num_workers | 16
         payload, offer_score, connection_timeout = await self._create_payload(image_hash=provider_config.image_hash)
         self._demand = await self._golem.create_demand(payload,
                                                        allocations=[self._allocation],

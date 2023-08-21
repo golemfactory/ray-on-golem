@@ -30,6 +30,10 @@ class RayService:
 
     def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeID]:
         matched_ids = []
+
+        if not tags_to_match:
+            return [node_id for node_id, node in self._golem_service.cluster_nodes.items()]
+
         for node_id, node in self._golem_service.cluster_nodes.items():
             if self._are_dicts_equal(node.tags, tags_to_match):
                 matched_ids.append(node_id)
@@ -93,11 +97,12 @@ class RayService:
 
     @staticmethod
     def _are_dicts_equal(dict1: Dict[str, str], dict2: Dict[str, str]) -> bool:
-        if set(dict1.keys()) != set(dict2.keys()):
-            return False
         for key in dict1.keys():
-            if dict1[key] != dict2[key]:
-                return False
+            if key in dict2:
+                if dict1[key] != dict2[key]:
+                    return False
+            # if dict1[key] != dict2[key]:
+            #     return False
 
         return True
 

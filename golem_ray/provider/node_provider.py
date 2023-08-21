@@ -1,4 +1,5 @@
 from ipaddress import IPv4Address
+from threading import RLock
 from types import ModuleType
 from typing import Any, List, Dict, Optional
 
@@ -22,12 +23,7 @@ class GolemNodeProvider(NodeProvider):
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 100)
         self._golem_ray_client.get_running_or_create_cluster(image_hash, network, budget)
-
-    @staticmethod
-    def _is_running_on_localhost():
-        if 'localhost' in str(BASE_URL):
-            return True
-        return False
+        self._lock = RLock()
 
     def get_command_runner(
             self,
@@ -61,22 +57,28 @@ class GolemNodeProvider(NodeProvider):
         return command_runner
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeID]:
-        return self._golem_ray_client.non_terminated_nodes(tag_filters)
+        with self._lock:
+            return self._golem_ray_client.non_terminated_nodes(tag_filters)
 
     def is_running(self, node_id: NodeID) -> bool:
-        return self._golem_ray_client.is_running(node_id)
+        with self._lock:
+            return self._golem_ray_client.is_running(node_id)
 
     def is_terminated(self, node_id: NodeID) -> bool:
-        return self._golem_ray_client.is_terminated(node_id)
+        with self._lock:
+            return self._golem_ray_client.is_terminated(node_id)
 
     def node_tags(self, node_id: NodeID) -> Dict:
-        return self._golem_ray_client.get_node_tags(node_id)
+        with self._lock:
+            return self._golem_ray_client.get_node_tags(node_id)
 
     def internal_ip(self, node_id: NodeID) -> IPv4Address:
-        return self._golem_ray_client.get_node_internal_ip(node_id)
+        with self._lock:
+            return self._golem_ray_client.get_node_internal_ip(node_id)
 
     def set_node_tags(self, node_id: NodeID, tags: Dict) -> None:
-        self._golem_ray_client.set_node_tags(node_id, tags)
+        with self._lock:
+            self._golem_ray_client.set_node_tags(node_id, tags)
 
     def create_node(
             self,
@@ -84,14 +86,30 @@ class GolemNodeProvider(NodeProvider):
             tags: Dict[str, str],
             count: int,
     ) -> Dict[str, Dict]:
-        return self._golem_ray_client.create_nodes(
-            cluster_id="",
-            count=count,
-            tags=tags,
-        )
+        with self._lock:
+            return self._golem_ray_client.create_nodes(
+                cluster_id="",
+                count=count,
+                tags=tags,
+            )
 
     def terminate_node(self, node_id: NodeID) -> None:
-        return self._golem_ray_client.terminate_node(node_id)
+        with self._lock:
+            return self._golem_ray_client.terminate_node(node_id)
 
     def terminate_nodes(self, node_ids: List[NodeID]) -> None:
-        return self._golem_ray_client.terminate_nodes(node_ids)
+        with self._lock:
+            return self._golem_ray_client.terminate_nodes(node_ids)
+
+    # def bootstrap_config(
+    #     cluster_config: Dict[str, Any], no_config_cache: bool = False
+    # ) -> Dict[str, Any]:
+    #     """Validate and add provider-specific fields to the config. For example,
+    #     IAM/authentication may be added here."""
+    #     return commands._bootstrap_config(cluster_config, no_config_cache)
+
+    @staticmethod
+    def _is_running_on_localhost():
+        if 'localhost' in str(BASE_URL):
+            return True
+        return False

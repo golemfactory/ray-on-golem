@@ -100,6 +100,7 @@ class SSHProviderCommandRunner(SSHCommandRunner):
                 + ["{}@{}".format(self.ssh_user, self.ssh_ip)]
                 + ['-p'] + [f"{self.ssh_port}"]
         )
+        print(final_cmd)
         if cmd:
             if environment_variables:
                 cmd = _with_environment_variables(cmd, environment_variables)
@@ -142,3 +143,54 @@ class SSHProviderCommandRunner(SSHCommandRunner):
         command += [source, "{}@{}:{}".format(self.ssh_user, self.ssh_ip, target)]
         cli_logger.verbose("Running `{}`", cf.bold(" ".join(command)))
         self._run_helper(command, silent=False)
+
+    def run_init(
+        self, *, as_head: bool, file_mounts: Dict[str, str], sync_run_yet: bool
+    ):
+        BOOTSTRAP_MOUNTS = ["~/ray_bootstrap_config.yaml", "~/ray_bootstrap_key.pem"]
+        print('hehehe')
+        cleaned_bind_mounts = file_mounts.copy()
+        for mnt in BOOTSTRAP_MOUNTS:
+            cleaned_bind_mounts.pop(mnt, None)
+
+        # Explicitly copy in ray bootstrap files.
+        for mount in BOOTSTRAP_MOUNTS:
+            if mount in file_mounts:
+                if not sync_run_yet:
+                    # NOTE(ilr) This rsync is needed because when starting from
+                    #  a stopped instance,  /tmp may be deleted and `run_init`
+                    # is called before the first `file_sync` happens
+                    self.run_rsync_up(file_mounts[mount], mount)
+                try:
+                    # Check if the current user has read permission.
+                    # If they do not, try to change ownership!
+                    self.run(
+                        f"cat {mount} >/dev/null 2>&1 || "
+                        f"sudo chown $(id -u):$(id -g) {mount}"
+                    )
+                except Exception:
+                    lsl_string = (
+                        self.run(f"ls -l {mount}", with_output=True)
+                        .decode("utf-8")
+                        .strip()
+                    )
+                    # The string is of format <Permission> <Links>
+                    # <Owner> <Group> <Size> <Date> <Name>
+                    permissions = lsl_string.split(" ")[0]
+                    owner = lsl_string.split(" ")[2]
+                    group = lsl_string.split(" ")[3]
+                    current_user = (
+                        self.run("whoami", with_output=True).decode("utf-8").strip()
+                    )
+                    cli_logger.warning(
+                        f"File ({mount}) is owned by user:{owner} and group:"
+                        f"{group} with permissions ({permissions}). The "
+                        f"current user ({current_user}) does not have "
+                        "permission to read these files, and Ray may not be "
+                        "able to autoscale. This can be resolved by "
+                        "installing `sudo` in your container, or adding a "
+                        f"command like 'chown {current_user} {mount}' to "
+                        "your `setup_commands`."
+                    )
+
+        return True

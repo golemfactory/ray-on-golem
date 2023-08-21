@@ -9,13 +9,14 @@ provider:   # The cloud provider-specific configuration properties.
   module: "golem_ray.provider.node_provider.GolemNodeProvider"
   parameters:
     golem_ray_url: "http://localhost:8080" # Url of golem webserver that has connection with golem network
-    image_hash: "4efb6857f41a4fcf7f547228bc8bed2ae6afa48c1f4dff8395394c9b" # Hash of the image to run on nodes
+    image_hash: "9661a940881d2754887591b5ea4097f9c7124ce719b7eddea20a627f" # Hash of the image to run on nodes
     # 18d1abd97ade626e5657a7e194ac85be0037ebff31dc924114a28d0b - old # TODO: resolve before merging to main
     network: "goerli" # Golem network on which we will launch nodes
     budget: 10 # Maximum amount of GML that's going to be spent
 
 file_mounts: # The files or directories to copy to the head and worker nodes
   {
+    "~/ray_bootstrap_config.yaml": "~/ray_bootstrap_config.yaml"
 #      "/tmp/golem": "/tmp/golem"
   }
 
@@ -46,10 +47,9 @@ head_start_ray_commands: [ # Command to start ray on the head node. You don't ne
 ]
 worker_start_ray_commands: [# Command to start ray on worker nodes. You don't need to change this.
   "ray start --address 192.168.0.3:6379 --dashboard-port 8266",
-  "touch /tmp/dupa.txt",
 ]
 auth:  # Authentication credentials that Ray will use to launch nodes
   ssh_user: 'root'
-  ssh_private_key: '~/.ssh/id_rsa.pub'
+  ssh_private_key: '~/.ssh/id_rsa'
 
 cluster_synced_files: [] # A list of paths to the files or directories to copy from the head node to the worker nodes
