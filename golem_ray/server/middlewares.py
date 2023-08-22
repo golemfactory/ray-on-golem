@@ -1,7 +1,6 @@
 from http import HTTPStatus
 
 from aiohttp import web
-
 from exceptions import GolemRayServerError
 
 
@@ -18,8 +17,8 @@ async def error_middleware(request, handler):
     else:
         if response.status != 404:
             return response
-        
-        message = 'not found'
+
+        message = "not found"
         status_code = HTTPStatus.NOT_FOUND
 
     return web.json_response({"error": message}, status=status_code)

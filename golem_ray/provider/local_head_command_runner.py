@@ -1,25 +1,20 @@
 import json
-import sys
 import subprocess
-
+import sys
 from types import ModuleType
 from typing import Any, Dict, List, Optional, Tuple
 
 import click
-
 from ray.autoscaler._private.cli_logger import cf, cli_logger
+from ray.autoscaler._private.subprocess_output_util import ProcessRunnerError, is_output_redirected
 from ray.autoscaler.command_runner import CommandRunnerInterface
-from ray.autoscaler._private.subprocess_output_util import (
-    ProcessRunnerError,
-    is_output_redirected,
-)
 
 # Implementation note: This code is meant to be an MVP equivalent of SSHCommandRunner class from Ray for AWS/GCP.
 # Leading thought of implementation is that if we can copy structure of the code and code itself from original
 # implementation then we should do it. If you don't know why something is written the way it is check out this link:
 # https://github.com/ray-project/ray/blob/ab1767a5fa3009e6ef1df91f7ae2eeb9b186b1c1/python/ray/autoscaler/_private/command_runner.py#LL159C2-L159C2
 
-_config = {"use_login_shells": True, "silent_rsync": True} # TODO Coverage needed
+_config = {"use_login_shells": True, "silent_rsync": True}  # TODO Coverage needed
 
 
 def is_rsync_silent():
@@ -99,16 +94,16 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         self.process_runner = process_runner
 
     def run(
-            self,
-            cmd: Optional[str] = None,
-            timeout: int = 120,
-            exit_on_fail: bool = False,
-            port_forward: List[Tuple[int, int]] = None,
-            with_output: bool = False,
-            environment_variables: Optional[Dict[str, object]] = None,
-            run_env: str = "auto",
-            ssh_options_override_ssh_key: str = "",
-            shutdown_after_run: bool = False,
+        self,
+        cmd: Optional[str] = None,
+        timeout: int = 120,
+        exit_on_fail: bool = False,
+        port_forward: List[Tuple[int, int]] = None,
+        with_output: bool = False,
+        environment_variables: Optional[Dict[str, object]] = None,
+        run_env: str = "auto",
+        ssh_options_override_ssh_key: str = "",
+        shutdown_after_run: bool = False,
     ) -> str:
         # if timeout != 120:
         #     raise InvalidLocalHeadArg('timeout', timeout)
@@ -123,7 +118,9 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
 
         if cmd:
             if environment_variables:
-                cmd = _with_environment_variables(cmd=cmd, environment_variables=environment_variables)
+                cmd = _with_environment_variables(
+                    cmd=cmd, environment_variables=environment_variables
+                )
 
         try:
             if not with_output:
@@ -132,7 +129,7 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
                 bytes_output = self.process_runner.check_output(cmd, shell=True)
         except subprocess.CalledProcessError as e:
             joined_cmd = " ".join(cmd)
-            if not is_using_login_shells(): # TODO Coverage needed
+            if not is_using_login_shells():  # TODO Coverage needed
                 raise ProcessRunnerError(
                     "Command failed",
                     "ssh_command_failed",
@@ -141,9 +138,7 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
                 )
 
             if exit_on_fail:
-                raise click.ClickException(
-                    "Command failed:\n\n  {}\n".format(joined_cmd)
-                ) from None
+                raise click.ClickException("Command failed:\n\n  {}\n".format(joined_cmd)) from None
             else:
                 fail_msg = "SSH command failed."
                 if is_output_redirected():
@@ -164,21 +159,18 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         rsync_excludes = options.get("rsync_exclude") or []
         rsync_filters = options.get("rsync_filter") or []
 
-        exclude_args = [
-            ["--exclude", rsync_exclude] for rsync_exclude in rsync_excludes
-        ]
+        exclude_args = [["--exclude", rsync_exclude] for rsync_exclude in rsync_excludes]
         filter_args = [
-            ["--filter", "dir-merge,- {}".format(rsync_filter)]
-            for rsync_filter in rsync_filters
+            ["--filter", "dir-merge,- {}".format(rsync_filter)] for rsync_filter in rsync_filters
         ]
 
         # Combine and flatten the two lists
         return [arg for args_list in exclude_args + filter_args for arg in args_list]
 
     def _run_rsync(
-            self, source: str, target: str, options: Optional[Dict[str, Any]] = None
+        self, source: str, target: str, options: Optional[Dict[str, Any]] = None
     ) -> None:
-        if source == target + '/':
+        if source == target + "/":
             return
 
         command = ["rsync"]
@@ -186,15 +178,15 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         command += self._create_rsync_filter_args(options=options)
         command += [source, target]
         cli_logger.verbose("Running `{}`", cf.bold(" ".join(command)))
-        final_cmd = ''
+        final_cmd = ""
         for index in range(len(command)):
             final_cmd += command[index]
             if index != len(command):
-                final_cmd += ' '
-        self.run(cmd=final_cmd, with_output=not is_rsync_silent()) # TODO Coverage needed
+                final_cmd += " "
+        self.run(cmd=final_cmd, with_output=not is_rsync_silent())  # TODO Coverage needed
 
     def run_rsync_up(
-            self, source: str, target: str, options: Optional[Dict[str, Any]] = None
+        self, source: str, target: str, options: Optional[Dict[str, Any]] = None
     ) -> None:
         """Rsync files up to the cluster node.
 
@@ -206,7 +198,7 @@ class LocalHeadCommandRunner(CommandRunnerInterface):
         self._run_rsync(source=source, target=target, options=options)
 
     def run_rsync_down(
-            self, source: str, target: str, options: Optional[Dict[str, Any]] = None
+        self, source: str, target: str, options: Optional[Dict[str, Any]] = None
     ) -> None:
         """Rsync files down from the cluster node.
 

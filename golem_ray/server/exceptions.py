@@ -7,7 +7,7 @@ class GolemRayServerError(GolemRayError):
     def __init__(self, additional_message=None):
         if additional_message:
             self.message += "\n" + additional_message
-            
+
         super().__init__(self.message)
 
 

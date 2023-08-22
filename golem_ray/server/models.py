@@ -8,10 +8,11 @@ from pydantic import BaseModel, Field
 NodeId = int
 Tags = Dict[str, str]
 
+
 class NodeState(Enum):
-    pending = 'pending'
-    running = 'running'
-    stopping = 'stopping'
+    pending = "pending"
+    running = "running"
+    stopping = "stopping"
 
 
 class Node(BaseModel):
@@ -74,7 +75,6 @@ class DeleteNodesRequestData(BaseModel):
 class SetNodeTagsRequestData(BaseModel):
     node_id: NodeId
     tags: Tags
-
 
 
 class CreateNodesResponseData(BaseModel):

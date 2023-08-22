@@ -1,4 +1,3 @@
-import os
 import socket
 from random import random
 
@@ -8,7 +7,7 @@ import ray
 # os.environ["RAY_OVERRIDE_RESOURCES"] = "{}"
 # Let's start Ray
 ray.init()
-print(f'{ray.available_resources() = }')
+print(f"{ray.available_resources() = }")
 # ray.init(address="auto")
 
 SAMPLES = 1000000
@@ -28,14 +27,14 @@ def pi4_sample():
     return in_count
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # To invoke this remote function, use the `remote` method.
     # This will immediately return an object ref (a future) and then create
     # a task that will be executed on a worker process. Get retreives the result.
-    print(f'{pandas.__version__ = }')
+    print(f"{pandas.__version__ = }")
     future = pi4_sample.remote()
     pi = ray.get(future) * 4.0 / SAMPLES
-    print(f'{pi} is an approximation of pi')
+    print(f"{pi} is an approximation of pi")
 
     # Now let's do this 100,000 times.
     # With regular python this would take 11 hours
@@ -47,4 +46,4 @@ if __name__ == '__main__':
         results.append(pi4_sample.remote())
     output = ray.get(results)
     pi = sum(output) * 4.0 / BATCHES / SAMPLES
-    print(f'{pi} is a way better approximation of pi')
+    print(f"{pi} is a way better approximation of pi")

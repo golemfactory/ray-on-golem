@@ -1,18 +1,18 @@
 import platform
 from ipaddress import IPv4Address
 from types import ModuleType
-from typing import Any, List, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import ray
 import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
-from golem_ray.provider.exceptions import GolemRayNodeProviderError
 from golem_ray.client.golem_ray_client import GolemRayClient
+from golem_ray.provider.exceptions import GolemRayNodeProviderError
 from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
-from golem_ray.server.settings import SERVER_BASE_URL
 from golem_ray.server.models import NodeId
+from golem_ray.server.settings import SERVER_BASE_URL
 
 
 class GolemNodeProvider(NodeProvider):
@@ -31,12 +31,14 @@ class GolemNodeProvider(NodeProvider):
         ray_version = ray.__version__
         if "image_tag" in provider_config["parameters"]:
             image_tag = provider_config["parameters"]["image_tag"]
-            tag_python_version = image_tag.split('-')[0].split("py")[1]
-            tag_ray_version = image_tag.split('-')[1].split("ray")[1]
+            tag_python_version = image_tag.split("-")[0].split("py")[1]
+            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
             if (python_version, ray_version) != (tag_python_version, tag_ray_version):
-                print("WARNING: "
-                      f"Version of python and ray on your machine {(python_version, ray_version)=}"
-                      f" does not match tag version {(tag_python_version, tag_ray_version)=}")
+                print(
+                    "WARNING: "
+                    f"Version of python and ray on your machine {(python_version, ray_version)=}"
+                    f" does not match tag version {(tag_python_version, tag_ray_version)=}"
+                )
         else:
             image_tag = f"py{python_version}-ray{ray_version}"
 
@@ -48,14 +50,14 @@ class GolemNodeProvider(NodeProvider):
         raise GolemRayNodeProviderError(f"Image tag {image_tag } does not exist")
 
     def get_command_runner(
-            self,
-            log_prefix: str,
-            node_id: str,
-            auth_config: Dict[str, Any],
-            cluster_name: str,
-            process_runner: ModuleType,
-            use_internal_ip: bool,
-            docker_config: Optional[Dict[str, Any]] = None,
+        self,
+        log_prefix: str,
+        node_id: str,
+        auth_config: Dict[str, Any],
+        cluster_name: str,
+        process_runner: ModuleType,
+        use_internal_ip: bool,
+        docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
         return LocalHeadCommandRunner(log_prefix, cluster_name, process_runner)
 
@@ -78,10 +80,10 @@ class GolemNodeProvider(NodeProvider):
         self._golem_ray_client.set_node_tags(node_id, tags)
 
     def create_node(
-            self,
-            node_config: Dict[str, Any],
-            tags: Dict[str, str],
-            count: int,
+        self,
+        node_config: Dict[str, Any],
+        tags: Dict[str, str],
+        count: int,
     ) -> Dict[str, Dict]:
         return self._golem_ray_client.create_nodes(
             count=count,

@@ -1,8 +1,13 @@
 from ipaddress import IPv4Address
 from typing import Dict, List
 
-from golem_ray.server.exceptions import NodeNotFound, NodesNotFound, DestroyActivityError, NodesCountExceeded
-from golem_ray.server.models import CreateClusterRequestData, NodeId, NodeState, Node, Tags
+from golem_ray.server.exceptions import (
+    DestroyActivityError,
+    NodeNotFound,
+    NodesCountExceeded,
+    NodesNotFound,
+)
+from golem_ray.server.models import CreateClusterRequestData, Node, NodeId, NodeState, Tags
 from golem_ray.server.services import GolemService
 
 
@@ -74,8 +79,7 @@ class RayService:
         if count + len(self._golem_service.cluster_nodes) > self._num_workers + 1:
             raise NodesCountExceeded
 
-        await self._golem_service.get_providers(tags=tags,
-                                                count=count)
+        await self._golem_service.get_providers(tags=tags, count=count,)
 
         return self._golem_service.cluster_nodes
 

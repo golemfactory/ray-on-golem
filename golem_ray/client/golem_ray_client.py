@@ -1,16 +1,15 @@
 from http import HTTPStatus
 from ipaddress import IPv4Address
-from typing import List, Dict, Type, TypeVar
+from typing import Dict, List, Type, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
 from yarl import URL
 
-from golem_ray.server import models, settings
 from golem_ray.client.exceptions import GolemRayClientError, GolemRayClientValidationError
+from golem_ray.server import models, settings
 
-
-TResponseModel = TypeVar('TResponseModel')
+TResponseModel = TypeVar("TResponseModel")
 
 
 class GolemRayClient:
@@ -18,19 +17,19 @@ class GolemRayClient:
         self._base_url = base_url
 
         self._session = requests.Session()
-        
+
     def _make_request(
-            self,
-            *,
-            url: str,
-            request_data: BaseModel,
-            response_model: Type[TResponseModel],
-            error_message: str,
-        ) -> TResponseModel:
-        response = self._session.post(self._base_url / url.lstrip('/'), data=request_data.json())
+        self,
+        *,
+        url: str,
+        request_data: BaseModel,
+        response_model: Type[TResponseModel],
+        error_message: str,
+    ) -> TResponseModel:
+        response = self._session.post(self._base_url / url.lstrip("/"), data=request_data.json())
 
         if response.status_code != HTTPStatus.OK:
-            raise GolemRayClientError(f'{error_message}: {response.text}')
+            raise GolemRayClientError(f"{error_message}: {response.text}")
 
         try:
             return response_model.parse_raw(response.text)
@@ -39,7 +38,9 @@ class GolemRayClient:
                 error_message="Couldn't validate response data",
             ) from e
 
-    def get_running_or_create_cluster(self, image_hash: str, network: str, budget: int) -> List[models.NodeId]:
+    def get_running_or_create_cluster(
+        self, image_hash: str, network: str, budget: int
+    ) -> List[models.NodeId]:
         response = self._make_request(
             url=settings.URL_CREATE_CLUSTER,
             request_data=models.CreateClusterRequestData(
@@ -93,7 +94,7 @@ class GolemRayClient:
         response = self._make_request(
             url=settings.URL_NODE_TAGS,
             request_data=models.SingleNodeRequestData(
-                node_id=node_id
+                node_id=node_id,
             ),
             response_model=models.GetNodeTagsResponseData,
             error_message="Couldn't get node tags",
@@ -105,7 +106,9 @@ class GolemRayClient:
         response = self._make_request(
             url=settings.URL_INTERNAL_IP,
             response_model=models.GetNodeIpAddressResponseData,
-            request_data=models.SingleNodeRequestData(node_id=node_id),
+            request_data=models.SingleNodeRequestData(
+                node_id=node_id,
+            ),
             error_message="Couldn't get node internal_ip",
         )
 

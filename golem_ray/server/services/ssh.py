@@ -1,4 +1,4 @@
-from typing import Tuple, Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Tuple
 from urllib.parse import urlparse
 
 from golem_core.core.activity_api import commands
@@ -21,7 +21,7 @@ class SshService:
             batch = await activity.execute_commands(
                 commands.Deploy(deploy_args),
                 commands.Start(),
-                commands.Run('service ssh start'),
+                commands.Run("service ssh start"),
                 # commands.Run('ssh -R "*:3001:127.0.0.1:6379" proxy@proxy.dev.golem.network'),
             )
             await batch.wait(600)

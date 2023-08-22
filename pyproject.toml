@@ -19,6 +19,34 @@ pydantic = "^2"
 
 setuptools = "*"
 
+[tool.poetry.group.dev.dependencies]
+poethepoet = "^0.22.0"
+
+black = "^23.7.0"
+isort = "^5.12.0"
+autoflake = "^2.2.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poe.tasks]
+format = {sequence = ["_format_autoflake", "_format_isort", "_format_black"], help = "Run code auto formatting"}
+_format_autoflake = "autoflake ."
+_format_isort = "isort ."
+_format_black = "black ."
+
+[tool.isort]
+profile = "black"
+py_version = 38
+line_length = 100
+
+[tool.autoflake]
+recursive = true
+in-place = true
+remove-all-unused-imports = true
+ignore-init-module-imports = true
+
+[tool.black]
+line-length = 100
+target-version = ['py38']

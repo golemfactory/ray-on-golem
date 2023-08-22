@@ -1,4 +1,3 @@
-
 from golem_ray.exceptions import GolemRayError
 
 
