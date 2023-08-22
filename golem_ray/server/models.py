@@ -3,11 +3,10 @@ from ipaddress import IPv4Address
 from typing import Dict, List, Optional
 
 from golem_core.core.activity_api import Activity
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-NodeID = int
-ClusterID = str
-
+NodeId = int
+Tags = Dict[str, str]
 
 class NodeState(Enum):
     pending = 'pending'
@@ -16,32 +15,36 @@ class NodeState(Enum):
 
 
 class Node(BaseModel):
-    node_id: NodeID
+    node_id: NodeId
     state: NodeState
-    tags: Dict
+    tags: Tags
     internal_ip: IPv4Address
-    external_ip: Optional[IPv4Address]
+    external_ip: Optional[IPv4Address] = None
 
 
 class ClusterNode(BaseModel):
-    node_id: int
-    activity: Optional[Activity]
+    node_id: NodeId
     internal_ip: IPv4Address
-    external_ip: Optional[IPv4Address]
-    state: Optional[NodeState]
-    connection_uri: Optional[str]
-    tags: Dict = {}
+    external_ip: Optional[IPv4Address] = None
+    state: Optional[NodeState] = None
+    connection_uri: Optional[str] = None
+    tags: Tags = Field(default_factory=dict)
+    activity: Optional[Activity] = None
 
     class Config:
         arbitrary_types_allowed = True
 
 
 class GetNodeRequestData(BaseModel):
-    node_id: int
+    node_id: NodeId
+
+
+class GetNodeResponseData(BaseModel):
+    node: Node
 
 
 class SingleNodeRequestData(BaseModel):
-    node_id: int
+    node_id: NodeId
 
 
 class CreateClusterRequestData(BaseModel):
@@ -51,38 +54,35 @@ class CreateClusterRequestData(BaseModel):
     num_workers: int = 4
 
 
+class CreateClusterResponseData(BaseModel):
+    nodes: List[NodeId]
+
+
 class NonTerminatedNodesRequestData(BaseModel):
-    tags: Dict
+    tags: Tags
 
 
 class CreateNodesRequestData(BaseModel):
     count: int
-    tags: Dict
+    tags: Tags
 
 
 class DeleteNodesRequestData(BaseModel):
-    node_ids: List[NodeID]
+    node_ids: List[NodeId]
 
 
 class SetNodeTagsRequestData(BaseModel):
-    node_id: NodeID
-    tags: Dict
+    node_id: NodeId
+    tags: Tags
 
-
-class CreateClusterResponseData(BaseModel):
-    nodes: List[NodeID]
 
 
 class CreateNodesResponseData(BaseModel):
-    nodes: Dict[str, Dict]
-
-
-class GetNodeResponseData(BaseModel):
-    node: Node
+    nodes: Dict[NodeId, Node]
 
 
 class GetNodesResponseData(BaseModel):
-    nodes: List[NodeID]
+    nodes: List[NodeId]
 
 
 class IsRunningResponseData(BaseModel):
@@ -94,7 +94,7 @@ class IsTerminatedResponseData(BaseModel):
 
 
 class GetNodeTagsResponseData(BaseModel):
-    tags: Dict
+    tags: Tags
 
 
 class GetNodeIpAddressResponseData(BaseModel):

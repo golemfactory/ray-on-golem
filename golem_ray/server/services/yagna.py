@@ -1,94 +1,95 @@
 import asyncio
 import json
 import logging
-import subprocess
+from pathlib import Path
 from asyncio.subprocess import Process
-from subprocess import check_output
 from typing import Optional
+from golem_ray.exceptions import GolemRayError
 
-from golem_ray.server.config import YAGNA_APPKEY
-from golem_ray.server.exceptions import CheckYagnaStatusError
+from golem_ray.server.settings import YAGNA_APPKEY
+from golem_ray.utils import run_subprocess
 
-logger = logging.getLogger('yagna-service')
+logger = logging.getLogger(__name__)
 
+YAGNA_APPNAME = 'golem-ray'
 
-class YagnaManager:
-    YAGNA_APPNAME = 'golem-ray'
+class YagnaServiceError(GolemRayError):
+    pass
 
-    def __init__(self, yagna_path: str):
-        self.yagna_path: str = yagna_path
-        self.yagna_appkey: str = self.get_or_create_yagna_appkey()
-        self.run_command = [yagna_path, 'service', 'run']
-        self.net_status_command = [yagna_path, 'net', 'status']
-        self.payment_fund_command = [yagna_path, 'payment', 'fund']
-        self._is_running = False
+class YagnaService:
+    def __init__(self, yagna_path: Path):
+        self._yagna_path = yagna_path
+
+        self.yagna_appkey: Optional[str] = None
         self._yagna_process: Optional[Process] = None
 
-    ##
-    # Public
-    async def run(self) -> None:
+    async def init(self) -> None:
+        self.yagna_appkey = await self._get_or_create_yagna_appkey()
+
         if await self._check_if_yagna_is_running():
-            logger.info('Yagna service is running')
+            logger.info('Yagna service is already running')
         else:
             await self._run_yagna_service()
 
-        await self._run_yagna_payment_fund()
+        # await self._run_yagna_payment_fund()
 
     async def shutdown(self):
-        if self._yagna_process:
-            if self._yagna_process.returncode is None:
-                self._yagna_process.terminate()
-            await self._yagna_process.wait()
+        if self._yagna_process is None:
+            return
+        
+        if self._yagna_process.returncode is None:
+            self._yagna_process.terminate()
 
-    ##
-    # Private
-    async def _wait_for_yagna(self):
-        while True:
-            await asyncio.sleep(25)
+        await self._yagna_process.wait()
+
+    async def _wait_for_yagna(self) -> bool:
+        for _ in range(25):
             if await self._check_if_yagna_is_running():
-                break
+                return True
+            
+            await asyncio.sleep(1)
 
+        return False
+
+    async def _check_if_yagna_is_running(self) -> bool:
+        try:
+            await run_subprocess(self._yagna_path, 'id', 'show')
+        except GolemRayError:
+            return False
+        
         return True
-
-    async def _check_if_yagna_is_running(self):
-        process = await asyncio.create_subprocess_exec(*self.net_status_command,
-                                                       stdout=subprocess.PIPE,
-                                                       stderr=subprocess.PIPE)
-        stdout_output, _ = await process.communicate()
-        if process.returncode == 0:
-            return True
-        else:
+    
+    async def _run_yagna_payment_fund(self) -> bool:
+        try:
+            await run_subprocess(self._yagna_path, 'payment', 'fund')
+        except GolemRayError:
             return False
 
-    async def _run_yagna_payment_fund(self):
-        result = await asyncio.create_subprocess_exec(*self.payment_fund_command,
-                                                      stdout=subprocess.PIPE,
-                                                      stderr=subprocess.PIPE)
-        stdout_output, _ = await result.communicate()
-        if result.returncode == 0:
-            await asyncio.sleep(2)
-            return True
-        else:
-            raise CheckYagnaStatusError
-
+        return True
+        
     async def _run_yagna_service(self):
-        try:
-            process = await asyncio.create_subprocess_exec(*self.run_command,
-                                                           stdout=subprocess.PIPE)
-            running = await self._wait_for_yagna()
-            if running:
-                self._yagna_process = process
-                self._is_running = True
+        process = await asyncio.create_subprocess_exec(self._yagna_path, 'service', 'run')
 
-        except asyncio.TimeoutError:
-            logger.error("Can't run yagna service.")
+        is_running = await self._wait_for_yagna()
 
-    def get_or_create_yagna_appkey(self):
+        if is_running:
+            self._yagna_process = process
+        else:
+            logger.error('Failed to start yagna!')
+
+    async def _get_or_create_yagna_appkey(self):
         if YAGNA_APPKEY:
             return YAGNA_APPKEY
-        id_data = json.loads(check_output(["yagna", "server-key", "list", "--json"]))
-        yagna_app = next((app for app in id_data if app['name'] == self.YAGNA_APPNAME), None)
-        if yagna_app is None:
-            return check_output(["yagna", "server-key", "create", self.YAGNA_APPNAME]).decode('utf-8').strip('"\n')
-        else:
+
+        output = await run_subprocess(self._yagna_path, "app-key", "list", "--json")
+
+        yagna_app = next((app for app in json.loads(output) if app['name'] == YAGNA_APPNAME), None)
+
+        if yagna_app is not None:
             return yagna_app['key']
+
+        output = await run_subprocess(
+            self._yagna_path, "app-key", "create", YAGNA_APPNAME, "--json",
+        )
+
+        return json.loads(output)

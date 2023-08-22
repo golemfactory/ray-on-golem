@@ -14,11 +14,11 @@ provider:
     # Url of golem webserver that has connection with golem network
     golem_ray_url: "http://localhost:8080"
     # check available versions at https://registry.golem.network/explore/loop/golem-ray
-    image_tag: "py3.10.6-ray2.6.1"
+    image_tag: "py3.9.2-ray2.6.3-lib"
     # Golem network on which we will launch nodes
     network: "goerli"
     # Maximum amount of GML that's going to be spent
-    budget: 10
+    budget: 1
 
 # The files or directories to copy to the head and worker nodes
 file_mounts:
@@ -56,7 +56,7 @@ worker_setup_commands: []
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands: [
-  "ray start --head --node-ip-address  --dashboard-port 0.0.0.0 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
+  "ray start --head --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
 ]
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [

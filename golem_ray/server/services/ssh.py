@@ -6,8 +6,7 @@ from golem_core.core.activity_api.resources import Activity
 from golem_core.core.network_api.resources import Network
 
 
-class SSHService:
-
+class SshService:
     @staticmethod
     def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
         async def _create_ssh_connection(activity: Activity) -> Tuple[Activity, Any, str]:

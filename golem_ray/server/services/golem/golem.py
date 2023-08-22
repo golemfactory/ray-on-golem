@@ -21,32 +21,30 @@ from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Chain, Map, Buffer, Limit
 
 from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
-from golem_ray.server.models import CreateClusterRequestData, NodeState, ClusterNode
+from golem_ray.server.models import CreateClusterRequestData, NodeId, NodeState, ClusterNode
+from golem_ray.server.services.ssh import SshService
 from golem_ray.server.services.golem.manifest import get_manifest
-from golem_ray.server.services.ssh import SSHService
 
-logger = logging.getLogger('__main__.' + __name__)
+logger = logging.getLogger(__name__)
 
 
 # "ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
 
 
 class GolemService:
-
-    def __init__(self, gcs_reverse_tunnel_port: str, yagna_appkey: str, proxy_ip: str):
-        self.gcs_reverse_tunnel_port = gcs_reverse_tunnel_port
-        self._proxy_ip = proxy_ip
+    def __init__(self, gcs_reverse_tunnel_port: int, proxy_url: str):
+        self._gcs_reverse_tunnel_port = gcs_reverse_tunnel_port
+        self._proxy_url = proxy_url
+        self._golem: Optional[GolemNode] = None
         self._demand: Optional[Demand] = None
         self._allocation: Optional[Allocation] = None
         self._network: Optional[Network] = None
         self._num_workers: Optional[int] = None
         self._head_node_process: Optional[Process] = None
         self._reverse_ssh_process: Optional[Process] = None
-        self._cluster_nodes: Dict[int, ClusterNode] = {}
-        self._golem = GolemNode(app_key=yagna_appkey)
+        self._cluster_nodes: Dict[NodeId, ClusterNode] = {}
         self._payment_manager: Optional[DefaultPaymentManager] = None
 
-    # Public api
     @property
     def golem(self):
         return self._golem
@@ -59,9 +57,12 @@ class GolemService:
     def payment_manager(self) -> DefaultPaymentManager:
         return self._payment_manager
 
-    async def init(self) -> None:
+    async def init(self, yagna_appkey: str) -> None:
+        self._golem = GolemNode(app_key=yagna_appkey)
+        await self._golem.start()
+
         async def on_event(event) -> None:
-            logger.info(f'-----EVENT: {event}')
+            logger.debug(f'-----EVENT: {event}')
 
         self._golem.event_bus.listen(on_event)
         self._network = await self._golem.create_network("192.168.0.1/24")  # will be retrieved from provider_config
@@ -69,6 +70,30 @@ class GolemService:
         self._allocation = await self._golem.create_allocation(amount=1, network="goerli", autoclose=True)
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
         # await self._allocation.get_data()
+
+    async def shutdown(self) -> None:
+        """
+        Terminates all activities and ray on head node.
+        Additionally, closes reverse ssh connection from local to proxy.
+
+        :return:
+        """
+        await self.payment_manager.terminate_agreements()
+        await self.payment_manager.wait_for_invoices()
+
+        tasks = [node.activity.destroy() for node in self._cluster_nodes.values() if node.activity]
+        if tasks:
+            await asyncio.gather(*tasks)
+            logger.info(f'-----{len(tasks)} activities stopped')
+
+        if self._reverse_ssh_process and self._reverse_ssh_process.returncode is None:
+            self._reverse_ssh_process.terminate()
+            await self._reverse_ssh_process.wait()
+            logger.info(f'-----Reverse ssh to {self._proxy_url} closed.')
+            self._reverse_ssh_process = None
+
+        await self._golem.aclose()
+        self._golem = None
 
     async def create_cluster(self, provider_config: CreateClusterRequestData):
         """
@@ -111,38 +136,15 @@ class GolemService:
         except Exception:
             raise DestroyActivityError
 
-    async def shutdown(self) -> None:
-        """
-        Terminates all activities and ray on head node.
-        Additionally, closes reverse ssh connection from local to proxy.
-
-        :return:
-        """
-        await self.payment_manager.terminate_agreements()
-        await self.payment_manager.wait_for_invoices()
-
-        tasks = [node.activity.destroy() for node in self._cluster_nodes.values() if node.activity]
-        if tasks:
-            await asyncio.gather(*tasks)
-            logger.info(f'-----{len(tasks)} activities stopped')
-
-        if self._reverse_ssh_process and self._reverse_ssh_process.returncode is None:
-            self._reverse_ssh_process.terminate()
-            await self._reverse_ssh_process.wait()
-            logger.info(f'-----Reverse ssh to {self._proxy_ip} closed.')
-            self._reverse_ssh_process = None
-
-    # Private
     async def _create_reverse_ssh_to_golem_network(self) -> Process:
         """
         Creates reverse tunnel to golem network
 
         :return: shell subprocess which runs reverse tunnel
         """
-        text_command = "ssh -N -R *:{port}:127.0.0.1:6379 proxy@proxy.dev.golem.network"
-        process = await subprocess.create_subprocess_shell(text_command.format(
-            port=self.gcs_reverse_tunnel_port))
-        logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{self.gcs_reverse_tunnel_port} created.')
+        text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._gcs_reverse_tunnel_port}:127.0.0.1:6379 proxy@proxy.dev.golem.network"
+        process = await asyncio.create_subprocess_shell(text_command, stderr=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE)
+        logger.info(f'Reverse ssh tunnel from 127.0.0.1:6379 to *:{self._gcs_reverse_tunnel_port} created.')
 
         return process
 
@@ -185,7 +187,7 @@ class GolemService:
         :param kwargs:
         :return:
         """
-        manifest = get_manifest(image_hash, self.gcs_reverse_tunnel_port)
+        manifest = get_manifest(image_hash, self._gcs_reverse_tunnel_port)
         manifest = base64.b64encode(json.dumps(manifest).encode('utf-8')).decode("utf-8")
 
         params = {
@@ -236,7 +238,7 @@ class GolemService:
                     Map(self._negotiate),
                     Map(default_create_agreement),
                     Map(default_create_activity),
-                    Map(SSHService.create_ssh_connection(self._network)),
+                    Map(SshService.create_ssh_connection(self._network)),
                     Buffer(1),
                     Limit(count))
 
@@ -249,7 +251,7 @@ class GolemService:
                                                tags=tags,
                                                state=NodeState.pending)
                     self._cluster_nodes[node_id] = cluster_node
-                    logger.info(f'-----ACTIVITY YIELDED: {str(activity)}')
+                    logger.debug(f'-----ACTIVITY YIELDED: {str(activity)}')
 
 
         except asyncio.TimeoutError:
@@ -259,11 +261,18 @@ class GolemService:
         """
         Add local ssh key to all providers
         """
-        with open(Path.home() / '.ssh/id_rsa.pub', 'r') as f:
+        id_rsa_file_path = Path.home() / '.ssh' / 'id_rsa.pub'
+
+        if not id_rsa_file_path.exists():
+            return
+
+        # TODO: Use async file handling
+        with id_rsa_file_path.open() as f:
             my_key = f.readline().strip()
 
         tasks = [self._add_authorized_key(value.activity, my_key) for value in self._cluster_nodes.values() if
                  value.activity]
+        
         await asyncio.gather(*tasks)
 
     async def _add_other_keys(self):

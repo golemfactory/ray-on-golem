@@ -1,4 +1,7 @@
-def get_manifest(image_hash, gcp_tunnel_port):
+from ast import Dict
+
+
+def get_manifest(image_hash: str, gcp_tunnel_port: int) -> Dict:
     return {
         "version": "0.1.0",
         "createdAt": "2023-06-26T00:00:00.000000Z",
