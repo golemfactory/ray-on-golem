@@ -109,8 +109,6 @@ class RayService:
             if key in dict2:
                 if dict1[key] != dict2[key]:
                     return False
-            # if dict1[key] != dict2[key]:
-            #     return False
 
         return True
 

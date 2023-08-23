@@ -23,6 +23,7 @@ provider:
 # The files or directories to copy to the head and worker nodes
 file_mounts:
   {
+    "~/ray_bootstrap_config.yaml": "~/ray_bootstrap_config.yaml",
     "/tmp/golem": "/tmp/golem"
   }
 
@@ -45,9 +46,9 @@ available_node_types:
       kind: Node
 
 # List of commands that will be run before `setup_commands`
-initialization_commands: [ "pip install pandas" ]
+initialization_commands: [ ]
 # List of shell commands to run to set up nodes
-setup_commands: ["echo 'export BASE_URL=http://proxy.dev.golem.network:3010' >> ~/.bashrc"
+setup_commands: ["echo 'export SERVER_BASE_URL=http://proxy.dev.golem.network:3010' >> ~/.bashrc"
 ]
 
 # Custom commands that will be run on the head node after common setup.
@@ -61,7 +62,7 @@ head_start_ray_commands: [
 ]
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [
-  "ray start --address 192.168.0.3 --dashboard-port 8266",
+  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
 # Authentication credentials that Ray will use to launch nodes
 auth:

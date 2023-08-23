@@ -1,7 +1,7 @@
 import socket
 from random import random
 
-import pandas
+# import pandas
 import ray
 
 # os.environ["RAY_OVERRIDE_RESOURCES"] = "{}"
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # To invoke this remote function, use the `remote` method.
     # This will immediately return an object ref (a future) and then create
     # a task that will be executed on a worker process. Get retreives the result.
-    print(f"{pandas.__version__ = }")
+    # print(f"{pandas.__version__ = }")
     future = pi4_sample.remote()
     pi = ray.get(future) * 4.0 / SAMPLES
     print(f"{pi} is an approximation of pi")
