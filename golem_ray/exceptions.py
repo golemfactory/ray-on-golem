@@ -1,0 +1,2 @@
+class GolemRayError(Exception):
+    pass

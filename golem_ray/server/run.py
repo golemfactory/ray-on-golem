@@ -1,50 +1,73 @@
 import logging
-import os
-from logging.config import dictConfig
+import logging.config
+from pathlib import Path
 
 from aiohttp import web
 
-from config import YAGNA_PATH, GCS_REVERSE_TUNNEL_PORT, LOGGER_DICT_CONFIG, PROXY_IP
-from middlewares import error_middleware
-from services import GolemService, RayService, YagnaManager
-from views import routes as nodes_routes
+from golem_ray.server.middlewares import error_middleware
+from golem_ray.server.services import GolemService, RayService, YagnaService
+from golem_ray.server.settings import GCS_REVERSE_TUNNEL_PORT, LOGGING_CONFIG, PROXY_URL, YAGNA_PATH
+from golem_ray.server.views import routes
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
-async def golem_engine(app):
+def prepare_tmp_dir():
     try:
-        os.mkdir('/tmp/golem')
+        Path("/tmp/golem").mkdir(parents=True, exist_ok=True)
     except OSError:
         pass
-    yagna_manager = YagnaManager(yagna_path=YAGNA_PATH)
-    await yagna_manager.run()
-    app['yagna'] = yagna_manager
 
-    golem_service = GolemService(gcs_reverse_tunnel_port=GCS_REVERSE_TUNNEL_PORT,
-                                 yagna_appkey=yagna_manager.yagna_appkey,
-                                 proxy_ip=PROXY_IP)
-    app['golem'] = golem_service
 
-    ray_service = RayService(golem_service)
-    app['ray'] = ray_service
+async def print_hello(app: web.Application) -> None:
+    logger.info("Server started")
 
-    async with golem_service.golem:
-        await golem_service.init()
-        yield  # before yield called on startup, after yield called on cleanup
-        await golem_service.shutdown()
-        await yagna_manager.shutdown()
+
+def create_application() -> web.Application:
+    app = web.Application(middlewares=[error_middleware])
+
+    app["yagna_service"] = YagnaService(
+        yagna_path=YAGNA_PATH,
+    )
+
+    app["golem_service"] = GolemService(
+        gcs_reverse_tunnel_port=GCS_REVERSE_TUNNEL_PORT,
+        proxy_url=PROXY_URL,
+    )
+
+    app["ray_service"] = RayService(
+        golem_service=app["golem_service"],
+    )
+
+    app.add_routes(routes)
+    app.cleanup_ctx.append(golem_ray_ctx)
+    app.on_startup.append(print_hello)
+
+    return app
+
+
+async def golem_ray_ctx(app: web.Application):
+    yagna_service: YagnaService = app["yagna_service"]
+    golem_service: GolemService = app["golem_service"]
+
+    await yagna_service.init()
+    await golem_service.init(yagna_appkey=yagna_service.yagna_appkey)
+
+    yield  # before yield called on startup, after yield called on cleanup
+
+    await golem_service.shutdown()
+    await yagna_service.shutdown()
 
 
 def main():
-    logging.config.dictConfig(LOGGER_DICT_CONFIG)
-    app = web.Application(middlewares=[error_middleware])
+    logging.config.dictConfig(LOGGING_CONFIG)
 
-    app.add_routes(nodes_routes)
-    app.cleanup_ctx.append(golem_engine)
-    logger.info('Server started')
+    prepare_tmp_dir()
+
+    app = create_application()
+
     web.run_app(app)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

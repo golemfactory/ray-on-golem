@@ -1,4 +1,4 @@
-from typing import Tuple, Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Tuple
 from urllib.parse import urlparse
 
 from golem_core.core.activity_api import commands
@@ -7,8 +7,7 @@ from golem_core.core.network_api.resources import Network
 from yapapi.contrib.service.socket_proxy import ProxyServer
 
 
-class SSHService:
-
+class SshService:
     @staticmethod
     def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
         async def _create_ssh_connection(activity: Activity) -> Tuple[Activity, Any, str]:
@@ -23,7 +22,7 @@ class SSHService:
             batch = await activity.execute_commands(
                 commands.Deploy(deploy_args),
                 commands.Start(),
-                commands.Run('service ssh start'),
+                commands.Run("service ssh start"),
                 # commands.Run('ssh -R "*:3001:127.0.0.1:6379" proxy@proxy.dev.golem.network'),
             )
             await batch.wait(600)

@@ -1,19 +1,16 @@
-def get_manifest(image_hash, gcp_tunnel_port):
+from typing import Dict
+
+
+def get_manifest(image_hash: str, gcp_tunnel_port: int) -> Dict:
     return {
         "version": "0.1.0",
         "createdAt": "2023-06-26T00:00:00.000000Z",
         "expiresAt": "2100-01-01T00:00:00.000000Z",
-        "metadata": {
-            "name": "Golem Ray",
-            "description": "Golem ray webserver",
-            "version": "0.0.1"
-        },
+        "metadata": {"name": "Golem Ray", "description": "Golem ray webserver", "version": "0.0.1"},
         "payload": [
             {
-                "urls": [
-                    f"http://registry.golem.network/download/{image_hash}"
-                ],
-                "hash": f"sha3:{image_hash}"
+                "urls": [f"http://registry.golem.network/download/{image_hash}"],
+                "hash": f"sha3:{image_hash}",
             }
         ],
         "compManifest": {
@@ -25,9 +22,9 @@ def get_manifest(image_hash, gcp_tunnel_port):
                     "run /bin/sh -c cat*",
                     "run /bin/sh -c service ssh start",
                     "run /bin/sh -c ssh*",
-                    "run /bin/sh -c *"
+                    "run /bin/sh -c *",
                 ],
-                "match": "regex"
+                "match": "regex",
             },
             "net": {
                 "inet": {
@@ -42,9 +39,10 @@ def get_manifest(image_hash, gcp_tunnel_port):
                             "tcp://proxy.dev.golem.network:3024/",
                             "tcp://proxy.dev.golem.network:3025/",
                             "tcp://proxy.dev.golem.network:3026/",
-                            "https://pypi.dev.golem.network"]
+                            "https://pypi.dev.golem.network",
+                        ],
                     }
                 }
-            }
-        }
+            },
+        },
     }
