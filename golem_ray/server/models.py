@@ -50,6 +50,10 @@ class SingleNodeRequestData(BaseModel):
 
 class CreateClusterRequestData(BaseModel):
     image_hash: str
+    capabilities: list[str]
+    min_mem_gib: int
+    min_cpu_threads: int
+    min_storage_gib: int
     network: str
     budget: int
     num_workers: int = 4

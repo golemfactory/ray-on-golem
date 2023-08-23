@@ -113,12 +113,10 @@ class GolemService:
             logger.info("Cluster was created already.")
             return
         self._num_workers = provider_config.num_workers
-        payload, offer_score, connection_timeout = await self._create_payload(
-            image_hash=provider_config.image_hash
-        )
-        self._demand = await self._golem.create_demand(
-            payload, allocations=[self._allocation], autostart=True
-        )
+        payload, offer_score, connection_timeout = await self._create_payload(provider_config=provider_config)
+        self._demand = await self._golem.create_demand(payload,
+                                                       allocations=[self._allocation],
+                                                       autostart=True)
         self._reverse_ssh_process = await self._create_reverse_ssh_to_golem_network()
 
     async def get_providers(
@@ -148,6 +146,7 @@ class GolemService:
         except Exception:
             raise DestroyActivityError
 
+    # Private
     async def _create_reverse_ssh_to_golem_network(self) -> Process:
         """
         Creates reverse tunnel to golem network
@@ -200,7 +199,10 @@ class GolemService:
         else:
             logger.info("-----FAILED ADDING PROVIDER KEY TO LOCAL")
 
-    async def _create_payload(self, image_hash: str) -> Tuple[ManifestVmPayload, None, timedelta]:
+    async def _create_payload(
+            self,
+            provider_config: CreateClusterRequestData,
+    ) -> Tuple[ManifestVmPayload, None, timedelta]:
         """
         Creates payload from given image_hash and parses manifest.json file
         which is then used to create demand in golem network
@@ -208,15 +210,15 @@ class GolemService:
         :param kwargs:
         :return:
         """
-        manifest = get_manifest(image_hash, self._gcs_reverse_tunnel_port)
+        manifest = get_manifest(provider_config.image_hash, self._gcs_reverse_tunnel_port)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
         params = {
             "manifest": manifest,
-            "capabilities": ["vpn", "inet", "manifest-support"],
-            "min_mem_gib": 0,
-            "min_cpu_threads": 0,
-            "min_storage_gib": 0,
+            "capabilities": provider_config.capabilities,
+            "min_mem_gib": provider_config.min_mem_gib,
+            "min_cpu_threads": provider_config.min_cpu_threads,
+            "min_storage_gib": provider_config.min_storage_gib,
         }
         # strategy = DEFAULT_SCORING_STRATEGY
         # connection_timeout = DEFAULT_CONNECTION_TIMEOUT

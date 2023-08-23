@@ -1,3 +1,4 @@
+import logging
 import platform
 from ipaddress import IPv4Address
 from types import ModuleType
@@ -14,6 +15,8 @@ from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
 from golem_ray.server.models import NodeId
 from golem_ray.server.settings import SERVER_BASE_URL
 
+logger = logging.getLogger()
+
 
 class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config: dict, cluster_name: str):
@@ -23,7 +26,19 @@ class GolemNodeProvider(NodeProvider):
         image_hash = self._get_image_hash(provider_config)
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1)
-        self._golem_ray_client.get_running_or_create_cluster(image_hash, network, budget)
+        capabilities = provider_config["parameters"].get("capabilities", ['vpn', 'inet', 'manifest-support'])
+        min_mem_gib = provider_config["parameters"].get("min_mem_gib", 0)
+        min_cpu_threads = provider_config["parameters"].get("min_cpu_threads", 0)
+        min_storage_gib = provider_config["parameters"].get("min_storage_gib", 0)
+        self._golem_ray_client.get_running_or_create_cluster(
+            image_hash=image_hash,
+            network=network,
+            budget=budget,
+            capabilities=capabilities,
+            min_mem_gib=min_mem_gib,
+            min_cpu_threads=min_cpu_threads,
+            min_storage_gib=min_storage_gib,
+        )
 
     @staticmethod
     def _get_image_hash(provider_config: dict) -> str:
@@ -31,13 +46,13 @@ class GolemNodeProvider(NodeProvider):
         ray_version = ray.__version__
         if "image_tag" in provider_config["parameters"]:
             image_tag = provider_config["parameters"]["image_tag"]
-            tag_python_version = image_tag.split("-")[0].split("py")[1]
-            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
+            tag_python_version = image_tag.split('-')[0].rsplit("py")[-1]
+            tag_ray_version = image_tag.split('-')[1].rsplit("ray")[-1]
             if (python_version, ray_version) != (tag_python_version, tag_ray_version):
-                print(
+                logging.warning(
                     "WARNING: "
-                    f"Version of python and ray on your machine {(python_version, ray_version)=}"
-                    f" does not match tag version {(tag_python_version, tag_ray_version)=}"
+                    f"Version of python and ray on your machine {(python_version, ray_version) = } "
+                    f"does not match tag version {(tag_python_version, tag_ray_version) = }"
                 )
         else:
             image_tag = f"py{python_version}-ray{ray_version}"

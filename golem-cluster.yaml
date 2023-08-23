@@ -19,6 +19,11 @@ provider:
     network: "goerli"
     # Maximum amount of GML that's going to be spent
     budget: 1
+    # Params for creating golem demands (same for head and workers)
+    capabilities: ['vpn', 'inet', 'manifest-support']
+    min_mem_gib: 0
+    min_cpu_threads: 0
+    min_storage_gib: 0
 
 # The files or directories to copy to the head and worker nodes
 file_mounts:
