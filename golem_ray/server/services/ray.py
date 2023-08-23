@@ -36,13 +36,16 @@ class RayService:
 
     def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeId]:
         matched_ids = []
-
+        print('tags_to_match: ', tags_to_match)
         if not tags_to_match:
             return [node_id for node_id, node in self._golem_service.cluster_nodes.items()]
 
         for node_id, node in self._golem_service.cluster_nodes.items():
+            print(node_id, ': ', node.tags)
             if self._are_dicts_equal(node.tags, tags_to_match):
                 matched_ids.append(node_id)
+
+        print('non_terminated_nodes_ids: ', matched_ids)
         return matched_ids
 
     def is_node_running(self, node_id: NodeId) -> bool:

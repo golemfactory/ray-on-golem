@@ -40,7 +40,7 @@ available_node_types:
   ray.worker.default:
     min_workers: 3
     max_workers: 10
-    resources: { "CPU": 3 }
+    resources: { "CPU": 1 }
     node_config:
       kind: Node
 
@@ -66,6 +66,7 @@ worker_start_ray_commands: [
 # Authentication credentials that Ray will use to launch nodes
 auth:
   ssh_user: 'root'
+  ssh_private_key: '~/.ssh/id_rsa'
 
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: [ ]

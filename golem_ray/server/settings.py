@@ -28,7 +28,7 @@ LOGGING_CONFIG = {
         },
         "aiohttp": {
             "handlers": ["console"],
-            "level": "ERROR",
+            "level": "DEBUG",
             "propagate": False,
         },
         "golem_ray": {

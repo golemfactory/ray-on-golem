@@ -35,7 +35,7 @@ class GolemRayClient:
             return response_model.parse_raw(response.text)
         except ValidationError as e:
             raise GolemRayClientValidationError(
-                error_message="Couldn't validate response data",
+                "Couldn't validate response data",
             ) from e
 
     def get_running_or_create_cluster(

@@ -46,7 +46,6 @@ class GolemNodeProvider(NodeProvider):
         else:
             image_tag = f"py{python_version}ray{ray_version}"
 
-        print( f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}")
         response = requests.get(
             f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
         )
@@ -68,22 +67,26 @@ class GolemNodeProvider(NodeProvider):
     ) -> CommandRunnerInterface:
         if self._is_running_on_localhost():
             node_port = self._golem_ray_client.get_node_port(node_id)
-            command_runner = SSHProviderCommandRunner(log_prefix,
-                                                      node_id,
-                                                      self,
-                                                      auth_config,
-                                                      cluster_name,
-                                                      process_runner,
-                                                      True)
+            command_runner = SSHProviderCommandRunner(
+                log_prefix,
+                node_id,
+                self,
+                auth_config,
+                cluster_name,
+                process_runner,
+                True
+            )
             command_runner.set_ssh_port(node_port)
         else:
-            command_runner = SSHCommandRunner(log_prefix,
-                                              node_id,
-                                              self,
-                                              auth_config,
-                                              cluster_name,
-                                              process_runner,
-                                              True)
+            command_runner = SSHCommandRunner(
+                log_prefix,
+                node_id,
+                self,
+                auth_config,
+                cluster_name,
+                process_runner,
+                True
+            )
 
         return command_runner
 
