@@ -26,7 +26,9 @@ from golem_core.pipeline import Buffer, Chain, Limit, Map
 
 from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
 from golem_ray.server.models import ClusterNode, CreateClusterRequestData, NodeId, NodeState
-from golem_ray.server.services import SshService, Proxy, get_manifest
+from golem_ray.server.services.golem.manifest import get_manifest
+from golem_ray.server.services.ssh import SshService, Proxy
+
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +259,7 @@ class GolemService:
         :param connection_timeout: Currently not used
         :return:
         """
-        try:
+        try: # TODO: upload golem_ray files
             async with async_timeout.timeout(int(150)):
                 chain = Chain(
                     self._demand.initial_proposals(),

@@ -47,9 +47,8 @@ class GolemNodeProvider(NodeProvider):
             image_tag = f"py{python_version}ray{ray_version}"
 
         response = requests.get(
-            f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
+            f"https://registry.dev.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
         )
-
         if response.status_code == 200:
             return response.json()["sha3"]
 
