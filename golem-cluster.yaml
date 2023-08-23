@@ -14,7 +14,9 @@ provider:
     # Url of golem webserver that has connection with golem network
     golem_ray_url: "http://localhost:8080"
     # check available versions at https://registry.golem.network/explore/loop/golem-ray
-    image_tag: "py3.10.6-ray2.6.1-lib"
+    # if not provided, image_tag will be resolved based on currently used
+    # version of python and ray
+    # image_tag: "py3.10.6-ray2.6.1-lib"
     # Golem network on which we will launch nodes
     network: "goerli"
     # Maximum amount of GML that's going to be spent
@@ -24,7 +26,7 @@ provider:
 file_mounts:
   {
     "~/ray_bootstrap_config.yaml": "~/ray_bootstrap_config.yaml",
-    "/tmp/golem": "/tmp/golem"
+    "/tmp/golem": "/tmp/golem",
   }
 
 # Tells the autoscaler the allowed node types and the resources they provide
@@ -35,30 +37,31 @@ available_node_types:
     # The maximum number of worker nodes of this type to launch
     max_workers: 1
     # The node type's CPU and GPU resources
-    resources: { "CPU": 1 }
+    resources: {"CPU": 1}
     node_config:
       kind: Node
   ray.worker.default:
     min_workers: 3
     max_workers: 10
-    resources: { "CPU": 1 }
+    resources: {"CPU": 1}
     node_config:
       kind: Node
 
 # List of commands that will be run before `setup_commands`
-initialization_commands: [ ]
+initialization_commands: []
 # List of shell commands to run to set up nodes
-setup_commands: ["echo 'export SERVER_BASE_URL=http://proxy.dev.golem.network:3010' >> ~/.bashrc"
+setup_commands: [
+  "echo 'export SERVER_BASE_URL=http://proxy.dev.golem.network:3010' >> ~/.bashrc",
 ]
 
 # Custom commands that will be run on the head node after common setup.
-head_setup_commands: [ ]
+head_setup_commands: []
 # Custom commands that will be run on worker nodes after common setup.
-worker_setup_commands: [ ]
+worker_setup_commands: []
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands: [
-  "ray start --head --node-ip-address 192.168.0.3 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml"
+  "ray start --head --node-ip-address 192.168.0.3 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [
@@ -70,4 +73,4 @@ auth:
   ssh_private_key: '~/.ssh/id_rsa'
 
 # A list of paths to the files or directories to copy from the head node to the worker nodes
-cluster_synced_files: [ ]
+cluster_synced_files: []

@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "golem-ray"
 version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+description = "Golem Netowrk (https://www.golem.network/) integration with Ray (https://ray.io/)"
+authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
 packages = [{include = "golem_ray"}]
 
@@ -15,7 +15,8 @@ aiohttp = "^3"
 python-dotenv = "^1"
 requests = "^2"
 click = "^8"
-pydantic = "^2"
+pydantic = "<2"  # <2 due to yapapi requirements
+yapapi = "0.10.0"
 
 setuptools = "*"
 

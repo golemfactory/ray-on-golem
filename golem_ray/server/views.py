@@ -1,8 +1,7 @@
 from aiohttp import web
 
-import golem_ray.server.settings as settings
-from golem_ray.server import models
-from services import RayService
+from golem_ray.server import models, settings
+from golem_ray.server.services import RayService
 
 routes = web.RouteTableDef()
 
@@ -17,6 +16,7 @@ async def create_cluster(request: web.Request) -> web.Response:
     nodes = ray_service.get_all_nodes_ids()
 
     response_data = models.GetNodesResponseData(nodes=nodes)
+
     return web.Response(text=response_data.json())
 
 
@@ -115,6 +115,7 @@ async def create_nodes(request: web.Request) -> web.Response:
 @routes.post(settings.URL_TERMINATE_NODES)
 async def terminate_nodes(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
+
     request_data = models.DeleteNodesRequestData.parse_raw(await request.text())
 
     await ray_service.terminate_nodes(request_data.node_ids)
@@ -128,8 +129,11 @@ async def terminate_nodes(request: web.Request) -> web.Response:
 @routes.post(settings.URL_GET_NODE_SSH_PORT)
 async def get_node_proxy_command(request):
     ray_service: RayService = request.app['ray_service']
+    
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
-    port = await ray_service.get_node_ssh_port(node_id=request_data.node_id)
-    response = models.GetNodePortResponseData(port=port)
 
-    return web.Response(text=response.json())
+    port = await ray_service.get_node_ssh_port(node_id=request_data.node_id)
+    
+    response_data = models.GetNodePortResponseData(port=port)
+
+    return web.Response(text=response_data.json())
