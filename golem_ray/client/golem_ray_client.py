@@ -19,12 +19,12 @@ class GolemRayClient:
         self._session = requests.Session()
 
     def _make_request(
-            self,
-            *,
-            url: str,
-            request_data: BaseModel,
-            response_model: Type[TResponseModel],
-            error_message: str,
+        self,
+        *,
+        url: str,
+        request_data: BaseModel,
+        response_model: Type[TResponseModel],
+        error_message: str,
     ) -> TResponseModel:
         response = self._session.post(self._base_url / url.lstrip("/"), data=request_data.json())
 
@@ -39,7 +39,7 @@ class GolemRayClient:
             ) from e
 
     def get_running_or_create_cluster(
-            self, image_hash: str, network: str, budget: int
+        self, image_hash: str, network: str, budget: int
     ) -> List[models.NodeId]:
         response = self._make_request(
             url=settings.URL_CREATE_CLUSTER,
@@ -158,7 +158,7 @@ class GolemRayClient:
             request_data=models.SingleNodeRequestData(
                 node_id=node_id,
             ),
-            error_message="Couldn't get node proxy command"
+            error_message="Couldn't get node proxy command",
         )
 
         return response.port

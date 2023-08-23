@@ -1,6 +1,6 @@
 from golem_ray.server.services.golem import GolemService, get_manifest
 from golem_ray.server.services.ray import RayService
-from golem_ray.server.services.ssh import SshService, Proxy
+from golem_ray.server.services.ssh import Proxy, SshService
 from golem_ray.server.services.yagna import YagnaService
 
 __all__ = (

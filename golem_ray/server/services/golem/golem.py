@@ -27,8 +27,7 @@ from golem_core.pipeline import Buffer, Chain, Limit, Map
 from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
 from golem_ray.server.models import ClusterNode, CreateClusterRequestData, NodeId, NodeState
 from golem_ray.server.services.golem.manifest import get_manifest
-from golem_ray.server.services.ssh import SshService, Proxy
-
+from golem_ray.server.services.ssh import Proxy, SshService
 
 logger = logging.getLogger(__name__)
 
@@ -126,9 +125,9 @@ class GolemService:
         self._reverse_ssh_process = await self._create_reverse_ssh_to_golem_network()
 
     async def get_providers(
-            self,
-            tags: Dict,
-            count: int,
+        self,
+        tags: Dict,
+        count: int,
     ) -> List[Tuple[int, ClusterNode]]:
         """
         Creates activities (demand providers) in golem network
@@ -259,7 +258,7 @@ class GolemService:
         :param connection_timeout: Currently not used
         :return:
         """
-        try: # TODO: upload golem_ray files
+        try:  # TODO: upload golem_ray files
             async with async_timeout.timeout(int(150)):
                 chain = Chain(
                     self._demand.initial_proposals(),
@@ -280,13 +279,15 @@ class GolemService:
                         internal_ip=IPv4Address(ip),
                         connection_uri=connection_uri,
                         tags=tags,
-                        state=NodeState.pending)
+                        state=NodeState.pending,
+                    )
                     await self._create_ssh_proxy_to_node(cluster_node)
-                    found = next((x for x in self.cluster_nodes.values() if x.internal_ip == ip), None)
+                    found = next(
+                        (x for x in self.cluster_nodes.values() if x.internal_ip == ip), None
+                    )
                     if not found:
                         self._cluster_nodes[node_id] = cluster_node
                         logger.debug(f"-----ACTIVITY YIELDED: {str(activity)}")
-
 
         except asyncio.TimeoutError:
             raise CreateActivitiesTimeout
@@ -297,7 +298,8 @@ class GolemService:
             ws_url=cluster_node.connection_uri + "/22",
             local_address="127.0.0.1",
             local_port=str(port),
-            yagna_appkey=self._yagna_appkey)
+            yagna_appkey=self._yagna_appkey,
+        )
         cluster_node.ssh_proxy = proxy
         asyncio.create_task(proxy.run())
 
@@ -341,9 +343,7 @@ class GolemService:
 
         for cluster_node in cluster_nodes:
             other_nodes: List[ClusterNode] = [
-                node
-                for node in cluster_nodes
-                if node.node_id != cluster_node.node_id
+                node for node in cluster_nodes if node.node_id != cluster_node.node_id
             ]
 
             for other_node in other_nodes:

@@ -40,7 +40,7 @@ class RayService:
             return [node_id for node_id, node in self._golem_service.cluster_nodes.items()]
 
         for node_id, node in self._golem_service.cluster_nodes.items():
-            print(node_id, ': ', node.tags)
+            print(node_id, ": ", node.tags)
             if self._are_dicts_equal(node.tags, tags_to_match):
                 matched_ids.append(node_id)
 
@@ -84,7 +84,10 @@ class RayService:
         if count + len(self._golem_service.cluster_nodes) > self._num_workers + 1:
             raise NodesCountExceeded
 
-        await self._golem_service.get_providers(tags=tags, count=count,)
+        await self._golem_service.get_providers(
+            tags=tags,
+            count=count,
+        )
 
         return self._golem_service.cluster_nodes
 

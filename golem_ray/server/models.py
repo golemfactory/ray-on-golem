@@ -40,8 +40,10 @@ class ClusterNode(BaseModel):
 class GetNodeRequestData(BaseModel):
     node_id: NodeId
 
+
 class GetNodeResponseData(BaseModel):
     node: Node
+
 
 class SingleNodeRequestData(BaseModel):
     node_id: NodeId

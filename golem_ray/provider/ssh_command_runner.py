@@ -4,22 +4,27 @@ import subprocess
 from getpass import getuser
 from typing import Dict
 
-from ray.autoscaler._private.cli_logger import cli_logger, cf
-from ray.autoscaler._private.command_runner import SSHCommandRunner, SSHOptions, HASH_MAX_LENGTH, is_using_login_shells, \
-    _with_environment_variables, _with_interactive
+from ray.autoscaler._private.cli_logger import cf, cli_logger
+from ray.autoscaler._private.command_runner import (
+    HASH_MAX_LENGTH,
+    SSHCommandRunner,
+    SSHOptions,
+    _with_environment_variables,
+    _with_interactive,
+    is_using_login_shells,
+)
 
 
 class SSHProviderCommandRunner(SSHCommandRunner):
-
     def __init__(
-            self,
-            log_prefix,
-            node_id,
-            provider,
-            auth_config,
-            cluster_name,
-            process_runner,
-            use_internal_ip,
+        self,
+        log_prefix,
+        node_id,
+        provider,
+        auth_config,
+        cluster_name,
+        process_runner,
+        use_internal_ip,
     ):
         ssh_control_hash = hashlib.md5(cluster_name.encode()).hexdigest()
         ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()
@@ -28,7 +33,6 @@ class SSHProviderCommandRunner(SSHCommandRunner):
         # ssh_control_path = "/tmp/ray_ssh_{}/{}".format(
         #     ssh_user_hash[:HASH_MAX_LENGTH], ssh_control_hash[:HASH_MAX_LENGTH]
         # )
-
 
         self.cluster_name = cluster_name
         self.log_prefix = log_prefix
@@ -54,21 +58,21 @@ class SSHProviderCommandRunner(SSHCommandRunner):
             cli_logger.warning("{}", str(e))
 
     def set_ssh_port(self, ssh_port: int):
-        self.ssh_ip = '127.0.0.1'
+        self.ssh_ip = "127.0.0.1"
         self.ssh_port = ssh_port
 
     def run(
-            self,
-            cmd,
-            timeout=120,
-            exit_on_fail=False,
-            port_forward=None,
-            with_output=False,
-            environment_variables: Dict[str, object] = None,
-            run_env="auto",  # Unused argument.
-            ssh_options_override_ssh_key="",
-            shutdown_after_run=False,
-            silent=False,
+        self,
+        cmd,
+        timeout=120,
+        exit_on_fail=False,
+        port_forward=None,
+        with_output=False,
+        environment_variables: Dict[str, object] = None,
+        run_env="auto",  # Unused argument.
+        ssh_options_override_ssh_key="",
+        shutdown_after_run=False,
+        silent=False,
     ):
         if shutdown_after_run:
             cmd += "; sudo shutdown -h now"
@@ -95,10 +99,11 @@ class SSHProviderCommandRunner(SSHCommandRunner):
             ssh = ["ssh"]
 
         final_cmd = (
-                ssh
-                + ssh_options.to_ssh_options_list(timeout=timeout)
-                + ["{}@{}".format(self.ssh_user, self.ssh_ip)]
-                + ['-p'] + [f"{self.ssh_port}"]
+            ssh
+            + ssh_options.to_ssh_options_list(timeout=timeout)
+            + ["{}@{}".format(self.ssh_user, self.ssh_ip)]
+            + ["-p"]
+            + [f"{self.ssh_port}"]
         )
         print(final_cmd)
         if cmd:
@@ -115,15 +120,11 @@ class SSHProviderCommandRunner(SSHCommandRunner):
 
         cli_logger.verbose("Running `{}`", cf.bold(cmd))
         with cli_logger.indented():
-            cli_logger.very_verbose(
-                "Full command is `{}`", cf.bold(" ".join(final_cmd))
-            )
+            cli_logger.very_verbose("Full command is `{}`", cf.bold(" ".join(final_cmd)))
 
         if cli_logger.verbosity > 0:
             with cli_logger.indented():
-                return self._run_helper(
-                    final_cmd, with_output, exit_on_fail, silent=silent
-                )
+                return self._run_helper(final_cmd, with_output, exit_on_fail, silent=silent)
         else:
             return self._run_helper(final_cmd, with_output, exit_on_fail, silent=silent)
 
@@ -135,7 +136,10 @@ class SSHProviderCommandRunner(SSHCommandRunner):
         command += [
             "--rsh",
             subprocess.list2cmdline(
-                ["ssh"] + ["-p"] + [f"{self.ssh_port}"] + self.ssh_options.to_ssh_options_list(timeout=120)
+                ["ssh"]
+                + ["-p"]
+                + [f"{self.ssh_port}"]
+                + self.ssh_options.to_ssh_options_list(timeout=120)
             ),
         ]
         command += ["-avz"]
@@ -144,11 +148,9 @@ class SSHProviderCommandRunner(SSHCommandRunner):
         cli_logger.verbose("Running `{}`", cf.bold(" ".join(command)))
         self._run_helper(command, silent=False)
 
-    def run_init(
-        self, *, as_head: bool, file_mounts: Dict[str, str], sync_run_yet: bool
-    ):
+    def run_init(self, *, as_head: bool, file_mounts: Dict[str, str], sync_run_yet: bool):
         BOOTSTRAP_MOUNTS = ["~/ray_bootstrap_config.yaml", "~/ray_bootstrap_key.pem"]
-        print('hehehe')
+        print("hehehe")
         cleaned_bind_mounts = file_mounts.copy()
         for mnt in BOOTSTRAP_MOUNTS:
             cleaned_bind_mounts.pop(mnt, None)
@@ -165,23 +167,18 @@ class SSHProviderCommandRunner(SSHCommandRunner):
                     # Check if the current user has read permission.
                     # If they do not, try to change ownership!
                     self.run(
-                        f"cat {mount} >/dev/null 2>&1 || "
-                        f"sudo chown $(id -u):$(id -g) {mount}"
+                        f"cat {mount} >/dev/null 2>&1 || " f"sudo chown $(id -u):$(id -g) {mount}"
                     )
                 except Exception:
                     lsl_string = (
-                        self.run(f"ls -l {mount}", with_output=True)
-                        .decode("utf-8")
-                        .strip()
+                        self.run(f"ls -l {mount}", with_output=True).decode("utf-8").strip()
                     )
                     # The string is of format <Permission> <Links>
                     # <Owner> <Group> <Size> <Date> <Name>
                     permissions = lsl_string.split(" ")[0]
                     owner = lsl_string.split(" ")[2]
                     group = lsl_string.split(" ")[3]
-                    current_user = (
-                        self.run("whoami", with_output=True).decode("utf-8").strip()
-                    )
+                    current_user = self.run("whoami", with_output=True).decode("utf-8").strip()
                     cli_logger.warning(
                         f"File ({mount}) is owned by user:{owner} and group:"
                         f"{group} with permissions ({permissions}). The "

@@ -1,8 +1,7 @@
 from aiohttp import web
 
-import golem_ray.server.settings as settings
-from golem_ray.server import models
-from services import RayService # TODO: importy z paczki (albo relatywnie albo pełna ścieżka - preferowane)
+from golem_ray.server import models, settings
+from golem_ray.server.services import RayService
 
 routes = web.RouteTableDef()
 
@@ -92,7 +91,10 @@ async def set_node_tags(request: web.Request) -> web.Response:
 
     request_data = models.SetNodeTagsRequestData.parse_raw(await request.text())
 
-    ray_service.set_node_tags(node_id=request_data.node_id, tags=request_data.tags, )
+    ray_service.set_node_tags(
+        node_id=request_data.node_id,
+        tags=request_data.tags,
+    )
 
     response_data = models.EmptyResponseData()
 
@@ -129,7 +131,7 @@ async def terminate_nodes(request: web.Request) -> web.Response:
 
 @routes.post(settings.URL_GET_NODE_SSH_PORT)
 async def get_node_proxy_command(request):
-    ray_service: RayService = request.app['ray_service']
+    ray_service: RayService = request.app["ray_service"]
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 

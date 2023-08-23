@@ -1,4 +1,3 @@
-import socket
 from random import random
 
 # import pandas
