@@ -26,8 +26,7 @@ from golem_core.pipeline import Buffer, Chain, Limit, Map
 
 from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
 from golem_ray.server.models import ClusterNode, CreateClusterRequestData, NodeId, NodeState
-from golem_ray.server.services.golem.manifest import get_manifest
-from golem_ray.server.services.ssh import Proxy, SshService
+from golem_ray.server.services import SshService, get_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,6 @@ class GolemService:
         self._cluster_nodes: Dict[NodeId, ClusterNode] = {}
         self._payment_manager: Optional[DefaultPaymentManager] = None
         self._yagna_appkey: Optional[str] = None
-        self._ssh_proxy_port: int = 2222
 
     @property
     def golem(self):
@@ -245,10 +243,11 @@ class GolemService:
                     f'-H=Authorization:"Bearer {self._golem._api_config.app_key}"\' root@{uuid4().hex} '
                 )
 
-    def get_node_ssh_port(self, node_id: int) -> int:
+    def get_node_ssh_proxy_command(self, node_id: NodeId) -> str:
         node = self._cluster_nodes.get(node_id)
 
-        return node.ssh_proxy.local_port
+        # Using single quotes for JWT token as double quotes are causing problems with CLI character escaping in ray
+        return f"websocat asyncstdio: {node.connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
 
     async def _create_activities(self, count: int, tags: Dict = None) -> None:
         """
@@ -281,7 +280,6 @@ class GolemService:
                         tags=tags,
                         state=NodeState.pending,
                     )
-                    await self._create_ssh_proxy_to_node(cluster_node)
                     found = next(
                         (x for x in self.cluster_nodes.values() if x.internal_ip == ip), None
                     )
@@ -291,17 +289,6 @@ class GolemService:
 
         except asyncio.TimeoutError:
             raise CreateActivitiesTimeout
-
-    async def _create_ssh_proxy_to_node(self, cluster_node: ClusterNode) -> None:
-        port = self._ssh_proxy_port + len(self._cluster_nodes)
-        proxy = Proxy(
-            ws_url=cluster_node.connection_uri + "/22",
-            local_address="127.0.0.1",
-            local_port=str(port),
-            yagna_appkey=self._yagna_appkey,
-        )
-        cluster_node.ssh_proxy = proxy
-        asyncio.create_task(proxy.run())
 
     async def _add_my_key(self):
         """

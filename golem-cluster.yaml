@@ -25,8 +25,6 @@ provider:
 # The files or directories to copy to the head and worker nodes
 file_mounts:
   {
-    "~/ray_bootstrap_config.yaml": "~/ray_bootstrap_config.yaml",
-    "/tmp/golem": "/tmp/golem",
   }
 
 # Tells the autoscaler the allowed node types and the resources they provide
@@ -70,7 +68,7 @@ worker_start_ray_commands: [
 # Authentication credentials that Ray will use to launch nodes
 auth:
   ssh_user: 'root'
-  ssh_private_key: '~/.ssh/id_rsa'
+  # ssh_private_key: '~/.ssh/id_rsa'
 
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: []

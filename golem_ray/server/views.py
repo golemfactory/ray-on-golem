@@ -1,7 +1,7 @@
 from aiohttp import web
 
 from golem_ray.server import models, settings
-from golem_ray.server.services import RayService
+from golem_ray.server.services import GolemService, RayService
 
 routes = web.RouteTableDef()
 
@@ -129,14 +129,14 @@ async def terminate_nodes(request: web.Request) -> web.Response:
     return web.Response(text=response_data.json())
 
 
-@routes.post(settings.URL_GET_NODE_SSH_PORT)
+@routes.post(settings.URL_GET_SSH_PROXY_COMMAND)
 async def get_node_proxy_command(request):
-    ray_service: RayService = request.app["ray_service"]
+    golem_service: GolemService = request.app["golem_service"]
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 
-    port = await ray_service.get_node_ssh_port(node_id=request_data.node_id)
+    ssh_proxy_command = golem_service.get_node_ssh_proxy_command(node_id=request_data.node_id)
 
-    response_data = models.GetNodePortResponseData(port=port)
+    response_data = models.GetSshProxyCommandResponseData(ssh_proxy_command=ssh_proxy_command)
 
     return web.Response(text=response_data.json())

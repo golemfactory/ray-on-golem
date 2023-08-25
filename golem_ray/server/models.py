@@ -31,7 +31,6 @@ class ClusterNode(BaseModel):
     connection_uri: Optional[str] = None
     tags: Tags = Field(default_factory=dict)
     activity: Optional[Activity] = None
-    ssh_proxy: Optional[Any] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -108,3 +107,7 @@ class EmptyResponseData(BaseModel):
 
 class GetNodePortResponseData(BaseModel):
     port: int
+
+
+class GetSshProxyCommandResponseData(BaseModel):
+    ssh_proxy_command: str

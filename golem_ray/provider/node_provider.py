@@ -5,13 +5,12 @@ from typing import Any, Dict, List, Optional
 
 import ray
 import requests
-from ray.autoscaler._private.command_runner import SSHCommandRunner
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.exceptions import GolemRayNodeProviderError
-from golem_ray.provider.ssh_command_runner import SSHProviderCommandRunner
+from golem_ray.provider.ssh_command_runner import SSHCommandRunner
 from golem_ray.server.models import Node, NodeId
 from golem_ray.server.settings import SERVER_BASE_URL
 
@@ -47,7 +46,7 @@ class GolemNodeProvider(NodeProvider):
             image_tag = f"py{python_version}-ray{ray_version}-lib"
 
         response = requests.get(
-            f"https://registry.dev.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
+            f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
         )
         if response.status_code == 200:
             return response.json()["sha3"]
@@ -64,18 +63,20 @@ class GolemNodeProvider(NodeProvider):
         use_internal_ip: bool,
         docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
-        if self._is_running_on_localhost():
-            node_port = self._golem_ray_client.get_node_port(node_id)
-            command_runner = SSHProviderCommandRunner(
-                log_prefix, node_id, self, auth_config, cluster_name, process_runner, True
-            )
-            command_runner.set_ssh_port(node_port)
-        else:
-            command_runner = SSHCommandRunner(
-                log_prefix, node_id, self, auth_config, cluster_name, process_runner, True
-            )
+        common_args = {
+            "log_prefix": log_prefix,
+            "node_id": node_id,
+            "provider": self,
+            "auth_config": auth_config,
+            "cluster_name": cluster_name,
+            "process_runner": process_runner,
+            "use_internal_ip": use_internal_ip,
+        }
 
-        return command_runner
+        if "ssh_proxy_command" not in auth_config:
+            auth_config["ssh_proxy_command"] = self._golem_ray_client.get_ssh_proxy_command(node_id)
+
+        return SSHCommandRunner(**common_args)
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
         return self._golem_ray_client.non_terminated_nodes(tag_filters)
@@ -114,6 +115,6 @@ class GolemNodeProvider(NodeProvider):
 
     @staticmethod
     def _is_running_on_localhost():
-        if "localhost" in str(SERVER_BASE_URL):
-            return True
-        return False
+        return any(
+            SERVER_BASE_URL.host in option for option in ["localhost", "127.0.0.1", "0.0.0.0"]
+        )

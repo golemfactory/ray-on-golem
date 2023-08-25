@@ -15,8 +15,7 @@ aiohttp = "^3"
 python-dotenv = "^1"
 requests = "^2"
 click = "^8"
-pydantic = "<2"  # <2 due to yapapi requirements
-yapapi = "0.10.0"
+pydantic = "^2"
 
 setuptools = "*"
 

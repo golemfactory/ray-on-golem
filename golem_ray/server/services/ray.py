@@ -112,6 +112,3 @@ class RayService:
                     return False
 
         return True
-
-    async def get_node_ssh_port(self, node_id: NodeId) -> int:
-        return self._golem_service.get_node_ssh_port(node_id)
