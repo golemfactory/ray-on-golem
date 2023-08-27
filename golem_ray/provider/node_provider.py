@@ -1,29 +1,68 @@
+import logging
 import platform
+import subprocess
 from ipaddress import IPv4Address
+from pathlib import Path
+from time import sleep
 from types import ModuleType
 from typing import Any, Dict, List, Optional
 
+import psutil
 import ray
 import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
+from yarl import URL
 
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.exceptions import GolemRayNodeProviderError
 from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
 from golem_ray.server.models import NodeId
-from golem_ray.server.settings import SERVER_BASE_URL
+
+PROJECT_ROOT = Path(__file__).parent.parent
+logger = logging.getLogger()
 
 
 class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config: dict, cluster_name: str):
         super().__init__(provider_config, cluster_name)
-        self._golem_ray_client = GolemRayClient(base_url=SERVER_BASE_URL)
+        webserver_port = provider_config["parameters"].get("webserver_port", 8080)
+        self._run_webserver(webserver_port)
+        self._golem_ray_client = GolemRayClient(base_url=URL(f"http://localhost:{webserver_port}"))
 
         image_hash = self._get_image_hash(provider_config)
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1)
-        self._golem_ray_client.get_running_or_create_cluster(image_hash, network, budget)
+        capabilities = provider_config["parameters"].get("capabilities", ['vpn', 'inet', 'manifest-support'])
+        min_mem_gib = provider_config["parameters"].get("min_mem_gib", 0)
+        min_cpu_threads = provider_config["parameters"].get("min_cpu_threads", 0)
+        min_storage_gib = provider_config["parameters"].get("min_storage_gib", 0)
+        self._golem_ray_client.get_running_or_create_cluster(
+            image_hash=image_hash,
+            network=network,
+            budget=budget,
+            capabilities=capabilities,
+            min_mem_gib=min_mem_gib,
+            min_cpu_threads=min_cpu_threads,
+            min_storage_gib=min_storage_gib,
+        )
+
+    @staticmethod
+    def _run_webserver(port: int) -> None:
+        for proc in psutil.process_iter():
+            command = proc.cmdline()
+            if (
+                    len(command) == 3
+                    and command[0] == "python"
+                    and command[1].endswith("run.py")
+                    and command[2] == str(port)
+            ):
+                logger.info("Webserver is running")
+                return
+        run_path = PROJECT_ROOT / "server" / "run.py"
+        logger.info("Starting webserver")
+        subprocess.Popen(["python", run_path, str(port)])
+        sleep(3)
 
     @staticmethod
     def _get_image_hash(provider_config: dict) -> str:
@@ -31,13 +70,13 @@ class GolemNodeProvider(NodeProvider):
         ray_version = ray.__version__
         if "image_tag" in provider_config["parameters"]:
             image_tag = provider_config["parameters"]["image_tag"]
-            tag_python_version = image_tag.split("-")[0].split("py")[1]
-            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
+            tag_python_version = image_tag.split('-')[0].rsplit("py")[-1]
+            tag_ray_version = image_tag.split('-')[1].rsplit("ray")[-1]
             if (python_version, ray_version) != (tag_python_version, tag_ray_version):
-                print(
+                logging.warning(
                     "WARNING: "
-                    f"Version of python and ray on your machine {(python_version, ray_version)=}"
-                    f" does not match tag version {(tag_python_version, tag_ray_version)=}"
+                    f"Version of python and ray on your machine {(python_version, ray_version) = } "
+                    f"does not match tag version {(tag_python_version, tag_ray_version) = }"
                 )
         else:
             image_tag = f"py{python_version}-ray{ray_version}"

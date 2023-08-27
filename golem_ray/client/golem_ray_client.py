@@ -19,12 +19,12 @@ class GolemRayClient:
         self._session = requests.Session()
 
     def _make_request(
-        self,
-        *,
-        url: str,
-        request_data: BaseModel,
-        response_model: Type[TResponseModel],
-        error_message: str,
+            self,
+            *,
+            url: str,
+            request_data: BaseModel,
+            response_model: Type[TResponseModel],
+            error_message: str,
     ) -> TResponseModel:
         response = self._session.post(self._base_url / url.lstrip("/"), data=request_data.json())
 
@@ -35,24 +35,16 @@ class GolemRayClient:
             return response_model.parse_raw(response.text)
         except ValidationError as e:
             raise GolemRayClientValidationError(
-                error_message="Couldn't validate response data",
+                "Couldn't validate response data",
             ) from e
 
-    def get_running_or_create_cluster(
-        self, image_hash: str, network: str, budget: int
-    ) -> List[models.NodeId]:
-        response = self._make_request(
-            url=settings.URL_CREATE_CLUSTER,
-            request_data=models.CreateClusterRequestData(
-                image_hash=image_hash,
-                network=network,
-                budget=budget,
-            ),
-            response_model=models.CreateClusterResponseData,
-            error_message="Couldn't create cluster",
-        )
-
-        return response.nodes
+    def get_running_or_create_cluster(self, **kwargs) -> None:
+        url = settings.URL_CREATE_CLUSTER
+        request_data = models.CreateClusterRequestData(**kwargs)
+        self._make_request(url=url,
+                           response_model=models.CreateClusterResponseData,
+                           request_data=request_data,
+                           error_message="Couldn't create cluster")
 
     def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
         response = self._make_request(
