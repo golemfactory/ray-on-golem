@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import sys
 from pathlib import Path
 
 from aiohttp import web
@@ -65,8 +66,10 @@ def main():
     prepare_tmp_dir()
 
     app = create_application()
-
-    web.run_app(app)
+    port = None
+    if len(sys.argv) > 1:
+        port = int(sys.argv[1])
+    web.run_app(app, port=port)
 
 
 if __name__ == "__main__":

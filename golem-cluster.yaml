@@ -11,8 +11,8 @@ provider:
   use_internal_ips: true
   module: "golem_ray.provider.node_provider.GolemNodeProvider"
   parameters:
-    # Url of golem webserver that has connection with golem network
-    golem_ray_url: "http://localhost:8080"
+    # Port of golem webserver that has connection with golem network
+    webserver_port: 8080
     # check available versions at https://registry.golem.network/explore/loop/golem-ray
     image_tag: "py3.9.2-ray2.6.3-lib"
     # Golem network on which we will launch nodes
