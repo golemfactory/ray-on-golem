@@ -55,7 +55,6 @@ class SshService:
                 if result.returncode == 0:
                     logger.info(f"Temporary ssh key created at {full_path}")
                     await cls._add_key_to_agent(full_path)
-                    # await cls._create_symlink_to_ssh_key(ssh_key_dir)
                 else:
                     logger.error(f"Failed to create temporary ssh key at {full_path}")
             except Exception as e:
@@ -63,7 +62,6 @@ class SshService:
         else:
             logger.info(f"Temporary ssh key exists at {full_path}")
             await cls._add_key_to_agent(full_path)
-            # await cls._create_symlink_to_ssh_key(ssh_key_dir)
 
     @staticmethod
     async def remove_temporary_ssh_key(ssh_key_dir: Path, ssh_key_filename: str):
@@ -103,21 +101,3 @@ class SshService:
             logger.info(f"Temporary ssh key directory at {ssh_key_dir}")
         except Exception:
             logger.error(f"Error creating temporary ssh key directory at {ssh_key_dir}")
-
-    @staticmethod
-    async def _create_symlink_to_ssh_key(ssh_key_dir: str):
-        ssh_key_dir_path = Path(ssh_key_dir)
-        ssh_config_dir = Path.home() / ".ssh"
-
-        for item in ssh_key_dir_path.iterdir():
-            src_item = item
-            dest_item = ssh_config_dir / item.name
-
-            if not dest_item.exists():
-                try:
-                    dest_item.symlink_to(src_item)
-                    logger.info(f"Symbolic link created: {dest_item} -> {src_item}")
-                except Exception as e:
-                    logger.error(f"Error creating symbolic link: {e}")
-            else:
-                logger.info(f"Symbolic link or file already exists at {dest_item}")
