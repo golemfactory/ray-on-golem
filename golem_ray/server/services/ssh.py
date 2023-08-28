@@ -1,9 +1,14 @@
+import logging
+from asyncio import subprocess
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Tuple
 from urllib.parse import urlparse
 
 from golem_core.core.activity_api import commands
 from golem_core.core.activity_api.resources import Activity
 from golem_core.core.network_api.resources import Network
+
+logger = logging.getLogger(__name__)
 
 
 class SshService:
@@ -34,3 +39,85 @@ class SshService:
             return activity, ip, connection_uri
 
         return _create_ssh_connection
+
+    @classmethod
+    async def create_temporary_ssh_key(cls, ssh_key_dir: Path, ssh_key_filename: str):
+        await cls._create_temporary_ssh_directory(ssh_key_dir)
+
+        full_path = ssh_key_dir / ssh_key_filename
+
+        if not full_path.exists():
+            try:
+                result = await subprocess.create_subprocess_shell(
+                    f"ssh-keygen -t rsa -b 4096 -N '' -f {full_path}"
+                )
+                await result.communicate()
+                if result.returncode == 0:
+                    logger.info(f"Temporary ssh key created at {full_path}")
+                    await cls._add_key_to_agent(full_path)
+                    # await cls._create_symlink_to_ssh_key(ssh_key_dir)
+                else:
+                    logger.error(f"Failed to create temporary ssh key at {full_path}")
+            except Exception as e:
+                logger.error(f"Error creating temporary ssh key: {e}")
+        else:
+            logger.info(f"Temporary ssh key exists at {full_path}")
+            await cls._add_key_to_agent(full_path)
+            # await cls._create_symlink_to_ssh_key(ssh_key_dir)
+
+    @staticmethod
+    async def remove_temporary_ssh_key(ssh_key_dir: Path, ssh_key_filename: str):
+        full_path = ssh_key_dir / ssh_key_filename
+        full_path_pub = ssh_key_dir / (ssh_key_filename + '.pub')
+        result = await subprocess.create_subprocess_shell(
+            "ssh-add -d {}".format(str(full_path))
+        )
+
+        await result.communicate()
+        if result.returncode == 0:
+            logger.info("SSH key removed from ssh-agent")
+        else:
+            logger.error("Error while removing ssh key from ssh-agent")
+
+        if full_path.exists():
+            full_path.unlink()
+        if full_path_pub.exists():
+            full_path_pub.unlink()
+
+    @staticmethod
+    async def _add_key_to_agent(full_path: Path):
+        result = await subprocess.create_subprocess_shell(
+            "ssh-add {}".format(str(full_path))
+        )
+
+        await result.communicate()
+        if result.returncode == 0:
+            logger.info("SSH key added to ssh-agent")
+        else:
+            logger.error("Error while adding ssh key to ssh-agent")
+
+    @staticmethod
+    async def _create_temporary_ssh_directory(ssh_key_dir: Path):
+        try:
+            ssh_key_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Temporary ssh key directory at {ssh_key_dir}")
+        except Exception:
+            logger.error(f"Error creating temporary ssh key directory at {ssh_key_dir}")
+
+    @staticmethod
+    async def _create_symlink_to_ssh_key(ssh_key_dir: str):
+        ssh_key_dir_path = Path(ssh_key_dir)
+        ssh_config_dir = Path.home() / ".ssh"
+
+        for item in ssh_key_dir_path.iterdir():
+            src_item = item
+            dest_item = ssh_config_dir / item.name
+
+            if not dest_item.exists():
+                try:
+                    dest_item.symlink_to(src_item)
+                    logger.info(f"Symbolic link created: {dest_item} -> {src_item}")
+                except Exception as e:
+                    logger.error(f"Error creating symbolic link: {e}")
+            else:
+                logger.info(f"Symbolic link or file already exists at {dest_item}")

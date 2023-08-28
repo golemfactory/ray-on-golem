@@ -1,12 +1,15 @@
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 from asyncio import subprocess
 from asyncio.subprocess import Process
 from datetime import timedelta
+from getpass import getuser
 from ipaddress import IPv4Address
 from pathlib import Path
+from threading import RLock
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
@@ -26,7 +29,8 @@ from golem_core.pipeline import Buffer, Chain, Limit, Map
 
 from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
 from golem_ray.server.models import ClusterNode, CreateClusterRequestData, NodeId, NodeState
-from golem_ray.server.services import SshService, get_manifest
+from golem_ray.server.services.golem.manifest import get_manifest
+from golem_ray.server.services.ssh import SshService
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +52,10 @@ class GolemService:
         self._cluster_nodes: Dict[NodeId, ClusterNode] = {}
         self._payment_manager: Optional[DefaultPaymentManager] = None
         self._yagna_appkey: Optional[str] = None
+        self._ssh_proxy_port: int = 2222
+        self._temp_ssh_key_dir: Path = Path('/tmp/golem-ray-ssh')
+        key_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
+        self._temp_ssh_key_filename: str = f"golem_ray_rsa_{key_hash}"
 
     @property
     def golem(self):
@@ -78,6 +86,10 @@ class GolemService:
             amount=1, network="goerli", autoclose=True
         )
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
+        await SshService.create_temporary_ssh_key(
+            ssh_key_dir=self._temp_ssh_key_dir,
+            ssh_key_filename=self._temp_ssh_key_filename
+        )
         # await self._allocation.get_data()
 
     async def shutdown(self) -> None:
@@ -100,6 +112,11 @@ class GolemService:
             await self._reverse_ssh_process.wait()
             logger.info(f"-----Reverse ssh to {self._proxy_url} closed.")
             self._reverse_ssh_process = None
+
+        await SshService.remove_temporary_ssh_key(
+            self._temp_ssh_key_dir,
+            self._temp_ssh_key_filename
+        )
 
         await self._golem.aclose()
         self._golem = None
@@ -148,6 +165,12 @@ class GolemService:
             await node.activity.destroy()
         except Exception:
             raise DestroyActivityError
+
+    def get_head_node_ip(self) -> IPv4Address:
+        for node in self._cluster_nodes.values():
+            ray_node_type = node.tags.get('ray-node-type')
+            if ray_node_type == 'head':
+                return node.internal_ip
 
     async def _create_reverse_ssh_to_golem_network(self) -> Process:
         """
@@ -294,9 +317,14 @@ class GolemService:
         """
         Add local ssh key to all providers
         """
-        id_rsa_file_path = Path.home() / ".ssh" / "id_rsa.pub"
+        id_rsa_file_path = (
+                self._temp_ssh_key_dir / (self._temp_ssh_key_filename + '.pub')
+        )
 
         if not id_rsa_file_path.exists():
+            logger.error(
+                '{} not exists. SSH connection may fail.'.format(id_rsa_file_path)
+            )
             return
 
         # TODO: Use async file handling

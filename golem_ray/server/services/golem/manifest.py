@@ -9,7 +9,7 @@ def get_manifest(image_hash: str, gcp_tunnel_port: int) -> Dict:
         "metadata": {"name": "Golem Ray", "description": "Golem ray webserver", "version": "0.0.1"},
         "payload": [
             {
-                "urls": [f"http://registry.golem.network/download/{image_hash}"],
+                "urls": [f"https://registry.golem.network/download/{image_hash}"],
                 "hash": f"sha3:{image_hash}",
             }
         ],

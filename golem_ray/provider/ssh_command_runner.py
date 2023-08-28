@@ -1,7 +1,29 @@
-from ray.autoscaler._private.command_runner import SSHCommandRunner as BaseSshCommandRunner
+import hashlib
+from getpass import getuser
+
+from ray.autoscaler._private.command_runner \
+    import (SSHCommandRunner as BaseSshCommandRunner, SSHOptions)
 
 
 class SSHCommandRunner(BaseSshCommandRunner):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
+
+        self.ssh_control_path = "/tmp/golem-ray-ssh/golem_ray_/{}".format(
+            ssh_user_hash
+        )
+        self.ssh_private_key = "/tmp/golem-ray-ssh/golem_ray_rsa_{}".format(
+            ssh_user_hash
+        )
+
+        self.ssh_options = SSHOptions(
+            self.ssh_private_key,
+            self.ssh_control_path,
+            ProxyCommand=self.ssh_proxy_command,
+        )
+
     def remote_shell_command_str(self):
         ssh_str = f'ssh -o UserKnownHostsFile=/dev/null -o ProxyCommand="{self.ssh_proxy_command}"'
 

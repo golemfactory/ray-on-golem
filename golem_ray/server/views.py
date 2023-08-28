@@ -140,3 +140,14 @@ async def get_node_proxy_command(request):
     response_data = models.GetSshProxyCommandResponseData(ssh_proxy_command=ssh_proxy_command)
 
     return web.Response(text=response_data.json())
+
+
+@routes.post(settings.URL_GET_HEAD_NODE_IP)
+async def get_head_node_ip(request):
+    golem_service: GolemService = request.app["golem_service"]
+
+    head_node_ip = golem_service.get_head_node_ip()
+
+    response_data = models.GetNodeIpAddressResponseData(ip_address=head_node_ip)
+
+    return web.Response(text=response_data.json())

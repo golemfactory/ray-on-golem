@@ -162,3 +162,13 @@ class GolemRayClient:
         )
 
         return response.ssh_proxy_command
+
+    def get_head_node_ip(self) -> IPv4Address:
+        response: models.GetNodeIpAddressResponseData = self._make_request(
+            url=settings.URL_GET_HEAD_NODE_IP,
+            request_data=models.EmptyRequestData(),
+            response_model=models.GetNodeIpAddressResponseData,
+            error_message="Couldn't get head node ip address"
+        )
+
+        return response.ip_address

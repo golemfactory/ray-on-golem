@@ -1,6 +1,6 @@
 from enum import Enum
 from ipaddress import IPv4Address
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from golem_core.core.activity_api import Activity
 from pydantic import BaseModel, Field
@@ -99,6 +99,10 @@ class GetNodeTagsResponseData(BaseModel):
 
 class GetNodeIpAddressResponseData(BaseModel):
     ip_address: IPv4Address
+
+
+class EmptyRequestData(BaseModel):
+    pass
 
 
 class EmptyResponseData(BaseModel):

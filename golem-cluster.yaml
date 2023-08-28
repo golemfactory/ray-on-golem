@@ -15,8 +15,10 @@ provider:
     golem_ray_url: "http://localhost:8080"
     # check available versions at https://registry.golem.network/explore/loop/golem-ray
     # if not provided, image_tag will be resolved based on currently used
+    # or image_hash may be provided
     # version of python and ray
-    # image_tag: "py3.10.6-ray2.6.1-lib"
+#    image_tag: "py3.10.6-ray2.6.1-lib"
+    image_hash: "9ef14614721f9655d65d9bc5dbf64038b5e21721a15b4686e051b9b2"
     # Golem network on which we will launch nodes
     network: "goerli"
     # Maximum amount of GML that's going to be spent
@@ -63,12 +65,12 @@ head_start_ray_commands: [
 ]
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [
-  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=$BOOTSTRAP_CONFIG_FILE",
 ]
 # Authentication credentials that Ray will use to launch nodes
 auth:
   ssh_user: 'root'
-  # ssh_private_key: '~/.ssh/id_rsa'
+#  ssh_private_key: '~/.ssh/id_rsa'
 
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: []

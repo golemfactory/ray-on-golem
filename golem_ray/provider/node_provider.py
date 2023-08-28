@@ -45,6 +45,9 @@ class GolemNodeProvider(NodeProvider):
         else:
             image_tag = f"py{python_version}-ray{ray_version}-lib"
 
+        if "image_hash" in provider_config["parameters"]:
+            return provider_config["parameters"]["image_hash"]
+
         response = requests.get(
             f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
         )
@@ -54,14 +57,14 @@ class GolemNodeProvider(NodeProvider):
         raise GolemRayNodeProviderError(f"Image tag {image_tag} does not exist")
 
     def get_command_runner(
-        self,
-        log_prefix: str,
-        node_id: str,
-        auth_config: Dict[str, Any],
-        cluster_name: str,
-        process_runner: ModuleType,
-        use_internal_ip: bool,
-        docker_config: Optional[Dict[str, Any]] = None,
+            self,
+            log_prefix: str,
+            node_id: str,
+            auth_config: Dict[str, Any],
+            cluster_name: str,
+            process_runner: ModuleType,
+            use_internal_ip: bool,
+            docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
         common_args = {
             "log_prefix": log_prefix,
@@ -97,10 +100,10 @@ class GolemNodeProvider(NodeProvider):
         self._golem_ray_client.set_node_tags(node_id, tags)
 
     def create_node(
-        self,
-        node_config: Dict[str, Any],
-        tags: Dict[str, str],
-        count: int,
+            self,
+            node_config: Dict[str, Any],
+            tags: Dict[str, str],
+            count: int,
     ) -> Dict[NodeId, Node]:
         return self._golem_ray_client.create_nodes(
             count=count,
@@ -118,3 +121,16 @@ class GolemNodeProvider(NodeProvider):
         return any(
             SERVER_BASE_URL.host in option for option in ["localhost", "127.0.0.1", "0.0.0.0"]
         )
+
+    # def _create_bootstrap_config(self, config):
+    @staticmethod
+    def bootstrap_config(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+        # print(cluster_config)
+        return cluster_config
+
+    def prepare_for_head_node(self, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Returns a new cluster config with custom configs for head node."""
+        self._golem_ray_client.get_head_node_ip()
+        print(cluster_config)
+        # cluster_config.
+        return cluster_config
