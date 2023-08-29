@@ -54,41 +54,22 @@ class SshService:
                 await result.communicate()
                 if result.returncode == 0:
                     logger.info(f"Temporary ssh key created at {full_path}")
-                    await cls._add_key_to_agent(full_path)
                 else:
                     logger.error(f"Failed to create temporary ssh key at {full_path}")
             except Exception as e:
                 logger.error(f"Error creating temporary ssh key: {e}")
         else:
             logger.info(f"Temporary ssh key exists at {full_path}")
-            await cls._add_key_to_agent(full_path)
 
     @staticmethod
     async def remove_temporary_ssh_key(ssh_key_dir: Path, ssh_key_filename: str):
         full_path = ssh_key_dir / ssh_key_filename
         full_path_pub = ssh_key_dir / (ssh_key_filename + ".pub")
-        result = await subprocess.create_subprocess_shell("ssh-add -d {}".format(str(full_path)))
-
-        await result.communicate()
-        if result.returncode == 0:
-            logger.info("SSH key removed from ssh-agent")
-        else:
-            logger.error("Error while removing ssh key from ssh-agent")
 
         if full_path.exists():
             full_path.unlink()
         if full_path_pub.exists():
             full_path_pub.unlink()
-
-    @staticmethod
-    async def _add_key_to_agent(full_path: Path):
-        result = await subprocess.create_subprocess_shell("ssh-add {}".format(str(full_path)))
-
-        await result.communicate()
-        if result.returncode == 0:
-            logger.info("SSH key added to ssh-agent")
-        else:
-            logger.error("Error while adding ssh key to ssh-agent")
 
     @staticmethod
     async def _create_temporary_ssh_directory(ssh_key_dir: Path):
