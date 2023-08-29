@@ -12,7 +12,7 @@ from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.exceptions import GolemRayNodeProviderError
 from golem_ray.provider.ssh_command_runner import SSHCommandRunner
 from golem_ray.server.models import Node, NodeId
-from golem_ray.server.settings import SERVER_BASE_URL
+from golem_ray.server.settings import GCS_REVERSE_TUNNEL_PORT, SERVER_BASE_URL
 
 
 class GolemNodeProvider(NodeProvider):
@@ -128,7 +128,9 @@ class GolemNodeProvider(NodeProvider):
 
         def replace_placeholders(obj):
             if isinstance(obj, str):
-                return obj.replace("$RAY_HEAD_IP", str(ip_address))
+                obj = obj.replace("$GCS_REVERSE_TUNNEL_PORT", GCS_REVERSE_TUNNEL_PORT)
+                obj.replace("$RAY_HEAD_IP", str(ip_address))
+                return obj
             elif isinstance(obj, list):
                 return [replace_placeholders(item) for item in obj]
             elif isinstance(obj, dict):

@@ -27,7 +27,6 @@ class SshService:
                 commands.Deploy(deploy_args),
                 commands.Start(),
                 commands.Run("service ssh start"),
-                # commands.Run('ssh -R "*:3001:127.0.0.1:6379" proxy@proxy.dev.golem.network'),
             )
             await batch.wait(600)
 
@@ -49,7 +48,7 @@ class SshService:
         if not full_path.exists():
             try:
                 result = await subprocess.create_subprocess_shell(
-                    f"ssh-keygen -t rsa -b 4096 -N '' -f {full_path}"
+                    f"ssh-keygen -t rsa -b 4096 -N '' -f {full_path} > /dev/null 2>&1"
                 )
                 await result.communicate()
                 if result.returncode == 0:
@@ -76,5 +75,7 @@ class SshService:
         try:
             ssh_key_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Temporary ssh key directory at {ssh_key_dir}")
-        except Exception:
-            logger.error(f"Error creating temporary ssh key directory at {ssh_key_dir}")
+        except Exception as e:
+            logger.error(
+                "Error creating temporary ssh key directory at {}. {}".format(ssh_key_dir, e)
+            )
