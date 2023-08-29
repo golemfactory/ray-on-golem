@@ -51,7 +51,7 @@ available_node_types:
 initialization_commands: []
 # List of shell commands to run to set up nodes
 setup_commands: [
-  "echo 'export SERVER_BASE_URL=http://proxy.dev.golem.network:3010' >> ~/.bashrc",
+  "echo 'export SERVER_BASE_URL=http://proxy.dev.golem.network:$GCS_REVERSE_TUNNEL_PORT' >> ~/.bashrc",
 ]
 
 # Custom commands that will be run on the head node after common setup.
