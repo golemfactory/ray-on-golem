@@ -168,7 +168,7 @@ class GolemRayClient:
             url=settings.URL_GET_HEAD_NODE_IP,
             request_data=models.EmptyRequestData(),
             response_model=models.GetNodeIpAddressResponseData,
-            error_message="Couldn't get head node ip address"
+            error_message="Couldn't get head node ip address",
         )
 
         return response.ip_address

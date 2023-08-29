@@ -66,10 +66,8 @@ class SshService:
     @staticmethod
     async def remove_temporary_ssh_key(ssh_key_dir: Path, ssh_key_filename: str):
         full_path = ssh_key_dir / ssh_key_filename
-        full_path_pub = ssh_key_dir / (ssh_key_filename + '.pub')
-        result = await subprocess.create_subprocess_shell(
-            "ssh-add -d {}".format(str(full_path))
-        )
+        full_path_pub = ssh_key_dir / (ssh_key_filename + ".pub")
+        result = await subprocess.create_subprocess_shell("ssh-add -d {}".format(str(full_path)))
 
         await result.communicate()
         if result.returncode == 0:
@@ -84,9 +82,7 @@ class SshService:
 
     @staticmethod
     async def _add_key_to_agent(full_path: Path):
-        result = await subprocess.create_subprocess_shell(
-            "ssh-add {}".format(str(full_path))
-        )
+        result = await subprocess.create_subprocess_shell("ssh-add {}".format(str(full_path)))
 
         await result.communicate()
         if result.returncode == 0:

@@ -9,7 +9,6 @@ from datetime import timedelta
 from getpass import getuser
 from ipaddress import IPv4Address
 from pathlib import Path
-from threading import RLock
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
@@ -52,10 +51,8 @@ class GolemService:
         self._cluster_nodes: Dict[NodeId, ClusterNode] = {}
         self._payment_manager: Optional[DefaultPaymentManager] = None
         self._yagna_appkey: Optional[str] = None
-        self._ssh_proxy_port: int = 2222
-        self._temp_ssh_key_dir: Path = Path('/tmp/golem-ray-ssh')
-        key_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
-        self._temp_ssh_key_filename: str = f"golem_ray_rsa_{key_hash}"
+        self._temp_ssh_key_dir: Optional[Path] = None
+        self._temp_ssh_key_filename: Optional[str] = None
 
     @property
     def golem(self):
@@ -86,9 +83,13 @@ class GolemService:
             amount=1, network="goerli", autoclose=True
         )
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
+
+        key_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
+        self._temp_ssh_key_dir = Path("/tmp/golem-ray-ssh")
+        self._temp_ssh_key_filename = f"golem_ray_rsa_{key_hash}"
+
         await SshService.create_temporary_ssh_key(
-            ssh_key_dir=self._temp_ssh_key_dir,
-            ssh_key_filename=self._temp_ssh_key_filename
+            ssh_key_dir=self._temp_ssh_key_dir, ssh_key_filename=self._temp_ssh_key_filename
         )
         # await self._allocation.get_data()
 
@@ -114,8 +115,7 @@ class GolemService:
             self._reverse_ssh_process = None
 
         await SshService.remove_temporary_ssh_key(
-            self._temp_ssh_key_dir,
-            self._temp_ssh_key_filename
+            self._temp_ssh_key_dir, self._temp_ssh_key_filename
         )
 
         await self._golem.aclose()
@@ -168,8 +168,8 @@ class GolemService:
 
     def get_head_node_ip(self) -> IPv4Address:
         for node in self._cluster_nodes.values():
-            ray_node_type = node.tags.get('ray-node-type')
-            if ray_node_type == 'head':
+            ray_node_type = node.tags.get("ray-node-type")
+            if ray_node_type == "head":
                 return node.internal_ip
 
     async def _create_reverse_ssh_to_golem_network(self) -> Process:
@@ -317,14 +317,10 @@ class GolemService:
         """
         Add local ssh key to all providers
         """
-        id_rsa_file_path = (
-                self._temp_ssh_key_dir / (self._temp_ssh_key_filename + '.pub')
-        )
+        id_rsa_file_path = self._temp_ssh_key_dir / (self._temp_ssh_key_filename + ".pub")
 
         if not id_rsa_file_path.exists():
-            logger.error(
-                '{} not exists. SSH connection may fail.'.format(id_rsa_file_path)
-            )
+            logger.error("{} not exists. SSH connection may fail.".format(id_rsa_file_path))
             return
 
         # TODO: Use async file handling

@@ -17,8 +17,8 @@ provider:
     # if not provided, image_tag will be resolved based on currently used
     # or image_hash may be provided
     # version of python and ray
-    #    image_tag: "py3.10.6-ray2.6.1-lib"
-    image_hash: "261c9e01b4428266f59bb30f8ca711dae1a0b7052c6c8bdc7d120b4a"
+#    image_tag: "py3.10.6-ray2.6.1-lib"
+    image_hash: "cd66c3b67d73e15bd103281614831daf8ec324d5a9f15035a32cd851"
     # Golem network on which we will launch nodes
     network: "goerli"
     # Maximum amount of GML that's going to be spent
@@ -37,27 +37,27 @@ available_node_types:
     # The maximum number of worker nodes of this type to launch
     max_workers: 1
     # The node type's CPU and GPU resources
-    resources: { "CPU": 1 }
+    resources: {"CPU": 1}
     node_config:
       kind: Node
   ray.worker.default:
     min_workers: 3
     max_workers: 10
-    resources: { "CPU": 1 }
+    resources: {"CPU": 1}
     node_config:
       kind: Node
 
 # List of commands that will be run before `setup_commands`
-initialization_commands: [ ]
+initialization_commands: []
 # List of shell commands to run to set up nodes
 setup_commands: [
   "echo 'export SERVER_BASE_URL=http://proxy.dev.golem.network:3010' >> ~/.bashrc",
 ]
 
 # Custom commands that will be run on the head node after common setup.
-head_setup_commands: [ ]
+head_setup_commands: []
 # Custom commands that will be run on worker nodes after common setup.
-worker_setup_commands: [ ]
+worker_setup_commands: []
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands: [
@@ -73,4 +73,4 @@ auth:
 #  ssh_private_key: '~/.ssh/id_rsa'
 
 # A list of paths to the files or directories to copy from the head node to the worker nodes
-cluster_synced_files: [ ]
+cluster_synced_files: []
