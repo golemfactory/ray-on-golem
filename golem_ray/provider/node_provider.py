@@ -128,7 +128,7 @@ class GolemNodeProvider(NodeProvider):
 
         def replace_placeholders(obj):
             if isinstance(obj, str):
-                obj = obj.replace("$GCS_REVERSE_TUNNEL_PORT", GCS_REVERSE_TUNNEL_PORT)
+                obj = obj.replace("$GCS_REVERSE_TUNNEL_PORT", str(GCS_REVERSE_TUNNEL_PORT))
                 obj.replace("$RAY_HEAD_IP", str(ip_address))
                 return obj
             elif isinstance(obj, list):

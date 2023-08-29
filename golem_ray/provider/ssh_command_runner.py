@@ -10,7 +10,7 @@ class SSHCommandRunner(BaseSshCommandRunner):
         super().__init__(**kwargs)
         auth_config = kwargs["auth_config"]
 
-        if not auth_config["ssh_private_key"]:
+        if not auth_config.get("ssh_private_key"):
             ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
 
             self.ssh_control_path = "/tmp/golem-ray-ssh/golem_ray_/{}".format(ssh_user_hash)
