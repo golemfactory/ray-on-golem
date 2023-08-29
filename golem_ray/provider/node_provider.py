@@ -122,15 +122,19 @@ class GolemNodeProvider(NodeProvider):
             SERVER_BASE_URL.host in option for option in ["localhost", "127.0.0.1", "0.0.0.0"]
         )
 
-    # def _create_bootstrap_config(self, config):
-    @staticmethod
-    def bootstrap_config(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
-        # print(cluster_config)
-        return cluster_config
-
     def prepare_for_head_node(self, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         """Returns a new cluster config with custom configs for head node."""
-        self._golem_ray_client.get_head_node_ip()
-        print(cluster_config)
+        ip_address = self._golem_ray_client.get_head_node_ip()
+
+        def replace_placeholders(obj):
+            if isinstance(obj, str):
+                return obj.replace("$RAY_HEAD_IP", str(ip_address))
+            elif isinstance(obj, list):
+                return [replace_placeholders(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {key: replace_placeholders(value) for key, value in obj.items()}
+            else:
+                return obj
+
         # cluster_config.
-        return cluster_config
+        return replace_placeholders(cluster_config)
