@@ -25,6 +25,7 @@ from golem_core.core.network_api import Network
 from golem_core.core.payment_api import Allocation
 from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Buffer, Chain, Limit, Map
+from yarl import URL
 
 from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError
 from golem_ray.server.models import ClusterNode, CreateClusterRequestData, NodeId, NodeState
@@ -132,7 +133,8 @@ class GolemService:
             return
         self._num_workers = provider_config.num_workers
         payload, offer_score, connection_timeout = await self._create_payload(
-            image_hash=provider_config.image_hash
+            image_url=provider_config.image_url,
+            image_hash=provider_config.image_hash,
         )
         self._demand = await self._golem.create_demand(
             payload, allocations=[self._allocation], autostart=True
@@ -225,7 +227,7 @@ class GolemService:
         else:
             logger.info("-----FAILED ADDING PROVIDER KEY TO LOCAL")
 
-    async def _create_payload(self, image_hash: str) -> Tuple[ManifestVmPayload, None, timedelta]:
+    async def _create_payload(self, image_url: URL, image_hash: str) -> Tuple[ManifestVmPayload, None, timedelta]:
         """
         Creates payload from given image_hash and parses manifest.json file
         which is then used to create demand in golem network
@@ -233,7 +235,7 @@ class GolemService:
         :param kwargs:
         :return:
         """
-        manifest = get_manifest(image_hash, self._gcs_reverse_tunnel_port)
+        manifest = get_manifest(image_url, image_hash, self._gcs_reverse_tunnel_port)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
         params = {

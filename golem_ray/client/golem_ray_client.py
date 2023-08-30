@@ -39,11 +39,12 @@ class GolemRayClient:
             ) from e
 
     def get_running_or_create_cluster(
-        self, image_hash: str, network: str, budget: int
+        self, image_url: URL, image_hash: str, network: str, budget: int
     ) -> List[models.NodeId]:
         response = self._make_request(
             url=settings.URL_CREATE_CLUSTER,
             request_data=models.CreateClusterRequestData(
+                image_url=str(image_url),
                 image_hash=image_hash,
                 network=network,
                 budget=budget,
