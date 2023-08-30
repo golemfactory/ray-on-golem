@@ -6,8 +6,8 @@ VOLUME /ttt
 WORKDIR /app
 
 
-
-COPY golem_ray pyproject.toml README.md /app/
+COPY golem_ray/__init__.py /app/golem_ray
+COPY pyproject.toml README.md /app/
 RUN pip install poetry && \
 	poetry config virtualenvs.create false && \
 	poetry install --no-interaction --no-ansi
