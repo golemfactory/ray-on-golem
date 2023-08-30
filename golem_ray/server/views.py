@@ -7,6 +7,11 @@ from golem_ray.server import models
 routes = web.RouteTableDef()
 
 
+@routes.get(settings.URL_HEALTH_CHECK)
+async def health_check(request: web.Request) -> web.Response:
+    return web.Response(text="ok")
+
+
 @routes.post(settings.URL_CREATE_CLUSTER)
 async def create_cluster(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]

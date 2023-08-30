@@ -45,6 +45,7 @@ GCS_REVERSE_TUNNEL_PORT = int(os.getenv("GCS_REVERSE_TUNNEL_PORT", 3009))
 PROXY_URL = URL(os.getenv("PROXY_URL", "proxy.dev.golem.network"))
 SERVER_BASE_URL = URL(os.getenv("SERVER_BASE_URL", "http://localhost:8080"))
 
+URL_HEALTH_CHECK = "/health_check"
 URL_CREATE_CLUSTER = "/create_cluster"
 URL_GET_NODES = "/"
 URL_IS_RUNNING = "/is_running"
