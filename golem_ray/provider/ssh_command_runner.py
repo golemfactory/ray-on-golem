@@ -13,7 +13,7 @@ class SSHCommandRunner(BaseSshCommandRunner):
         if not auth_config.get("ssh_private_key"):
             ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
 
-            self.ssh_control_path = "/tmp/golem-ray-ssh/golem_ray_/{}".format(ssh_user_hash)
+            self.ssh_control_path = "/tmp/golem-ray-ssh/golem_ray_{}".format(ssh_user_hash)
             self.ssh_private_key = "/tmp/golem-ray-ssh/golem_ray_rsa_{}".format(ssh_user_hash)
             self.ssh_options = SSHOptions(
                 self.ssh_private_key,
