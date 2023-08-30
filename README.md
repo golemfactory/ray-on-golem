@@ -32,6 +32,13 @@ $ poetry run poe format
 
 ## Creating docker images for use with providers
 
+### Requirements
+
+```text
+- docker
+- gvmkit-build
+```
+
 ### Select python and ray versions in pyproject.toml
 
 ```toml
