@@ -7,7 +7,7 @@ WORKDIR /app
 
 
 
-COPY golem_ray pyproject.toml README.md /app
+COPY golem_ray pyproject.toml README.md /app/
 RUN pip install poetry && \
 	poetry config virtualenvs.create false && \
 	poetry install --no-interaction --no-ansi
