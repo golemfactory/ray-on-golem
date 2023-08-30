@@ -49,10 +49,14 @@ class SingleNodeRequestData(BaseModel):
 
 
 class CreateClusterRequestData(BaseModel):
+    image_url: str  # FIXME: Use yarl.URL
     image_hash: str
     network: str
     budget: int
     num_workers: int = 4
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class CreateClusterResponseData(BaseModel):

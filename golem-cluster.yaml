@@ -18,7 +18,7 @@ provider:
     # or image_hash may be provided
     # version of python and ray
 #    image_tag: "py3.10.6-ray2.6.1-lib"
-    image_hash: "cd66c3b67d73e15bd103281614831daf8ec324d5a9f15035a32cd851"
+#    image_hash: "9c1d3eb5215767b4af9f77de16229879bdbfe1a9dc73cb9f6560be9b"
     # Golem network on which we will launch nodes
     network: "goerli"
     # Maximum amount of GML that's going to be spent

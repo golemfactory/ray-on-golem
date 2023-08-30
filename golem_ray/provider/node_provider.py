@@ -1,7 +1,10 @@
 import platform
 from ipaddress import IPv4Address
+
+from yarl import URL
+
 from types import ModuleType
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import ray
 import requests
@@ -20,19 +23,45 @@ class GolemNodeProvider(NodeProvider):
         super().__init__(provider_config, cluster_name)
         self._golem_ray_client = GolemRayClient(base_url=SERVER_BASE_URL)
 
-        image_hash = self._get_image_hash(provider_config)
+        image_url, image_hash = self._get_image_url_and_hash(provider_config)
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1)
-        self._golem_ray_client.get_running_or_create_cluster(image_hash, network, budget)
+        self._golem_ray_client.get_running_or_create_cluster(image_url, image_hash, network, budget)
+
+    @classmethod
+    def _get_image_url_and_hash(cls, provider_config: dict) -> Tuple[URL, str]:
+        image_tag = provider_config["parameters"].get("image_tag")
+        image_hash = provider_config["parameters"].get("image_hash")
+
+        if image_tag is not None and image_hash is not None:
+            raise GolemRayNodeProviderError("Only one of 'image_tag' and 'image_hash' parameter should be defined!")
+
+        if image_hash is not None:
+            image_url = cls._get_image_url_from_hash(image_hash)
+            return image_url, image_hash
+
+        return cls._get_image_url_and_hash_from_tag(image_tag)
 
     @staticmethod
-    def _get_image_hash(provider_config: dict) -> str:
-        python_version = platform.python_version()
+    def _get_image_url_from_hash(image_hash: str) -> URL:
+        response = requests.get(
+            f"https://registry.golem.network/v1/image/info?hash={image_hash}",
+        )
+        response_data = response.json()
 
+        if response.status_code == 200:
+            return response_data['http']
+        elif response.status_code == 404:
+            raise GolemRayNodeProviderError(f"Image hash {image_hash} does not exist")
+        else:
+            raise GolemRayNodeProviderError("Can't access Golem Registry for image lookup!")
+
+    @staticmethod
+    def _get_image_url_and_hash_from_tag(image_tag: Optional[str]) -> Tuple[URL, str]:
+        python_version = platform.python_version()
         ray_version = ray.__version__
 
-        if "image_tag" in provider_config["parameters"]:
-            image_tag = provider_config["parameters"]["image_tag"]
+        if image_tag is not None:
             tag_python_version = image_tag.split("-")[0].split("py")[1]
             tag_ray_version = image_tag.split("-")[1].split("ray")[1]
 
@@ -43,18 +72,19 @@ class GolemNodeProvider(NodeProvider):
                     f" does not match tag version {(tag_python_version, tag_ray_version)=}"
                 )
         else:
-            image_tag = f"py{python_version}-ray{ray_version}-lib"
-
-        if "image_hash" in provider_config["parameters"]:
-            return provider_config["parameters"]["image_hash"]
+            image_tag = f"py{python_version}-ray{ray_version}"
 
         response = requests.get(
             f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
         )
-        if response.status_code == 200:
-            return response.json()["sha3"]
+        response_data = response.json()
 
-        raise GolemRayNodeProviderError(f"Image tag {image_tag} does not exist")
+        if response.status_code == 200:
+            return URL(response_data['http']), response_data["sha3"]
+        elif response.status_code == 404:
+            raise GolemRayNodeProviderError(f"Image tag '{image_tag}' does not exist")
+        else:
+            raise GolemRayNodeProviderError("Can't access Golem Registry for image lookup!")
 
     def get_command_runner(
             self,
