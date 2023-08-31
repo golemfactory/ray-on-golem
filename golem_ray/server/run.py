@@ -7,7 +7,12 @@ from aiohttp import web
 
 from golem_ray.server.middlewares import error_middleware
 from golem_ray.server.services import GolemService, RayService, YagnaService
-from golem_ray.server.settings import GOLEM_RAY_REVERSE_TUNNEL_PORT, LOGGING_CONFIG, PROXY_URL, YAGNA_PATH
+from golem_ray.server.settings import (
+    GOLEM_RAY_REVERSE_TUNNEL_PORT,
+    LOGGING_CONFIG,
+    PROXY_URL,
+    YAGNA_PATH,
+)
 from golem_ray.server.views import routes
 
 logger = logging.getLogger(__name__)
@@ -53,11 +58,11 @@ async def golem_ray_ctx(app: web.Application):
 
     await yagna_service.init()
     await golem_service.init(yagna_appkey=yagna_service.yagna_appkey)
-    app['client_session'] = aiohttp.ClientSession()
+    app["client_session"] = aiohttp.ClientSession()
 
     yield  # before yield called on startup, after yield called on cleanup
 
-    await app['client_session'].close()
+    await app["client_session"].close()
     await golem_service.shutdown()
     await yagna_service.shutdown()
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Tuple
 from urllib.parse import urlparse
 
-from golem_core.core.activity_api import commands, BatchError
+from golem_core.core.activity_api import BatchError, commands
 from golem_core.core.activity_api.resources import Activity
 from golem_core.core.network_api.resources import Network
 
@@ -32,10 +32,16 @@ class SshService:
             try:
                 await batch.wait(600)
             except BatchError:
-                provider_name = activity.parent.parent.data.properties['golem.node.id.name']
-                manifest = json.loads(base64.b64decode(activity.parent.parent.demand.data.properties['golem.srv.comp.payload']))
-                image_url = manifest['payload'][0]['urls'][0]
-                print(f"Provider '{provider_name}' deploy failed on image '{image_url}' with batch id: '{batch.id}'")
+                provider_name = activity.parent.parent.data.properties["golem.node.id.name"]
+                manifest = json.loads(
+                    base64.b64decode(
+                        activity.parent.parent.demand.data.properties["golem.srv.comp.payload"]
+                    )
+                )
+                image_url = manifest["payload"][0]["urls"][0]
+                print(
+                    f"Provider '{provider_name}' deploy failed on image '{image_url}' with batch id: '{batch.id}'"
+                )
                 raise
 
             batch = await activity.execute_commands(

@@ -4,7 +4,6 @@ from types import ModuleType
 from typing import Any, Dict, List, Optional, Tuple
 
 import ray
-import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 from yarl import URL
@@ -32,7 +31,9 @@ class GolemNodeProvider(NodeProvider):
         image_hash = provider_config["parameters"].get("image_hash")
 
         if image_tag is not None and image_hash is not None:
-            raise GolemRayNodeProviderError("Only one of 'image_tag' and 'image_hash' parameter should be defined!")
+            raise GolemRayNodeProviderError(
+                "Only one of 'image_tag' and 'image_hash' parameter should be defined!"
+            )
 
         if image_hash is not None:
             image_url = self._get_image_url_from_hash(image_hash)
@@ -63,14 +64,14 @@ class GolemNodeProvider(NodeProvider):
         return self._golem_ray_client.get_image_url_and_hash_from_tag(image_tag)
 
     def get_command_runner(
-            self,
-            log_prefix: str,
-            node_id: str,
-            auth_config: Dict[str, Any],
-            cluster_name: str,
-            process_runner: ModuleType,
-            use_internal_ip: bool,
-            docker_config: Optional[Dict[str, Any]] = None,
+        self,
+        log_prefix: str,
+        node_id: str,
+        auth_config: Dict[str, Any],
+        cluster_name: str,
+        process_runner: ModuleType,
+        use_internal_ip: bool,
+        docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
         common_args = {
             "log_prefix": log_prefix,
@@ -106,10 +107,10 @@ class GolemNodeProvider(NodeProvider):
         self._golem_ray_client.set_node_tags(node_id, tags)
 
     def create_node(
-            self,
-            node_config: Dict[str, Any],
-            tags: Dict[str, str],
-            count: int,
+        self,
+        node_config: Dict[str, Any],
+        tags: Dict[str, str],
+        count: int,
     ) -> Dict[NodeId, Node]:
         return self._golem_ray_client.create_nodes(
             count=count,
@@ -135,7 +136,9 @@ class GolemNodeProvider(NodeProvider):
 
         def replace_placeholders(obj):
             if isinstance(obj, str):
-                obj = obj.replace("$GOLEM_RAY_REVERSE_TUNNEL_PORT", str(GOLEM_RAY_REVERSE_TUNNEL_PORT))
+                obj = obj.replace(
+                    "$GOLEM_RAY_REVERSE_TUNNEL_PORT", str(GOLEM_RAY_REVERSE_TUNNEL_PORT)
+                )
                 obj = obj.replace("$RAY_HEAD_IP", str(self.ray_head_ip))
                 return obj
             elif isinstance(obj, list):

@@ -28,7 +28,11 @@ from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Buffer, Chain, Limit, Map
 from yarl import URL
 
-from golem_ray.server.exceptions import CreateActivitiesTimeout, DestroyActivityError, RegistryRequestError
+from golem_ray.server.exceptions import (
+    CreateActivitiesTimeout,
+    DestroyActivityError,
+    RegistryRequestError,
+)
 from golem_ray.server.models import ClusterNode, CreateClusterRequestData, NodeId, NodeState
 from golem_ray.server.services.golem.manifest import get_manifest
 from golem_ray.server.services.ssh import SshService
@@ -143,38 +147,41 @@ class GolemService:
         )
 
     @staticmethod
-    async def get_image_url_from_hash(image_hash: str, client_session: aiohttp.ClientSession) -> str:
+    async def get_image_url_from_hash(
+        image_hash: str, client_session: aiohttp.ClientSession
+    ) -> str:
         async with client_session.get(
-                f"https://registry.golem.network/v1/image/info?hash={image_hash}",
+            f"https://registry.golem.network/v1/image/info?hash={image_hash}",
         ) as response:
             response_data = await response.json()
 
             if response.status == 200:
-                return response_data['http']
+                return response_data["http"]
             elif response.status == 404:
                 raise RegistryRequestError(f"Image hash {image_hash} does not exist")
             else:
                 raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
     @staticmethod
-    async def get_image_url_and_hash_from_tag(image_tag: str, client_session: aiohttp.ClientSession) -> tuple[
-        str, str]:
+    async def get_image_url_and_hash_from_tag(
+        image_tag: str, client_session: aiohttp.ClientSession
+    ) -> tuple[str, str]:
         async with client_session.get(
-                f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}"
+            f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}"
         ) as response:
             response_data = await response.json()
 
             if response.status == 200:
-                return response_data['http'], response_data["sha3"]
+                return response_data["http"], response_data["sha3"]
             elif response.status == 404:
                 raise RegistryRequestError(f"Image tag '{image_tag}' does not exist")
             else:
                 raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
     async def get_providers(
-            self,
-            tags: Dict,
-            count: int,
+        self,
+        tags: Dict,
+        count: int,
     ) -> List[Tuple[int, ClusterNode]]:
         """
         Creates activities (demand providers) in golem network
@@ -259,7 +266,9 @@ class GolemService:
             print(batch.events)
             raise
 
-    async def _create_payload(self, image_url: URL, image_hash: str) -> Tuple[ManifestVmPayload, None, timedelta]:
+    async def _create_payload(
+        self, image_url: URL, image_hash: str
+    ) -> Tuple[ManifestVmPayload, None, timedelta]:
         """
         Creates payload from given image_hash and parses manifest.json file
         which is then used to create demand in golem network

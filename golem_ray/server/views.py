@@ -162,8 +162,7 @@ async def get_image_url_from_hash(request):
     request_data = models.GetImageUrlFromHashRequestData.parse_raw(await request.text())
 
     image_url = await golem_service.get_image_url_from_hash(
-        image_hash=request_data.image_hash,
-        client_session=client_session
+        image_hash=request_data.image_hash, client_session=client_session
     )
 
     response_data = models.GetImageUrlFromHashResponseData(url=image_url)
@@ -179,10 +178,11 @@ async def get_image_url_and_hash_from_tag(request):
     request_data = models.GetImageUrlAndHashFromTagRequestData.parse_raw(await request.text())
 
     image_url, image_hash = await golem_service.get_image_url_and_hash_from_tag(
-        image_tag=request_data.image_tag,
-        client_session=client_session
+        image_tag=request_data.image_tag, client_session=client_session
     )
 
-    response_data = models.GetImageUrlAndHashFromTagResponseData(image_url=image_url, image_hash=image_hash)
+    response_data = models.GetImageUrlAndHashFromTagResponseData(
+        image_url=image_url, image_hash=image_hash
+    )
 
     return web.Response(text=response_data.json())

@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 
 from golem_core.core.activity_api import Activity
 from pydantic import BaseModel, Field
-from yarl import URL
 
 NodeId = int
 Tags = Dict[str, str]
