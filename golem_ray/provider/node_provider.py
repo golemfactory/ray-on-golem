@@ -28,7 +28,7 @@ logger = logging.getLogger()
 class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config: dict, cluster_name: str):
         super().__init__(provider_config, cluster_name)
-        self.port = provider_config["parameters"].get("webserver_port", 8080)
+        self.port = provider_config["parameters"].get("webserver_port", 4578)
         self.webserver_url = f"http://localhost:{self.port}"
         self._run_webserver()
         self._golem_ray_client = GolemRayClient(base_url=URL(self.webserver_url))
@@ -51,14 +51,8 @@ class GolemNodeProvider(NodeProvider):
         )
 
     def _run_webserver(self) -> None:
-        try:
-            response = requests.get(f"{self.webserver_url}/health_check", timeout=2)
-        except ConnectionError:
-            pass
-        else:
-            if response.status_code == 200 and response.text == "ok":
-                logger.info("Webserver is running")
-                return
+        if self._webserver_is_running():
+            logger.info("Webserver is running")
 
         run_path = PROJECT_ROOT / "server" / "run.py"
         logger.info("Starting webserver")
@@ -68,7 +62,21 @@ class GolemNodeProvider(NodeProvider):
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-        sleep(2)
+        sleep(1)
+        for _ in range(3):
+            if self._webserver_is_running():
+                return
+            logger.info("Webserver is not running yet, checking health_check again in 2 seconds")
+            sleep(2)
+        raise GolemRayNodeProviderError("Could not start webserver")
+
+    def _webserver_is_running(self) -> bool:
+        try:
+            response = requests.get(f"{self.webserver_url}/health_check", timeout=2)
+        except ConnectionError:
+            return False
+        else:
+            return response.status_code == 200 and response.text == "ok"
 
     @staticmethod
     def _get_image_hash(provider_config: dict) -> str:
