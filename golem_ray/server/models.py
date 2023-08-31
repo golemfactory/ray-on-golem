@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 
 from golem_core.core.activity_api import Activity
 from pydantic import BaseModel, Field
+from yarl import URL
 
 NodeId = int
 Tags = Dict[str, str]
@@ -119,3 +120,20 @@ class GetNodePortResponseData(BaseModel):
 
 class GetSshProxyCommandResponseData(BaseModel):
     ssh_proxy_command: str
+
+
+class GetImageUrlFromHashRequestData(BaseModel):
+    image_hash: str
+
+
+class GetImageUrlFromHashResponseData(BaseModel):
+    url: str
+
+
+class GetImageUrlAndHashFromTagRequestData(BaseModel):
+    image_tag: str
+
+
+class GetImageUrlAndHashFromTagResponseData(BaseModel):
+    url: str
+    image_hash: str

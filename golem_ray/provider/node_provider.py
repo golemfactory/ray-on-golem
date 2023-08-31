@@ -1,8 +1,5 @@
 import platform
 from ipaddress import IPv4Address
-
-from yarl import URL
-
 from types import ModuleType
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -10,12 +7,13 @@ import ray
 import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
+from yarl import URL
 
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.exceptions import GolemRayNodeProviderError
 from golem_ray.provider.ssh_command_runner import SSHCommandRunner
 from golem_ray.server.models import Node, NodeId
-from golem_ray.server.settings import GCS_REVERSE_TUNNEL_PORT, SERVER_BASE_URL
+from golem_ray.server.settings import GOLEM_RAY_REVERSE_TUNNEL_PORT, SERVER_BASE_URL
 
 
 class GolemNodeProvider(NodeProvider):
@@ -27,9 +25,9 @@ class GolemNodeProvider(NodeProvider):
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1)
         self._golem_ray_client.get_running_or_create_cluster(image_url, image_hash, network, budget)
+        self.ray_head_ip: Optional[str] = None
 
-    @classmethod
-    def _get_image_url_and_hash(cls, provider_config: dict) -> Tuple[URL, str]:
+    def _get_image_url_and_hash(self, provider_config: dict) -> Tuple[URL, str]:
         image_tag = provider_config["parameters"].get("image_tag")
         image_hash = provider_config["parameters"].get("image_hash")
 
@@ -37,27 +35,15 @@ class GolemNodeProvider(NodeProvider):
             raise GolemRayNodeProviderError("Only one of 'image_tag' and 'image_hash' parameter should be defined!")
 
         if image_hash is not None:
-            image_url = cls._get_image_url_from_hash(image_hash)
+            image_url = self._get_image_url_from_hash(image_hash)
             return image_url, image_hash
 
-        return cls._get_image_url_and_hash_from_tag(image_tag)
+        return self._get_image_url_and_hash_from_tag(image_tag)
 
-    @staticmethod
-    def _get_image_url_from_hash(image_hash: str) -> URL:
-        response = requests.get(
-            f"https://registry.golem.network/v1/image/info?hash={image_hash}",
-        )
-        response_data = response.json()
+    def _get_image_url_from_hash(self, image_hash: str) -> URL:
+        return self._golem_ray_client.get_image_url_from_hash(image_hash)
 
-        if response.status_code == 200:
-            return response_data['http']
-        elif response.status_code == 404:
-            raise GolemRayNodeProviderError(f"Image hash {image_hash} does not exist")
-        else:
-            raise GolemRayNodeProviderError("Can't access Golem Registry for image lookup!")
-
-    @staticmethod
-    def _get_image_url_and_hash_from_tag(image_tag: Optional[str]) -> Tuple[URL, str]:
+    def _get_image_url_and_hash_from_tag(self, image_tag: Optional[str]) -> Tuple[URL, str]:
         python_version = platform.python_version()
         ray_version = ray.__version__
 
@@ -74,17 +60,7 @@ class GolemNodeProvider(NodeProvider):
         else:
             image_tag = f"py{python_version}-ray{ray_version}"
 
-        response = requests.get(
-            f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
-        )
-        response_data = response.json()
-
-        if response.status_code == 200:
-            return URL(response_data['http']), response_data["sha3"]
-        elif response.status_code == 404:
-            raise GolemRayNodeProviderError(f"Image tag '{image_tag}' does not exist")
-        else:
-            raise GolemRayNodeProviderError("Can't access Golem Registry for image lookup!")
+        return self._golem_ray_client.get_image_url_and_hash_from_tag(image_tag)
 
     def get_command_runner(
             self,
@@ -154,12 +130,13 @@ class GolemNodeProvider(NodeProvider):
 
     def prepare_for_head_node(self, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         """Returns a new cluster config with custom configs for head node."""
-        ip_address = self._golem_ray_client.get_head_node_ip()
+        self.ray_head_ip = self._golem_ray_client.get_head_node_ip()
+        print(cluster_config)
 
         def replace_placeholders(obj):
             if isinstance(obj, str):
-                obj = obj.replace("$GCS_REVERSE_TUNNEL_PORT", str(GCS_REVERSE_TUNNEL_PORT))
-                obj = obj.replace("$RAY_HEAD_IP", str(ip_address))
+                obj = obj.replace("$GOLEM_RAY_REVERSE_TUNNEL_PORT", str(GOLEM_RAY_REVERSE_TUNNEL_PORT))
+                obj = obj.replace("$RAY_HEAD_IP", str(self.ray_head_ip))
                 return obj
             elif isinstance(obj, list):
                 return [replace_placeholders(item) for item in obj]
@@ -169,5 +146,6 @@ class GolemNodeProvider(NodeProvider):
                 return obj
 
         final_config = replace_placeholders(cluster_config)
+        print(final_config)
         # cluster_config.
         return final_config

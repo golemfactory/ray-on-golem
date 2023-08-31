@@ -1,6 +1,6 @@
 from http import HTTPStatus
 from ipaddress import IPv4Address
-from typing import Dict, List, Type, TypeVar
+from typing import Dict, List, Type, TypeVar, Tuple
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -19,12 +19,12 @@ class GolemRayClient:
         self._session = requests.Session()
 
     def _make_request(
-        self,
-        *,
-        url: str,
-        request_data: BaseModel,
-        response_model: Type[TResponseModel],
-        error_message: str,
+            self,
+            *,
+            url: str,
+            request_data: BaseModel,
+            response_model: Type[TResponseModel],
+            error_message: str,
     ) -> TResponseModel:
         response = self._session.post(self._base_url / url.lstrip("/"), data=request_data.json())
 
@@ -39,7 +39,7 @@ class GolemRayClient:
             ) from e
 
     def get_running_or_create_cluster(
-        self, image_url: URL, image_hash: str, network: str, budget: int
+            self, image_url: URL, image_hash: str, network: str, budget: int
     ) -> List[models.NodeId]:
         response = self._make_request(
             url=settings.URL_CREATE_CLUSTER,
@@ -173,3 +173,27 @@ class GolemRayClient:
         )
 
         return response.ip_address
+
+    def get_image_url_from_hash(self, image_hash: str) -> URL:
+        response: models.GetImageUrlFromHashResponseData = self._make_request(
+            url=settings.URL_GET_IMAGE_URL_FROM_HASH,
+            request_data=models.GetImageUrlFromHashRequestData(
+                image_hash=image_hash
+            ),
+            response_model=models.GetImageUrlFromHashResponseData,
+            error_message="Couldn't get image url from given hash"
+        )
+
+        return URL(response.url)
+
+    def get_image_url_and_hash_from_tag(self, image_tag: str) -> Tuple[URL, str]:
+        response: models.GetImageUrlAndHashFromTagResponseData = self._make_request(
+            url=settings.URL_GET_IMAGE_URL_AND_HASH_FROM_TAG,
+            request_data=models.GetImageUrlAndHashFromTagRequestData(
+                image_tag=image_tag
+            ),
+            response_model=models.GetImageUrlAndHashFromTagResponseData,
+            error_message="Couldn't get image url and hash from given tag"
+        )
+
+        return URL(response.url), response.image_hash

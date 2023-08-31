@@ -1,3 +1,4 @@
+import aiohttp
 from aiohttp import web
 
 from golem_ray.server import models, settings
@@ -149,5 +150,39 @@ async def get_head_node_ip(request):
     head_node_ip = golem_service.get_head_node_ip()
 
     response_data = models.GetNodeIpAddressResponseData(ip_address=head_node_ip)
+
+    return web.Response(text=response_data.json())
+
+
+@routes.post(settings.URL_GET_IMAGE_URL_FROM_HASH)
+async def get_image_url_from_hash(request):
+    golem_service: GolemService = request.app["golem_service"]
+    client_session: aiohttp.ClientSession = request.app["client_session"]
+
+    request_data = models.GetImageUrlFromHashRequestData.parse_raw(await request.text())
+
+    image_url = await golem_service.get_image_url_from_hash(
+        image_hash=request_data.image_hash,
+        client_session=client_session
+    )
+
+    response_data = models.GetImageUrlFromHashResponseData(url=image_url)
+
+    return web.Response(text=response_data.json())
+
+
+@routes.post(settings.URL_GET_IMAGE_URL_AND_HASH_FROM_TAG)
+async def get_image_url_and_hash_from_tag(request):
+    golem_service: GolemService = request.app["golem_service"]
+    client_session: aiohttp.ClientSession = request.app["client_session"]
+
+    request_data = models.GetImageUrlAndHashFromTagRequestData.parse_raw(await request.text())
+
+    image_url, image_hash = await golem_service.get_image_url_and_hash_from_tag(
+        image_tag=request_data.image_tag,
+        client_session=client_session
+    )
+
+    response_data = models.GetImageUrlAndHashFromTagResponseData(image_url=image_url, image_hash=image_hash)
 
     return web.Response(text=response_data.json())

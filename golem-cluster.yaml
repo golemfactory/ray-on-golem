@@ -18,7 +18,7 @@ provider:
     # or image_hash may be provided
     # version of python and ray
 #    image_tag: "py3.10.6-ray2.6.1-lib"
-#    image_hash: "9c1d3eb5215767b4af9f77de16229879bdbfe1a9dc73cb9f6560be9b"
+    image_hash: "9c1d3eb5215767b4af9f77de16229879bdbfe1a9dc73cb9f6560be9b"
     # Golem network on which we will launch nodes
     network: "goerli"
     # Maximum amount of GML that's going to be spent
@@ -27,6 +27,8 @@ provider:
 # The files or directories to copy to the head and worker nodes
 file_mounts:
   {
+    "/app": "./golem_ray",
+    "/usr/local/lib/python3.8/golem_ray": "./golem_ray"
   }
 
 # Tells the autoscaler the allowed node types and the resources they provide
@@ -51,7 +53,7 @@ available_node_types:
 initialization_commands: []
 # List of shell commands to run to set up nodes
 setup_commands: [
-  "echo 'export SERVER_BASE_URL=http://proxy.dev.golem.network:$GCS_REVERSE_TUNNEL_PORT' >> ~/.bashrc",
+  "echo 'export SERVER_BASE_URL=http://127.0.0.1:3010' >> ~/.bashrc",
 ]
 
 # Custom commands that will be run on the head node after common setup.
@@ -61,11 +63,11 @@ worker_setup_commands: []
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands: [
-  "ray start --head --node-ip-address $RAY_HEAD_IP --dashboard-port 8266",
+  "ray start --head --node-ip-address 192.168.0.3 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [
-  "ray start --address $RAY_HEAD_IP:6379 --dashboard-port 8266",
+  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
 # Authentication credentials that Ray will use to launch nodes
 auth:

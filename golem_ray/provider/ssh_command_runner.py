@@ -9,6 +9,8 @@ class SSHCommandRunner(BaseSshCommandRunner):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         auth_config = kwargs["auth_config"]
+        self._provider = kwargs['provider']
+        print(self._provider.ray_head_ip)
 
         if not auth_config.get("ssh_private_key"):
             ssh_user_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
