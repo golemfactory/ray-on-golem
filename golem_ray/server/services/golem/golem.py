@@ -59,7 +59,7 @@ class GolemService:
         self._yagna_appkey: Optional[str] = None
         self._temp_ssh_key_dir: Optional[Path] = None
         self._temp_ssh_key_filename: Optional[str] = None
-        self._lock = RLock()
+        self._lock = asyncio.Lock()
 
     @property
     def golem(self):
