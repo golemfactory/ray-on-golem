@@ -391,7 +391,7 @@ class GolemService:
             for cluster_node in cluster_nodes:
                 if cluster_node.activity:
                     batch = await cluster_node.activity.execute_commands(
-                        commands.Run('ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
+                        commands.Run('[ -f /root/.ssh/id_rsa ] || ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
                         commands.Run("cat /root/.ssh/id_rsa.pub"),
                     )
                     await batch.wait()

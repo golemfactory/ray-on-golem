@@ -132,7 +132,6 @@ class GolemNodeProvider(NodeProvider):
     def prepare_for_head_node(self, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         """Returns a new cluster config with custom configs for head node."""
         self.ray_head_ip = self._golem_ray_client.get_head_node_ip()
-        print(cluster_config)
 
         def replace_placeholders(obj):
             if isinstance(obj, str):
@@ -149,6 +148,4 @@ class GolemNodeProvider(NodeProvider):
                 return obj
 
         final_config = replace_placeholders(cluster_config)
-        print(final_config)
-        # cluster_config.
         return final_config
