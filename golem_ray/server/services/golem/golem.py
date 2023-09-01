@@ -113,10 +113,12 @@ class GolemService:
             logger.info("Cluster was created already.")
             return
         self._num_workers = provider_config.num_workers
-        payload, offer_score, connection_timeout = await self._create_payload(provider_config=provider_config)
-        self._demand = await self._golem.create_demand(payload,
-                                                       allocations=[self._allocation],
-                                                       autostart=True)
+        payload, offer_score, connection_timeout = await self._create_payload(
+            provider_config=provider_config
+        )
+        self._demand = await self._golem.create_demand(
+            payload, allocations=[self._allocation], autostart=True
+        )
         self._reverse_ssh_process = await self._create_reverse_ssh_to_golem_network()
 
     async def get_providers(
@@ -200,8 +202,8 @@ class GolemService:
             logger.info("-----FAILED ADDING PROVIDER KEY TO LOCAL")
 
     async def _create_payload(
-            self,
-            provider_config: CreateClusterRequestData,
+        self,
+        provider_config: CreateClusterRequestData,
     ) -> Tuple[ManifestVmPayload, None, timedelta]:
         """
         Creates payload from given image_hash and parses manifest.json file

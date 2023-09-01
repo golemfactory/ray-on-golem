@@ -8,7 +8,6 @@ from time import sleep
 from types import ModuleType
 from typing import Any, Dict, List, Optional
 
-import psutil
 import ray
 import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
@@ -36,7 +35,9 @@ class GolemNodeProvider(NodeProvider):
         image_hash = self._get_image_hash(provider_config)
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1)
-        capabilities = provider_config["parameters"].get("capabilities", ['vpn', 'inet', 'manifest-support'])
+        capabilities = provider_config["parameters"].get(
+            "capabilities", ["vpn", "inet", "manifest-support"]
+        )
         min_mem_gib = provider_config["parameters"].get("min_mem_gib", 0)
         min_cpu_threads = provider_config["parameters"].get("min_cpu_threads", 0)
         min_storage_gib = provider_config["parameters"].get("min_storage_gib", 0)
@@ -84,8 +85,8 @@ class GolemNodeProvider(NodeProvider):
         ray_version = ray.__version__
         if "image_tag" in provider_config["parameters"]:
             image_tag = provider_config["parameters"]["image_tag"]
-            tag_python_version = image_tag.split('-')[0].rsplit("py")[-1]
-            tag_ray_version = image_tag.split('-')[1].rsplit("ray")[-1]
+            tag_python_version = image_tag.split("-")[0].rsplit("py")[-1]
+            tag_ray_version = image_tag.split("-")[1].rsplit("ray")[-1]
             if (python_version, ray_version) != (tag_python_version, tag_ray_version):
                 logging.warning(
                     "WARNING: "

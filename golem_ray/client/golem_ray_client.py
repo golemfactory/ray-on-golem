@@ -19,12 +19,12 @@ class GolemRayClient:
         self._session = requests.Session()
 
     def _make_request(
-            self,
-            *,
-            url: str,
-            request_data: BaseModel,
-            response_model: Type[TResponseModel],
-            error_message: str,
+        self,
+        *,
+        url: str,
+        request_data: BaseModel,
+        response_model: Type[TResponseModel],
+        error_message: str,
     ) -> TResponseModel:
         response = self._session.post(self._base_url / url.lstrip("/"), data=request_data.json())
 
@@ -41,10 +41,12 @@ class GolemRayClient:
     def get_running_or_create_cluster(self, **kwargs) -> None:
         url = settings.URL_CREATE_CLUSTER
         request_data = models.CreateClusterRequestData(**kwargs)
-        self._make_request(url=url,
-                           response_model=models.CreateClusterResponseData,
-                           request_data=request_data,
-                           error_message="Couldn't create cluster")
+        self._make_request(
+            url=url,
+            response_model=models.CreateClusterResponseData,
+            request_data=request_data,
+            error_message="Couldn't create cluster",
+        )
 
     def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
         response = self._make_request(

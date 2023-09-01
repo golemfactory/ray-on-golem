@@ -96,7 +96,10 @@ async def set_node_tags(request: web.Request) -> web.Response:
 
     request_data = models.SetNodeTagsRequestData.parse_raw(await request.text())
 
-    ray_service.set_node_tags(node_id=request_data.node_id, tags=request_data.tags,)
+    ray_service.set_node_tags(
+        node_id=request_data.node_id,
+        tags=request_data.tags,
+    )
 
     response_data = models.EmptyResponseData()
 

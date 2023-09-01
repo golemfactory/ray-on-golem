@@ -79,7 +79,10 @@ class RayService:
         if count + len(self._golem_service.cluster_nodes) > self._num_workers + 1:
             raise NodesCountExceeded
 
-        await self._golem_service.get_providers(tags=tags, count=count,)
+        await self._golem_service.get_providers(
+            tags=tags,
+            count=count,
+        )
 
         return self._golem_service.cluster_nodes
 
