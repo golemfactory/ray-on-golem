@@ -1,6 +1,6 @@
 from http import HTTPStatus
 from ipaddress import IPv4Address
-from typing import Dict, List, Type, TypeVar
+from typing import Dict, List, Tuple, Type, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -38,11 +38,17 @@ class GolemRayClient:
                 "Couldn't validate response data",
             ) from e
 
-    def get_running_or_create_cluster(self, **kwargs) -> None:
-        url = settings.URL_CREATE_CLUSTER
-        request_data = models.CreateClusterRequestData(**kwargs)
-        self._make_request(
-            url=url,
+    def get_running_or_create_cluster(
+        self, image_url: URL, image_hash: str, network: str, budget: int
+    ) -> List[models.NodeId]:
+        response = self._make_request(
+            url=settings.URL_CREATE_CLUSTER,
+            request_data=models.CreateClusterRequestData(
+                image_url=str(image_url),
+                image_hash=image_hash,
+                network=network,
+                budget=budget,
+            ),
             response_model=models.CreateClusterResponseData,
             request_data=request_data,
             error_message="Couldn't create cluster",
@@ -144,3 +150,45 @@ class GolemRayClient:
         )
 
         return response.nodes
+
+    def get_ssh_proxy_command(self, node_id: str) -> str:
+        response: models.GetSshProxyCommandResponseData = self._make_request(
+            url=settings.URL_GET_SSH_PROXY_COMMAND,
+            request_data=models.SingleNodeRequestData(
+                node_id=node_id,
+            ),
+            response_model=models.GetSshProxyCommandResponseData,
+            error_message="Cound't get ssh proxy command",
+        )
+
+        return response.ssh_proxy_command
+
+    def get_head_node_ip(self) -> IPv4Address:
+        response: models.GetNodeIpAddressResponseData = self._make_request(
+            url=settings.URL_GET_HEAD_NODE_IP,
+            request_data=models.EmptyRequestData(),
+            response_model=models.GetNodeIpAddressResponseData,
+            error_message="Couldn't get head node ip address",
+        )
+
+        return response.ip_address
+
+    def get_image_url_from_hash(self, image_hash: str) -> URL:
+        response: models.GetImageUrlFromHashResponseData = self._make_request(
+            url=settings.URL_GET_IMAGE_URL_FROM_HASH,
+            request_data=models.GetImageUrlFromHashRequestData(image_hash=image_hash),
+            response_model=models.GetImageUrlFromHashResponseData,
+            error_message="Couldn't get image url from given hash",
+        )
+
+        return URL(response.url)
+
+    def get_image_url_and_hash_from_tag(self, image_tag: str) -> Tuple[URL, str]:
+        response: models.GetImageUrlAndHashFromTagResponseData = self._make_request(
+            url=settings.URL_GET_IMAGE_URL_AND_HASH_FROM_TAG,
+            request_data=models.GetImageUrlAndHashFromTagRequestData(image_tag=image_tag),
+            response_model=models.GetImageUrlAndHashFromTagResponseData,
+            error_message="Couldn't get image url and hash from given tag",
+        )
+
+        return URL(response.url), response.image_hash

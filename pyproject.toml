@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "golem-ray"
 version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+description = "Golem Netowrk (https://www.golem.network/) integration with Ray (https://ray.io/)"
+authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
 packages = [{include = "golem_ray"}]
 

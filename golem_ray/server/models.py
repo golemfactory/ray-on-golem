@@ -49,6 +49,7 @@ class SingleNodeRequestData(BaseModel):
 
 
 class CreateClusterRequestData(BaseModel):
+    image_url: str  # FIXME: Use yarl.URL
     image_hash: str
     capabilities: list[str]
     min_mem_gib: int
@@ -57,6 +58,9 @@ class CreateClusterRequestData(BaseModel):
     network: str
     budget: int
     num_workers: int = 4
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class CreateClusterResponseData(BaseModel):
@@ -105,5 +109,34 @@ class GetNodeIpAddressResponseData(BaseModel):
     ip_address: IPv4Address
 
 
+class EmptyRequestData(BaseModel):
+    pass
+
+
 class EmptyResponseData(BaseModel):
     pass
+
+
+class GetNodePortResponseData(BaseModel):
+    port: int
+
+
+class GetSshProxyCommandResponseData(BaseModel):
+    ssh_proxy_command: str
+
+
+class GetImageUrlFromHashRequestData(BaseModel):
+    image_hash: str
+
+
+class GetImageUrlFromHashResponseData(BaseModel):
+    url: str
+
+
+class GetImageUrlAndHashFromTagRequestData(BaseModel):
+    image_tag: str
+
+
+class GetImageUrlAndHashFromTagResponseData(BaseModel):
+    url: str
+    image_hash: str

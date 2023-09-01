@@ -37,3 +37,7 @@ class CheckYagnaStatusError(GolemRayServerError):
 
 class ManifestNotFound(GolemRayServerError):
     message = "Manifest file not found"
+
+
+class RegistryRequestError(GolemRayServerError):
+    pass

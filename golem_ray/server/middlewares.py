@@ -1,7 +1,6 @@
-from http import HTTPStatus
-
 from aiohttp import web
-from exceptions import GolemRayServerError
+
+from golem_ray.server.exceptions import GolemRayServerError
 
 
 @web.middleware
@@ -13,12 +12,12 @@ async def error_middleware(request, handler):
         status_code = e.status_code
     except GolemRayServerError as e:
         message = e.message
-        status_code = HTTPStatus.BAD_REQUEST
+        status_code = 400
     else:
         if response.status != 404:
             return response
 
         message = "not found"
-        status_code = HTTPStatus.NOT_FOUND
+        status_code = 404
 
     return web.json_response({"error": message}, status=status_code)

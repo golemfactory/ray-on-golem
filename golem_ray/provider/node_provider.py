@@ -6,19 +6,19 @@ from ipaddress import IPv4Address
 from pathlib import Path
 from time import sleep
 from types import ModuleType
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from requests import ConnectionError
 
 import ray
-import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
-from requests import ConnectionError
 from yarl import URL
 
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.exceptions import GolemRayNodeProviderError
-from golem_ray.provider.local_head_command_runner import LocalHeadCommandRunner
-from golem_ray.server.models import NodeId
+from golem_ray.provider.ssh_command_runner import SSHCommandRunner
+from golem_ray.server.models import Node, NodeId
+from golem_ray.server.settings import GOLEM_RAY_REVERSE_TUNNEL_PORT, SERVER_BASE_URL
 
 PROJECT_ROOT = Path(__file__).parent.parent
 logger = logging.getLogger()
@@ -32,24 +32,11 @@ class GolemNodeProvider(NodeProvider):
         self._run_webserver()
         self._golem_ray_client = GolemRayClient(base_url=URL(self.webserver_url))
 
-        image_hash = self._get_image_hash(provider_config)
+        image_url, image_hash = self._get_image_url_and_hash(provider_config)
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1)
-        capabilities = provider_config["parameters"].get(
-            "capabilities", ["vpn", "inet", "manifest-support"]
-        )
-        min_mem_gib = provider_config["parameters"].get("min_mem_gib", 0)
-        min_cpu_threads = provider_config["parameters"].get("min_cpu_threads", 0)
-        min_storage_gib = provider_config["parameters"].get("min_storage_gib", 0)
-        self._golem_ray_client.get_running_or_create_cluster(
-            image_hash=image_hash,
-            network=network,
-            budget=budget,
-            capabilities=capabilities,
-            min_mem_gib=min_mem_gib,
-            min_cpu_threads=min_cpu_threads,
-            min_storage_gib=min_storage_gib,
-        )
+        self._golem_ray_client.get_running_or_create_cluster(image_url, image_hash, network, budget)
+        self.ray_head_ip: Optional[str] = None
 
     def _run_webserver(self) -> None:
         if self._webserver_is_running():
@@ -79,14 +66,32 @@ class GolemNodeProvider(NodeProvider):
         else:
             return response.status_code == 200 and response.text == "ok"
 
-    @staticmethod
-    def _get_image_hash(provider_config: dict) -> str:
+    def _get_image_url_and_hash(self, provider_config: dict) -> Tuple[URL, str]:
+        image_tag = provider_config["parameters"].get("image_tag")
+        image_hash = provider_config["parameters"].get("image_hash")
+
+        if image_tag is not None and image_hash is not None:
+            raise GolemRayNodeProviderError(
+                "Only one of 'image_tag' and 'image_hash' parameter should be defined!"
+            )
+
+        if image_hash is not None:
+            image_url = self._get_image_url_from_hash(image_hash)
+            return image_url, image_hash
+
+        return self._get_image_url_and_hash_from_tag(image_tag)
+
+    def _get_image_url_from_hash(self, image_hash: str) -> URL:
+        return self._golem_ray_client.get_image_url_from_hash(image_hash)
+
+    def _get_image_url_and_hash_from_tag(self, image_tag: Optional[str]) -> Tuple[URL, str]:
         python_version = platform.python_version()
         ray_version = ray.__version__
-        if "image_tag" in provider_config["parameters"]:
-            image_tag = provider_config["parameters"]["image_tag"]
-            tag_python_version = image_tag.split("-")[0].rsplit("py")[-1]
-            tag_ray_version = image_tag.split("-")[1].rsplit("ray")[-1]
+
+        if image_tag is not None:
+            tag_python_version = image_tag.split("-")[0].split("py")[1]
+            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
+
             if (python_version, ray_version) != (tag_python_version, tag_ray_version):
                 logging.warning(
                     "WARNING: "
@@ -96,12 +101,7 @@ class GolemNodeProvider(NodeProvider):
         else:
             image_tag = f"py{python_version}-ray{ray_version}"
 
-        response = requests.get(
-            f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}",
-        )
-        if response.status_code == 200:
-            return response.json()["sha3"]
-        raise GolemRayNodeProviderError(f"Image tag {image_tag } does not exist")
+        return self._golem_ray_client.get_image_url_and_hash_from_tag(image_tag)
 
     def get_command_runner(
         self,
@@ -113,7 +113,20 @@ class GolemNodeProvider(NodeProvider):
         use_internal_ip: bool,
         docker_config: Optional[Dict[str, Any]] = None,
     ) -> CommandRunnerInterface:
-        return LocalHeadCommandRunner(log_prefix, cluster_name, process_runner)
+        common_args = {
+            "log_prefix": log_prefix,
+            "node_id": node_id,
+            "provider": self,
+            "auth_config": auth_config,
+            "cluster_name": cluster_name,
+            "process_runner": process_runner,
+            "use_internal_ip": use_internal_ip,
+        }
+
+        if "ssh_proxy_command" not in auth_config:
+            auth_config["ssh_proxy_command"] = self._golem_ray_client.get_ssh_proxy_command(node_id)
+
+        return SSHCommandRunner(**common_args)
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
         return self._golem_ray_client.non_terminated_nodes(tag_filters)
@@ -138,7 +151,7 @@ class GolemNodeProvider(NodeProvider):
         node_config: Dict[str, Any],
         tags: Dict[str, str],
         count: int,
-    ) -> Dict[str, Dict]:
+    ) -> Dict[NodeId, Node]:
         return self._golem_ray_client.create_nodes(
             count=count,
             tags=tags,
@@ -149,3 +162,30 @@ class GolemNodeProvider(NodeProvider):
 
     def terminate_nodes(self, node_ids: List[NodeId]) -> None:
         return self._golem_ray_client.terminate_nodes(node_ids)
+
+    @staticmethod
+    def _is_running_on_localhost():
+        return any(
+            SERVER_BASE_URL.host in option for option in ["localhost", "127.0.0.1", "0.0.0.0"]
+        )
+
+    def prepare_for_head_node(self, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Returns a new cluster config with custom configs for head node."""
+        self.ray_head_ip = self._golem_ray_client.get_head_node_ip()
+
+        def replace_placeholders(obj):
+            if isinstance(obj, str):
+                obj = obj.replace(
+                    "$GOLEM_RAY_REVERSE_TUNNEL_PORT", str(GOLEM_RAY_REVERSE_TUNNEL_PORT)
+                )
+                obj = obj.replace("$RAY_HEAD_IP", str(self.ray_head_ip))
+                return obj
+            elif isinstance(obj, list):
+                return [replace_placeholders(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {key: replace_placeholders(value) for key, value in obj.items()}
+            else:
+                return obj
+
+        final_config = replace_placeholders(cluster_config)
+        return final_config

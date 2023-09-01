@@ -14,7 +14,7 @@ from golem_ray.server.services import GolemService
 class RayService:
     def __init__(self, golem_service: GolemService):
         self._golem_service = golem_service
-        self._num_workers = 2
+        self._num_workers = 15
 
     def get_all_nodes_ids(self) -> List[NodeId]:
         return list(self._golem_service.cluster_nodes.keys())
@@ -36,9 +36,14 @@ class RayService:
 
     def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeId]:
         matched_ids = []
+        if not tags_to_match:
+            return [node_id for node_id, node in self._golem_service.cluster_nodes.items()]
+
         for node_id, node in self._golem_service.cluster_nodes.items():
+            print(node_id, ": ", node.tags)
             if self._are_dicts_equal(node.tags, tags_to_match):
                 matched_ids.append(node_id)
+
         return matched_ids
 
     def is_node_running(self, node_id: NodeId) -> bool:
@@ -101,10 +106,9 @@ class RayService:
 
     @staticmethod
     def _are_dicts_equal(dict1: Dict[str, str], dict2: Dict[str, str]) -> bool:
-        if set(dict1.keys()) != set(dict2.keys()):
-            return False
         for key in dict1.keys():
-            if dict1[key] != dict2[key]:
-                return False
+            if key in dict2:
+                if dict1[key] != dict2[key]:
+                    return False
 
         return True
