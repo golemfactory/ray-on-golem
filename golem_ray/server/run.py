@@ -1,9 +1,8 @@
+import argparse
 import logging
 import logging.config
-import sys
 from pathlib import Path
 
-import aiohttp
 from aiohttp import web
 
 from golem_ray.server.middlewares import error_middleware
@@ -12,11 +11,18 @@ from golem_ray.server.settings import (
     GOLEM_RAY_REVERSE_TUNNEL_PORT,
     LOGGING_CONFIG,
     PROXY_URL,
+    WEBSOCAT_PATH,
     YAGNA_PATH,
 )
 from golem_ray.server.views import routes
 
 logger = logging.getLogger(__name__)
+
+
+def parse_sys_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Golem Ray's webserver.")
+    parser.add_argument("port", type=int, help="port which be used for webserver to listen to")
+    return parser.parse_args()
 
 
 def prepare_tmp_dir():
@@ -40,6 +46,7 @@ def create_application() -> web.Application:
     app["golem_service"] = GolemService(
         golem_ray_reverse_tunnel_port=GOLEM_RAY_REVERSE_TUNNEL_PORT,
         proxy_url=PROXY_URL,
+        websocat_path=WEBSOCAT_PATH,
     )
 
     app["ray_service"] = RayService(
@@ -59,11 +66,9 @@ async def golem_ray_ctx(app: web.Application):
 
     await yagna_service.init()
     await golem_service.init(yagna_appkey=yagna_service.yagna_appkey)
-    app["client_session"] = aiohttp.ClientSession()
 
     yield  # before yield called on startup, after yield called on cleanup
 
-    await app["client_session"].close()
     await golem_service.shutdown()
     await yagna_service.shutdown()
 
@@ -71,13 +76,11 @@ async def golem_ray_ctx(app: web.Application):
 def main():
     logging.config.dictConfig(LOGGING_CONFIG)
 
+    args = parse_sys_args()
     prepare_tmp_dir()
 
     app = create_application()
-    port = None
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
-    web.run_app(app, port=port)
+    web.run_app(app, port=args.port)
 
 
 if __name__ == "__main__":

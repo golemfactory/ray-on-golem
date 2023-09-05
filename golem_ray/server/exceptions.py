@@ -40,4 +40,4 @@ class ManifestNotFound(GolemRayServerError):
 
 
 class RegistryRequestError(GolemRayServerError):
-    pass
+    message = "Golem Registry request failed"

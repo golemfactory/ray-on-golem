@@ -40,10 +40,14 @@ LOGGING_CONFIG = {
 }
 
 YAGNA_PATH = Path(os.getenv("YAGNA_PATH", "yagna"))
+WEBSOCAT_PATH = Path(os.getenv("WEBSOCAT_PATH", "websocat"))
 YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
-GOLEM_RAY_REVERSE_TUNNEL_PORT = int(os.getenv("GOLEM_RAY_REVERSE_TUNNEL_PORT", 3009))
-PROXY_URL = URL(os.getenv("PROXY_URL", "proxy.dev.golem.network"))
-SERVER_BASE_URL = URL(os.getenv("SERVER_BASE_URL", "http://localhost:8080"))
+GOLEM_RAY_REVERSE_TUNNEL_PORT = int(
+    os.getenv("GOLEM_RAY_REVERSE_TUNNEL_PORT", 3009)
+)  # FIXME: remove
+GOLEM_RAY_PORT = int(os.getenv("GOLEM_RAY_PORT", 4578))
+PROXY_URL = URL(os.getenv("PROXY_URL", "proxy.dev.golem.network"))  # FIXME: remove
+SERVER_BASE_URL = URL(os.getenv("SERVER_BASE_URL", "http://localhost:8080"))  # FIXME: remove
 
 URL_HEALTH_CHECK = "/health_check"
 URL_CREATE_CLUSTER = "/create_cluster"

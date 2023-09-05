@@ -2,6 +2,7 @@ cluster_name: golem-cluster
 
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10
+
 # The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
 idle_timeout_minutes: 5
 
@@ -13,21 +14,28 @@ provider:
   parameters:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
-    # check available versions at https://registry.golem.network/explore/loop/golem-ray
-    # if not provided, image_tag will be resolved based on currently used
-    # or image_hash may be provided
-    # version of python and ray
-#    image_tag: "py3.10.6-ray2.6.1-lib"
-    image_hash: "9c1d3eb5215767b4af9f77de16229879bdbfe1a9dc73cb9f6560be9b"
+
     # Golem network on which we will launch nodes
     network: "goerli"
+
     # Maximum amount of GML that's going to be spent
     budget: 1
+
     # Params for creating golem demands (same for head and workers)
-    capabilities: ['vpn', 'inet', 'manifest-support']
-    min_mem_gib: 0
-    min_cpu_threads: 0
-    min_storage_gib: 0
+    node_config:
+      # if not provided, image_tag will be resolved based on currently used
+      # check available versions at https://registry.golem.network/explore/loop/golem-ray
+      # image_tag: "py3.10.6-ray2.6.1-lib"
+
+      # or image_hash may be provided version of python and ray
+      image_hash: "9c1d3eb5215767b4af9f77de16229879bdbfe1a9dc73cb9f6560be9b"
+
+      #TODO: image_url
+
+      capabilities: ['vpn', 'inet', 'manifest-support']
+      min_mem_gib: 0
+      min_cpu_threads: 0
+      min_storage_gib: 0
 
 # The files or directories to copy to the head and worker nodes
 file_mounts:
@@ -41,11 +49,15 @@ available_node_types:
   ray.head.default:
     # The minimum number of worker nodes of this type to launch
     min_workers: 0
+
     # The maximum number of worker nodes of this type to launch
     max_workers: 1
+
     # The node type's CPU and GPU resources
     resources: {"CPU": 1}
+
     node_config:
+      # TODO: Demand description here
       kind: Node
   ray.worker.default:
     min_workers: 3
@@ -56,6 +68,7 @@ available_node_types:
 
 # List of commands that will be run before `setup_commands`
 initialization_commands: []
+
 # List of shell commands to run to set up nodes
 setup_commands: [
   "echo 'export SERVER_BASE_URL=http://127.0.0.1:3010' >> ~/.bashrc",
@@ -63,6 +76,7 @@ setup_commands: [
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands: []
+
 # Custom commands that will be run on worker nodes after common setup.
 worker_setup_commands: []
 
@@ -70,14 +84,19 @@ worker_setup_commands: []
 head_start_ray_commands: [
   "ray start --head --node-ip-address 192.168.0.3 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
+
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [
   "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
+
 # Authentication credentials that Ray will use to launch nodes
 auth:
+  # TODO: try to remove explicit ssh_user field
   ssh_user: 'root'
-#  ssh_private_key: '~/.ssh/id_rsa'
+
+  # If ssh_private_key will be not provided, temporary key will be created and used
+  # ssh_private_key: '~/.ssh/id_rsa'
 
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: []

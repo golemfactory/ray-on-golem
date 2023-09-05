@@ -3,17 +3,17 @@ import base64
 import hashlib
 import json
 import logging
+import platform
 from asyncio.subprocess import Process
-from datetime import timedelta
 from getpass import getuser
 from ipaddress import IPv4Address
 from pathlib import Path
-from threading import RLock
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
 import aiohttp
 import async_timeout
+import ray
 from golem_core.core.activity_api import commands
 from golem_core.core.golem_node import GolemNode
 from golem_core.core.market_api import Demand, ManifestVmPayload
@@ -31,9 +31,16 @@ from yarl import URL
 from golem_ray.server.exceptions import (
     CreateActivitiesTimeout,
     DestroyActivityError,
+    GolemRayServerError,
     RegistryRequestError,
 )
-from golem_ray.server.models import ClusterNode, CreateClusterRequestData, NodeId, NodeState
+from golem_ray.server.models import (
+    ClusterNode,
+    CreateClusterRequestData,
+    NodeConfigData,
+    NodeId,
+    NodeState,
+)
 from golem_ray.server.services.golem.manifest import get_manifest
 from golem_ray.server.services.ssh import SshService
 
@@ -44,9 +51,11 @@ logger = logging.getLogger(__name__)
 
 
 class GolemService:
-    def __init__(self, golem_ray_reverse_tunnel_port: int, proxy_url: str):
+    def __init__(self, golem_ray_reverse_tunnel_port: int, proxy_url: str, websocat_path: Path):
         self._golem_ray_reverse_tunnel_port = golem_ray_reverse_tunnel_port
         self._proxy_url = proxy_url
+        self._websocat_path = websocat_path
+
         self._golem: Optional[GolemNode] = None
         self._demand: Optional[Demand] = None
         self._allocation: Optional[Allocation] = None
@@ -137,52 +146,19 @@ class GolemService:
         if self._demand:
             logger.info("Cluster was created already.")
             return
+
         self._num_workers = provider_config.num_workers
-        payload, offer_score, connection_timeout = await self._create_payload(
-            image_url=provider_config.image_url,
-            image_hash=provider_config.image_hash,
-        )
+
+        payload = await self._create_payload(provider_config.node_config)
         self._demand = await self._golem.create_demand(
             payload, allocations=[self._allocation], autostart=True
         )
-
-    @staticmethod
-    async def get_image_url_from_hash(
-        image_hash: str, client_session: aiohttp.ClientSession
-    ) -> str:
-        async with client_session.get(
-            f"https://registry.golem.network/v1/image/info?hash={image_hash}",
-        ) as response:
-            response_data = await response.json()
-
-            if response.status == 200:
-                return response_data["http"]
-            elif response.status == 404:
-                raise RegistryRequestError(f"Image hash {image_hash} does not exist")
-            else:
-                raise RegistryRequestError("Can't access Golem Registry for image lookup!")
-
-    @staticmethod
-    async def get_image_url_and_hash_from_tag(
-        image_tag: str, client_session: aiohttp.ClientSession
-    ) -> tuple[str, str]:
-        async with client_session.get(
-            f"https://registry.golem.network/v1/image/info?tag=loop/golem-ray:{image_tag}"
-        ) as response:
-            response_data = await response.json()
-
-            if response.status == 200:
-                return response_data["http"], response_data["sha3"]
-            elif response.status == 404:
-                raise RegistryRequestError(f"Image tag '{image_tag}' does not exist")
-            else:
-                raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
     async def get_providers(
         self,
         tags: Dict,
         count: int,
-    ) -> List[Tuple[int, ClusterNode]]:
+    ) -> None:
         """
         Creates activities (demand providers) in golem network
         :param tags: tags from ray
@@ -190,7 +166,7 @@ class GolemService:
         :param current_nodes_count: current count of running nodes
         :return:
         """
-        new_nodes = await self._create_activities(tags=tags, count=count)
+        await self._create_activities(tags=tags, count=count)
         await self._network.refresh_nodes()
         await self._add_my_key()
         await self._add_other_keys()  # TODO: Fix adding other keys
@@ -199,8 +175,6 @@ class GolemService:
         if not self._reverse_ssh_process:
             self._reverse_ssh_process = await self._create_reverse_ssh_to_golem_network()
 
-        return new_nodes
-
     @staticmethod
     async def destroy_activity(node: ClusterNode):
         try:
@@ -208,15 +182,16 @@ class GolemService:
         except Exception:
             raise DestroyActivityError
 
-    def _get_head_node(self) -> ClusterNode:
-        with self._lock:
+    async def _get_head_node(self) -> ClusterNode:
+        async with self._lock:
             for node in self._cluster_nodes.values():
                 ray_node_type = node.tags.get("ray-node-type")
                 if ray_node_type == "head":
                     return node
 
-    def get_head_node_ip(self) -> IPv4Address:
-        return self._get_head_node().internal_ip
+    async def get_head_node_ip(self) -> IPv4Address:
+        head_node = await self._get_head_node()
+        return head_node.internal_ip
 
     async def _create_reverse_ssh_to_golem_network(self) -> Process:
         """
@@ -224,7 +199,7 @@ class GolemService:
 
         :return: shell subprocess which runs reverse tunnel
         """
-        head_node = self._get_head_node()
+        head_node = await self._get_head_node()
         proxy_command = self.get_node_ssh_proxy_command(head_node.node_id)
         # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_reverse_tunnel_port}:127.0.0.1:8080 proxy@proxy.dev.golem.network"
         text_command = (
@@ -266,33 +241,87 @@ class GolemService:
             print(batch.events)
             raise
 
-    async def _create_payload(
-        self, image_url: URL, image_hash: str
-    ) -> Tuple[ManifestVmPayload, None, timedelta]:
+    async def _create_payload(self, node_config: NodeConfigData) -> ManifestVmPayload:
         """
         Creates payload from given image_hash and parses manifest.json file
         which is then used to create demand in golem network
-        :param provider_config: dictionary containing image_hash and num_workers
-        :param kwargs:
+        :param node_config: dictionary containing image_hash and num_workers
         :return:
         """
+        image_url, image_hash = await self._get_image_url_and_hash(node_config)
+
         manifest = get_manifest(image_url, image_hash, self._golem_ray_reverse_tunnel_port)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
-        params = {
-            "manifest": manifest,
-            "capabilities": provider_config.capabilities,
-            "min_mem_gib": provider_config.min_mem_gib,
-            "min_cpu_threads": provider_config.min_cpu_threads,
-            "min_storage_gib": provider_config.min_storage_gib,
-        }
-        # strategy = DEFAULT_SCORING_STRATEGY
-        # connection_timeout = DEFAULT_CONNECTION_TIMEOUT
-        connection_timeout = timedelta(seconds=150)
-        offer_scorer = None
+        params = node_config.dict(exclude={"image_url", "image_hash", "image_tag"})
+        params["manifest"] = manifest
+
         payload = ManifestVmPayload(**params)
 
-        return payload, offer_scorer, connection_timeout
+        return payload
+
+    async def _get_image_url_and_hash(self, node_config: NodeConfigData) -> Tuple[URL, str]:
+        image_tag = node_config.image_tag
+        image_hash = node_config.image_hash
+
+        if image_tag is not None and image_hash is not None:
+            raise GolemRayServerError(
+                "Only one of 'image_tag' and 'image_hash' parameter should be defined!"
+            )
+
+        if image_hash is not None:
+            image_url = await self._get_image_url_from_hash(image_hash)
+            return image_url, image_hash
+
+        return await self._get_image_url_and_hash_from_tag(image_tag)
+
+    @staticmethod
+    async def _get_image_url_from_hash(image_hash: str) -> URL:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"https://registry.golem.network/v1/image/info",
+                params={"hash": image_hash},
+            ) as response:
+                response_data = await response.json()
+
+                if response.status == 200:
+                    return URL(response_data["http"])
+                elif response.status == 404:
+                    raise RegistryRequestError(f"Image hash {image_hash} does not exist")
+                else:
+                    raise RegistryRequestError("Can't access Golem Registry for image lookup!")
+
+    @staticmethod
+    async def _get_image_url_and_hash_from_tag(image_tag: Optional[str]) -> Tuple[URL, str]:
+        python_version = platform.python_version()
+        ray_version = ray.__version__
+
+        if image_tag is not None:
+            tag_python_version = image_tag.split("-")[0].split("py")[1]
+            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
+
+            if (python_version, ray_version) != (tag_python_version, tag_ray_version):
+                logging.warning(
+                    "WARNING: "
+                    f"Version of python and ray on your machine {(python_version, ray_version) = } "
+                    f"does not match tag version {(tag_python_version, tag_ray_version) = }"
+                )
+        else:
+            image_tag = f"py{python_version}-ray{ray_version}"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"https://registry.golem.network/v1/image/info",
+                params={"tag": f"loop/golem-ray:{image_tag}"},
+            ) as response:
+                response_data = await response.json()
+
+                if response.status == 200:
+                    return response_data["http"], response_data["sha3"]
+                elif response.status == 404:
+                    raise RegistryRequestError(f"Image tag '{image_tag}' does not exist")
+                else:
+                    raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
     def _print_ws_connection_data(self) -> None:
         """
@@ -305,7 +334,7 @@ class GolemService:
                     "Connect with:\n"
                     f"ssh "
                     f"-o StrictHostKeyChecking=no "
-                    f"-o ProxyCommand='websocat asyncstdio: {node.connection_uri}/22 --binary "
+                    f"-o ProxyCommand='{self._websocat_path} asyncstdio: {node.connection_uri}/22 --binary "
                     f'-H=Authorization:"Bearer {self._golem._api_config.app_key}"\' root@{uuid4().hex} '
                     # f"-i ${str(self._temp_ssh_key_dir)}/${self._temp_ssh_key_filename}"
                 )
@@ -314,7 +343,7 @@ class GolemService:
         node = self._cluster_nodes.get(node_id)
 
         # Using single quotes for JWT token as double quotes are causing problems with CLI character escaping in ray
-        return f"websocat asyncstdio: {node.connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
+        return f"{self._websocat_path} asyncstdio: {node.connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
 
     async def _create_activities(self, count: int, tags: Dict = None) -> None:
         """
@@ -324,7 +353,7 @@ class GolemService:
         :param connection_timeout: Currently not used
         :return:
         """
-        with self._lock:
+        async with self._lock:
             try:  # TODO: upload golem_ray files
                 async with async_timeout.timeout(int(150)):
                     chain = Chain(
@@ -362,7 +391,7 @@ class GolemService:
         """
         Add local ssh key to all providers
         """
-        with self._lock:
+        async with self._lock:
             id_rsa_file_path = self._temp_ssh_key_dir / (self._temp_ssh_key_filename + ".pub")
 
             if not id_rsa_file_path.exists():
@@ -385,13 +414,15 @@ class GolemService:
         """
         Adds all providers key to other providers machines
         """
-        with self._lock:
+        async with self._lock:
             keys = {}
             cluster_nodes = list(self._cluster_nodes.values())
             for cluster_node in cluster_nodes:
                 if cluster_node.activity:
                     batch = await cluster_node.activity.execute_commands(
-                        commands.Run('[ -f /root/.ssh/id_rsa ] || ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'),
+                        commands.Run(
+                            '[ -f /root/.ssh/id_rsa ] || ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'
+                        ),
                         commands.Run("cat /root/.ssh/id_rsa.pub"),
                     )
                     await batch.wait()

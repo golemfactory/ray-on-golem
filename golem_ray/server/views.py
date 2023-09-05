@@ -152,7 +152,7 @@ async def get_node_proxy_command(request):
 async def get_head_node_ip(request):
     golem_service: GolemService = request.app["golem_service"]
 
-    head_node_ip = golem_service.get_head_node_ip()
+    head_node_ip = await golem_service.get_head_node_ip()
 
     response_data = models.GetNodeIpAddressResponseData(ip_address=head_node_ip)
 

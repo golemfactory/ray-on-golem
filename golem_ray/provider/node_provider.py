@@ -1,107 +1,86 @@
 import logging
-import platform
 import subprocess
 import sys
 from ipaddress import IPv4Address
 from pathlib import Path
 from time import sleep
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple
-from requests import ConnectionError
+from typing import Any, Dict, List, Optional
 
-import ray
+import requests
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
+from requests import ConnectionError
 from yarl import URL
 
 from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.exceptions import GolemRayNodeProviderError
 from golem_ray.provider.ssh_command_runner import SSHCommandRunner
-from golem_ray.server.models import Node, NodeId
-from golem_ray.server.settings import GOLEM_RAY_REVERSE_TUNNEL_PORT, SERVER_BASE_URL
+from golem_ray.server.models import Node, NodeConfigData, NodeId
+from golem_ray.server.settings import (
+    GOLEM_RAY_PORT,
+    GOLEM_RAY_REVERSE_TUNNEL_PORT,
+    SERVER_BASE_URL,
+    URL_HEALTH_CHECK,
+)
 
 PROJECT_ROOT = Path(__file__).parent.parent
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config: dict, cluster_name: str):
         super().__init__(provider_config, cluster_name)
-        self.port = provider_config["parameters"].get("webserver_port", 4578)
-        self.webserver_url = f"http://localhost:{self.port}"
-        self._run_webserver()
-        self._golem_ray_client = GolemRayClient(base_url=URL(self.webserver_url))
 
-        image_url, image_hash = self._get_image_url_and_hash(provider_config)
+        self._port = provider_config["parameters"].get("webserver_port", GOLEM_RAY_PORT)
+        self._webserver_url = URL("http://127.0.0.1").with_port(self._port)
+        self._run_webserver()
+        self._golem_ray_client = GolemRayClient(base_url=self._webserver_url)
+
+        self.ray_head_ip: Optional[str] = None
+
         network = provider_config["parameters"].get("network", "goerli")
         budget = provider_config["parameters"].get("budget", 1)
-        self._golem_ray_client.get_running_or_create_cluster(image_url, image_hash, network, budget)
-        self.ray_head_ip: Optional[str] = None
+        node_config = provider_config["parameters"].get("node_config")
+        self._golem_ray_client.get_running_or_create_cluster(
+            network=network,
+            budget=budget,
+            node_config=NodeConfigData(**node_config),
+        )
 
     def _run_webserver(self) -> None:
         if self._webserver_is_running():
-            logger.info("Webserver is running")
+            logger.info("Webserver is already running")
+            return
 
         run_path = PROJECT_ROOT / "server" / "run.py"
-        logger.info("Starting webserver")
+        logger.info("Starting webserver...")
         subprocess.Popen(
-            [sys.executable, run_path, str(self.port)],
+            [sys.executable, run_path, str(self._port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-        sleep(1)
+
+        sleep(2)
+
         for _ in range(3):
             if self._webserver_is_running():
+                logger.info("Webserver started")
                 return
-            logger.info("Webserver is not running yet, checking health_check again in 2 seconds")
+
+            logger.info("Webserver is not yet running, retrying in 2 seconds...")
             sleep(2)
+
         raise GolemRayNodeProviderError("Could not start webserver")
 
     def _webserver_is_running(self) -> bool:
         try:
-            response = requests.get(f"{self.webserver_url}/health_check", timeout=2)
+            response = requests.get(self._webserver_url / URL_HEALTH_CHECK.lstrip("/"), timeout=2)
         except ConnectionError:
             return False
         else:
             return response.status_code == 200 and response.text == "ok"
-
-    def _get_image_url_and_hash(self, provider_config: dict) -> Tuple[URL, str]:
-        image_tag = provider_config["parameters"].get("image_tag")
-        image_hash = provider_config["parameters"].get("image_hash")
-
-        if image_tag is not None and image_hash is not None:
-            raise GolemRayNodeProviderError(
-                "Only one of 'image_tag' and 'image_hash' parameter should be defined!"
-            )
-
-        if image_hash is not None:
-            image_url = self._get_image_url_from_hash(image_hash)
-            return image_url, image_hash
-
-        return self._get_image_url_and_hash_from_tag(image_tag)
-
-    def _get_image_url_from_hash(self, image_hash: str) -> URL:
-        return self._golem_ray_client.get_image_url_from_hash(image_hash)
-
-    def _get_image_url_and_hash_from_tag(self, image_tag: Optional[str]) -> Tuple[URL, str]:
-        python_version = platform.python_version()
-        ray_version = ray.__version__
-
-        if image_tag is not None:
-            tag_python_version = image_tag.split("-")[0].split("py")[1]
-            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
-
-            if (python_version, ray_version) != (tag_python_version, tag_ray_version):
-                logging.warning(
-                    "WARNING: "
-                    f"Version of python and ray on your machine {(python_version, ray_version) = } "
-                    f"does not match tag version {(tag_python_version, tag_ray_version) = }"
-                )
-        else:
-            image_tag = f"py{python_version}-ray{ray_version}"
-
-        return self._golem_ray_client.get_image_url_and_hash_from_tag(image_tag)
 
     def get_command_runner(
         self,

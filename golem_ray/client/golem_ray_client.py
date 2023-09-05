@@ -8,6 +8,7 @@ from yarl import URL
 
 from golem_ray.client.exceptions import GolemRayClientError, GolemRayClientValidationError
 from golem_ray.server import models, settings
+from golem_ray.server.models import NodeConfigData
 
 TResponseModel = TypeVar("TResponseModel")
 
@@ -39,20 +40,23 @@ class GolemRayClient:
             ) from e
 
     def get_running_or_create_cluster(
-        self, image_url: URL, image_hash: str, network: str, budget: int
+        self,
+        network: str,
+        budget: int,
+        node_config: NodeConfigData,
     ) -> List[models.NodeId]:
         response = self._make_request(
             url=settings.URL_CREATE_CLUSTER,
             request_data=models.CreateClusterRequestData(
-                image_url=str(image_url),
-                image_hash=image_hash,
                 network=network,
                 budget=budget,
+                node_config=node_config,
             ),
             response_model=models.CreateClusterResponseData,
-            request_data=request_data,
             error_message="Couldn't create cluster",
         )
+
+        return response.nodes
 
     def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
         response = self._make_request(

@@ -48,19 +48,21 @@ class SingleNodeRequestData(BaseModel):
     node_id: NodeId
 
 
-class CreateClusterRequestData(BaseModel):
-    image_url: str  # FIXME: Use yarl.URL
-    image_hash: str
-    capabilities: list[str]
-    min_mem_gib: int
+class NodeConfigData(BaseModel):
+    image_url: Optional[str] = None  # FIXME: Use yarl.URL
+    image_hash: Optional[str] = None
+    image_tag: Optional[str] = None
+    capabilities: List[str]
+    min_mem_gib: float
     min_cpu_threads: int
-    min_storage_gib: int
+    min_storage_gib: float
+
+
+class CreateClusterRequestData(BaseModel):
     network: str
     budget: int
     num_workers: int = 4
-
-    class Config:
-        arbitrary_types_allowed = True
+    node_config: NodeConfigData
 
 
 class CreateClusterResponseData(BaseModel):
