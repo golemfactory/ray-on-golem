@@ -1,4 +1,5 @@
 import logging
+import os
 import subprocess
 import sys
 from ipaddress import IPv4Address
@@ -32,7 +33,7 @@ class GolemNodeProvider(NodeProvider):
 
         self._port = provider_config["parameters"].get("webserver_port", GOLEM_RAY_PORT)
         self._webserver_url = URL("http://127.0.0.1").with_port(self._port)
-        # FIXME: Enable autostart webserwer
+        # FIXME: Enable autostart webserver
         # self._run_webserver()
         self._golem_ray_client = GolemRayClient(base_url=self._webserver_url)
 
@@ -101,10 +102,14 @@ class GolemNodeProvider(NodeProvider):
             "use_internal_ip": use_internal_ip,
         }
 
-        if "ssh_proxy_command" not in auth_config:
+        if "ssh_proxy_command" not in auth_config and not self._is_running_on_golem_network():
             auth_config["ssh_proxy_command"] = self._golem_ray_client.get_ssh_proxy_command(node_id)
 
         return SSHCommandRunner(**common_args)
+
+    @staticmethod
+    def _is_running_on_golem_network() -> bool:
+        return os.getenv('ON_GOLEM_NETWORK') is not None
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
         return self._golem_ray_client.non_terminated_nodes(tag_filters)
@@ -118,7 +123,7 @@ class GolemNodeProvider(NodeProvider):
     def node_tags(self, node_id: NodeId) -> Dict:
         return self._golem_ray_client.get_node_tags(node_id)
 
-    def internal_ip(self, node_id: NodeId) -> IPv4Address:
+    def internal_ip(self, node_id: NodeId) -> str:
         return self._golem_ray_client.get_node_internal_ip(node_id)
 
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:

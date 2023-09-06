@@ -208,7 +208,7 @@ class GolemService:
             f"-i {self._temp_ssh_key_dir / self._temp_ssh_key_filename} "
             f"root@{uuid4().hex}"
         )
-        print('proxy', text_command)
+
         process = await asyncio.create_subprocess_shell(
             text_command,
             stderr=asyncio.subprocess.PIPE,

@@ -46,6 +46,7 @@ class SshService:
 
             batch = await activity.execute_commands(
                 commands.Start(),
+                commands.Run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment"),
                 commands.Run("service ssh start"),
             )
             await batch.wait(600)

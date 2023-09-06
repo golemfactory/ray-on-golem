@@ -106,7 +106,7 @@ class GolemRayClient:
 
         return response.tags
 
-    def get_node_internal_ip(self, node_id: models.NodeId) -> IPv4Address:
+    def get_node_internal_ip(self, node_id: models.NodeId) -> str:
         response = self._make_request(
             url=settings.URL_INTERNAL_IP,
             response_model=models.GetNodeIpAddressResponseData,
@@ -116,7 +116,7 @@ class GolemRayClient:
             error_message="Couldn't get node internal_ip",
         )
 
-        return response.ip_address
+        return str(response.ip_address)
 
     def set_node_tags(self, node_id: models.NodeId, tags: models.Tags) -> None:
         self._make_request(
