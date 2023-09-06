@@ -28,7 +28,7 @@ provider:
       # image_tag: "py3.10.6-ray2.6.1-lib"
 
       # or image_hash may be provided version of python and ray
-      image_hash: "6c4e5f30965c4a1cd6e32dc065107b641e85da9a5c0a780ca3646dfb"
+      image_hash: "fd36e77b00465567f41a8e6d04cb8c0f972c3b0f0864cafb83f44ab1"
 
       capabilities: ['vpn', 'inet', 'manifest-support']
       min_mem_gib: 0
