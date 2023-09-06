@@ -3,7 +3,7 @@ from typing import Dict
 from yarl import URL
 
 
-def get_manifest(image_url: URL, image_hash: str, gcp_tunnel_port: int) -> Dict:
+def get_manifest(image_url: URL, image_hash: str) -> Dict:
     return {
         "version": "0.1.0",
         "createdAt": "2023-06-26T00:00:00.000000Z",
@@ -31,9 +31,8 @@ def get_manifest(image_url: URL, image_hash: str, gcp_tunnel_port: int) -> Dict:
             "net": {
                 "inet": {
                     "out": {
-                        "protocols": ["https", "tcp"],
+                        "protocols": ["https"],
                         "urls": [
-                            f"tcp://proxy.dev.golem.network:{gcp_tunnel_port}/",
                             "https://pypi.dev.golem.network",
                         ],
                     }

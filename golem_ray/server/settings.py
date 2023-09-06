@@ -1,11 +1,6 @@
 import os
 from pathlib import Path
 
-import dotenv
-from yarl import URL
-
-dotenv.load_dotenv()
-
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": True,
@@ -41,13 +36,9 @@ LOGGING_CONFIG = {
 
 YAGNA_PATH = Path(os.getenv("YAGNA_PATH", "yagna"))
 WEBSOCAT_PATH = Path(os.getenv("WEBSOCAT_PATH", "websocat"))
+
 YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
-GOLEM_RAY_REVERSE_TUNNEL_PORT = int(
-    os.getenv("GOLEM_RAY_REVERSE_TUNNEL_PORT", 3009)
-)  # FIXME: remove
 GOLEM_RAY_PORT = int(os.getenv("GOLEM_RAY_PORT", 4578))
-PROXY_URL = URL(os.getenv("PROXY_URL", "proxy.dev.golem.network"))  # FIXME: remove
-SERVER_BASE_URL = URL(os.getenv("SERVER_BASE_URL", "http://localhost:8080"))  # FIXME: remove
 
 URL_HEALTH_CHECK = "/health_check"
 URL_CREATE_CLUSTER = "/create_cluster"
@@ -61,5 +52,3 @@ URL_CREATE_NODES = "/create_nodes"
 URL_TERMINATE_NODES = "/terminate"
 URL_GET_SSH_PROXY_COMMAND = "/ssh_proxy_command"
 URL_GET_HEAD_NODE_IP = "/head_node_ip"
-URL_GET_IMAGE_URL_FROM_HASH = "/image_url"
-URL_GET_IMAGE_URL_AND_HASH_FROM_TAG = "/image_url_and_hash"

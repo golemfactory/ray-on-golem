@@ -49,7 +49,6 @@ class SingleNodeRequestData(BaseModel):
 
 
 class NodeConfigData(BaseModel):
-    image_url: Optional[str] = None  # FIXME: Use yarl.URL
     image_hash: Optional[str] = None
     image_tag: Optional[str] = None
     capabilities: List[str]

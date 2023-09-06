@@ -28,9 +28,7 @@ provider:
       # image_tag: "py3.10.6-ray2.6.1-lib"
 
       # or image_hash may be provided version of python and ray
-      image_hash: "9c1d3eb5215767b4af9f77de16229879bdbfe1a9dc73cb9f6560be9b"
-
-      #TODO: image_url
+      image_hash: "6c4e5f30965c4a1cd6e32dc065107b641e85da9a5c0a780ca3646dfb"
 
       capabilities: ['vpn', 'inet', 'manifest-support']
       min_mem_gib: 0
@@ -40,8 +38,7 @@ provider:
 # The files or directories to copy to the head and worker nodes
 file_mounts:
   {
-    "/app": "./golem_ray",
-    "/usr/local/lib/python3.8/golem_ray": "./golem_ray"
+    "/app/golem_ray": "./golem_ray",
   }
 
 # Tells the autoscaler the allowed node types and the resources they provide
@@ -70,9 +67,7 @@ available_node_types:
 initialization_commands: []
 
 # List of shell commands to run to set up nodes
-setup_commands: [
-  "echo 'export SERVER_BASE_URL=http://127.0.0.1:3010' >> ~/.bashrc",
-]
+setup_commands: []
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands: []

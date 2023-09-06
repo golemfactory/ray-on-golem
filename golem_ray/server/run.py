@@ -8,11 +8,10 @@ from aiohttp import web
 from golem_ray.server.middlewares import error_middleware
 from golem_ray.server.services import GolemService, RayService, YagnaService
 from golem_ray.server.settings import (
-    GOLEM_RAY_REVERSE_TUNNEL_PORT,
     LOGGING_CONFIG,
-    PROXY_URL,
     WEBSOCAT_PATH,
     YAGNA_PATH,
+    GOLEM_RAY_PORT,
 )
 from golem_ray.server.views import routes
 
@@ -44,8 +43,7 @@ def create_application() -> web.Application:
     )
 
     app["golem_service"] = GolemService(
-        golem_ray_reverse_tunnel_port=GOLEM_RAY_REVERSE_TUNNEL_PORT,
-        proxy_url=PROXY_URL,
+        golem_ray_port=GOLEM_RAY_PORT,
         websocat_path=WEBSOCAT_PATH,
     )
 
