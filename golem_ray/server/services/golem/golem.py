@@ -200,9 +200,9 @@ class GolemService:
         """
         head_node = await self._get_head_node()
         proxy_command = self.get_node_ssh_proxy_command(head_node.node_id)
-        # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_port}:127.0.0.1:8080 proxy@proxy.dev.golem.network"
+        # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port} proxy@proxy.dev.golem.network"
         text_command = (
-            f"ssh -N -R '*:{self._golem_ray_port}:127.0.0.1:8080' "
+            f"ssh -N -R '*:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port}' "
             f"-o StrictHostKeyChecking=no "
             f'-o ProxyCommand="{proxy_command}" '
             f"-i {self._temp_ssh_key_dir / self._temp_ssh_key_filename} "
@@ -216,7 +216,7 @@ class GolemService:
             stdin=asyncio.subprocess.PIPE,
         )
         logger.info(
-            f"Reverse ssh tunnel from 127.0.0.1:8080 to *:{self._golem_ray_port} created."
+            f"Reverse ssh tunnel from 127.0.0.1:{self._golem_ray_port} to *:{self._golem_ray_port} created."
         )
 
         return process
