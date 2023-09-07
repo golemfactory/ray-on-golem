@@ -51,9 +51,8 @@ logger = logging.getLogger(__name__)
 
 
 class GolemService:
-    def __init__(self, golem_ray_reverse_tunnel_port: int, proxy_url: str, websocat_path: Path):
-        self._golem_ray_reverse_tunnel_port = golem_ray_reverse_tunnel_port
-        self._proxy_url = proxy_url
+    def __init__(self, golem_ray_port: int, websocat_path: Path):
+        self._golem_ray_port = golem_ray_port
         self._websocat_path = websocat_path
 
         self._golem: Optional[GolemNode] = None
@@ -127,7 +126,7 @@ class GolemService:
         if self._reverse_ssh_process and self._reverse_ssh_process.returncode is None:
             self._reverse_ssh_process.terminate()
             await self._reverse_ssh_process.wait()
-            logger.info(f"-----Reverse ssh to {self._proxy_url} closed.")
+            logger.info(f"-----Reverse ssh to *:{self._golem_ray_port} closed.")
             self._reverse_ssh_process = None
 
         await SshService.remove_temporary_ssh_key(
@@ -201,14 +200,15 @@ class GolemService:
         """
         head_node = await self._get_head_node()
         proxy_command = self.get_node_ssh_proxy_command(head_node.node_id)
-        # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_reverse_tunnel_port}:127.0.0.1:8080 proxy@proxy.dev.golem.network"
+        # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port} proxy@proxy.dev.golem.network"
         text_command = (
-            f"ssh -N -R '*:{self._golem_ray_reverse_tunnel_port}:127.0.0.1:8080' "
+            f"ssh -N -R '*:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port}' "
             f"-o StrictHostKeyChecking=no "
             f'-o ProxyCommand="{proxy_command}" '
             f"-i {self._temp_ssh_key_dir / self._temp_ssh_key_filename} "
             f"root@{uuid4().hex}"
         )
+
         process = await asyncio.create_subprocess_shell(
             text_command,
             stderr=asyncio.subprocess.PIPE,
@@ -216,7 +216,7 @@ class GolemService:
             stdin=asyncio.subprocess.PIPE,
         )
         logger.info(
-            f"Reverse ssh tunnel from 127.0.0.1:8080 to *:{self._golem_ray_reverse_tunnel_port} created."
+            f"Reverse ssh tunnel from 127.0.0.1:{self._golem_ray_port} to *:{self._golem_ray_port} created."
         )
 
         return process
@@ -250,7 +250,7 @@ class GolemService:
         """
         image_url, image_hash = await self._get_image_url_and_hash(node_config)
 
-        manifest = get_manifest(image_url, image_hash, self._golem_ray_reverse_tunnel_port)
+        manifest = get_manifest(image_url, image_hash)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
         params = node_config.dict(exclude={"image_url", "image_hash", "image_tag"})

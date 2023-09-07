@@ -1,4 +1,5 @@
 import logging
+import os
 import subprocess
 import sys
 from ipaddress import IPv4Address
@@ -19,8 +20,6 @@ from golem_ray.provider.ssh_command_runner import SSHCommandRunner
 from golem_ray.server.models import Node, NodeConfigData, NodeId
 from golem_ray.server.settings import (
     GOLEM_RAY_PORT,
-    GOLEM_RAY_REVERSE_TUNNEL_PORT,
-    SERVER_BASE_URL,
     URL_HEALTH_CHECK,
 )
 
@@ -34,7 +33,8 @@ class GolemNodeProvider(NodeProvider):
 
         self._port = provider_config["parameters"].get("webserver_port", GOLEM_RAY_PORT)
         self._webserver_url = URL("http://127.0.0.1").with_port(self._port)
-        self._run_webserver()
+        # FIXME: Enable autostart webserver
+        # self._run_webserver()
         self._golem_ray_client = GolemRayClient(base_url=self._webserver_url)
 
         self.ray_head_ip: Optional[str] = None
@@ -102,10 +102,14 @@ class GolemNodeProvider(NodeProvider):
             "use_internal_ip": use_internal_ip,
         }
 
-        if "ssh_proxy_command" not in auth_config:
+        if "ssh_proxy_command" not in auth_config and not self._is_running_on_golem_network():
             auth_config["ssh_proxy_command"] = self._golem_ray_client.get_ssh_proxy_command(node_id)
 
         return SSHCommandRunner(**common_args)
+
+    @staticmethod
+    def _is_running_on_golem_network() -> bool:
+        return os.getenv('ON_GOLEM_NETWORK') is not None
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
         return self._golem_ray_client.non_terminated_nodes(tag_filters)
@@ -119,7 +123,7 @@ class GolemNodeProvider(NodeProvider):
     def node_tags(self, node_id: NodeId) -> Dict:
         return self._golem_ray_client.get_node_tags(node_id)
 
-    def internal_ip(self, node_id: NodeId) -> IPv4Address:
+    def internal_ip(self, node_id: NodeId) -> str:
         return self._golem_ray_client.get_node_internal_ip(node_id)
 
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
@@ -142,21 +146,12 @@ class GolemNodeProvider(NodeProvider):
     def terminate_nodes(self, node_ids: List[NodeId]) -> None:
         return self._golem_ray_client.terminate_nodes(node_ids)
 
-    @staticmethod
-    def _is_running_on_localhost():
-        return any(
-            SERVER_BASE_URL.host in option for option in ["localhost", "127.0.0.1", "0.0.0.0"]
-        )
-
     def prepare_for_head_node(self, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         """Returns a new cluster config with custom configs for head node."""
         self.ray_head_ip = self._golem_ray_client.get_head_node_ip()
 
         def replace_placeholders(obj):
             if isinstance(obj, str):
-                obj = obj.replace(
-                    "$GOLEM_RAY_REVERSE_TUNNEL_PORT", str(GOLEM_RAY_REVERSE_TUNNEL_PORT)
-                )
                 obj = obj.replace("$RAY_HEAD_IP", str(self.ray_head_ip))
                 return obj
             elif isinstance(obj, list):
