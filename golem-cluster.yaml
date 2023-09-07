@@ -26,11 +26,11 @@ provider:
 
     # Params for creating golem demands (same for head and workers)
     node_config:
-      # if not provided, image_tag will be resolved based on currently used
-      # check available versions at https://registry.golem.network/explore/loop/golem-ray
+      # if not provided, image_tag will be autodetected based on currently used python and ray versions
+      # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
       # image_tag: "py3.10.6-ray2.6.1-lib"
 
-      # or image_hash may be provided version of python and ray
+      # you can also provide the image hash directly (although it is not recommended :)
       image_hash: "fd36e77b00465567f41a8e6d04cb8c0f972c3b0f0864cafb83f44ab1"
 
       capabilities: ['vpn', 'inet', 'manifest-support']
