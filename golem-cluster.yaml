@@ -16,10 +16,12 @@ provider:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
 
-    # Golem network on which we will launch nodes
+    # Blockchain used for payments. 
+    # Goerli means running free nodes on testnet, 
+    # Polygon is for mainnet operations.
     network: "goerli"
 
-    # Maximum amount of GML that's going to be spent
+    # Maximum amount of GML that's going to be spent (not supported yet)
     budget: 1
 
     # Params for creating golem demands (same for head and workers)
