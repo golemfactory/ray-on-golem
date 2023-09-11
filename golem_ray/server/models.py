@@ -58,6 +58,7 @@ class NodeConfigData(BaseModel):
 
 
 class CreateClusterRequestData(BaseModel):
+    cluster_name: str
     network: str
     budget: int
     num_workers: int = 4
@@ -126,18 +127,9 @@ class GetSshProxyCommandResponseData(BaseModel):
     ssh_proxy_command: str
 
 
-class GetImageUrlFromHashRequestData(BaseModel):
-    image_hash: str
+class GetOrCreateSshKeyRequestData(BaseModel):
+    cluster_name: str
 
 
-class GetImageUrlFromHashResponseData(BaseModel):
-    url: str
-
-
-class GetImageUrlAndHashFromTagRequestData(BaseModel):
-    image_tag: str
-
-
-class GetImageUrlAndHashFromTagResponseData(BaseModel):
-    url: str
-    image_hash: str
+class GetOrCreateSshKeyResponseData(BaseModel):
+    ssh_key_base64: str

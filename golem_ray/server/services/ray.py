@@ -1,12 +1,7 @@
 from ipaddress import IPv4Address
 from typing import Dict, List
 
-from golem_ray.server.exceptions import (
-    DestroyActivityError,
-    NodeNotFound,
-    NodesCountExceeded,
-    NodesNotFound,
-)
+from golem_ray.server.exceptions import NodeNotFound, NodesNotFound
 from golem_ray.server.models import CreateClusterRequestData, Node, NodeId, NodeState, Tags
 from golem_ray.server.services import GolemService
 
@@ -14,7 +9,6 @@ from golem_ray.server.services import GolemService
 class RayService:
     def __init__(self, golem_service: GolemService):
         self._golem_service = golem_service
-        self._num_workers = 15
 
     def get_all_nodes_ids(self) -> List[NodeId]:
         return list(self._golem_service.cluster_nodes.keys())
@@ -40,7 +34,6 @@ class RayService:
             return [node_id for node_id, node in self._golem_service.cluster_nodes.items()]
 
         for node_id, node in self._golem_service.cluster_nodes.items():
-            print(node_id, ": ", node.tags)
             if self._are_dicts_equal(node.tags, tags_to_match):
                 matched_ids.append(node_id)
 
@@ -78,12 +71,6 @@ class RayService:
         raise NodeNotFound
 
     async def create_nodes(self, count: int, tags: Tags) -> Dict:
-        if tags is None:
-            tags = {}
-
-        if count + len(self._golem_service.cluster_nodes) > self._num_workers + 1:
-            raise NodesCountExceeded
-
         await self._golem_service.get_providers(
             tags=tags,
             count=count,
@@ -102,7 +89,8 @@ class RayService:
         node = self._golem_service.cluster_nodes.get(node_id)
         if node:
             await self._golem_service.destroy_activity(node)
-        raise DestroyActivityError
+            return
+        raise NodeNotFound
 
     @staticmethod
     def _are_dicts_equal(dict1: Dict[str, str], dict2: Dict[str, str]) -> bool:

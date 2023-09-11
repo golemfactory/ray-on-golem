@@ -1,15 +1,12 @@
 import asyncio
 import base64
-import hashlib
 import json
 import logging
 import platform
 from asyncio.subprocess import Process
-from getpass import getuser
 from ipaddress import IPv4Address
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from uuid import uuid4
 
 import aiohttp
 import async_timeout
@@ -43,6 +40,8 @@ from golem_ray.server.models import (
 )
 from golem_ray.server.services.golem.manifest import get_manifest
 from golem_ray.server.services.ssh import SshService
+from golem_ray.server.settings import TMP_PATH
+from golem_ray.utils import get_ssh_key_name
 
 logger = logging.getLogger(__name__)
 
@@ -99,15 +98,6 @@ class GolemService:
         )
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
 
-        key_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
-        self._temp_ssh_key_dir = Path("/tmp/golem-ray-ssh")
-        self._temp_ssh_key_filename = f"golem_ray_rsa_{key_hash}"
-
-        await SshService.create_temporary_ssh_key(
-            ssh_key_dir=self._temp_ssh_key_dir, ssh_key_filename=self._temp_ssh_key_filename
-        )
-        # await self._allocation.get_data()
-
     async def shutdown(self) -> None:
         """
         Terminates all activities and ray on head node.
@@ -129,10 +119,6 @@ class GolemService:
             logger.info(f"-----Reverse ssh to *:{self._golem_ray_port} closed.")
             self._reverse_ssh_process = None
 
-        await SshService.remove_temporary_ssh_key(
-            self._temp_ssh_key_dir, self._temp_ssh_key_filename
-        )
-
         await self._golem.aclose()
         self._golem = None
 
@@ -147,6 +133,9 @@ class GolemService:
             return
 
         self._num_workers = provider_config.num_workers
+        self._cluster_name = provider_config.cluster_name
+        self._temp_ssh_key_dir = TMP_PATH
+        self._temp_ssh_key_filename = get_ssh_key_name(self._cluster_name)
 
         payload = await self._create_payload(provider_config.node_config)
         self._demand = await self._golem.create_demand(
@@ -168,7 +157,7 @@ class GolemService:
         await self._create_activities(tags=tags, count=count)
         await self._network.refresh_nodes()
         await self._add_my_key()
-        await self._add_other_keys()  # TODO: Fix adding other keys
+        # await self._add_other_keys()  # TODO: Fix adding other keys
         self._print_ws_connection_data()
 
         if not self._reverse_ssh_process:
@@ -203,10 +192,11 @@ class GolemService:
         # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port} proxy@proxy.dev.golem.network"
         text_command = (
             f"ssh -N -R '*:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port}' "
-            f"-o StrictHostKeyChecking=no "
+            "-o StrictHostKeyChecking=no "
+            "-o UserKnownHostsFile=/dev/null "
             f'-o ProxyCommand="{proxy_command}" '
             f"-i {self._temp_ssh_key_dir / self._temp_ssh_key_filename} "
-            f"root@{uuid4().hex}"
+            f"root@{head_node.internal_ip}"
         )
 
         process = await asyncio.create_subprocess_shell(
@@ -332,10 +322,11 @@ class GolemService:
             if node.activity:
                 print(
                     "Connect with:\n"
-                    f"ssh "
-                    f"-o StrictHostKeyChecking=no "
+                    "ssh "
+                    "-o StrictHostKeyChecking=no "
+                    "-o UserKnownHostsFile=/dev/null "
                     f"-o ProxyCommand='{self._websocat_path} asyncstdio: {node.connection_uri}/22 --binary "
-                    f'-H=Authorization:"Bearer {self._golem._api_config.app_key}"\' root@{uuid4().hex} '
+                    f'-H=Authorization:"Bearer {self._golem._api_config.app_key}"\' root@{node.internal_ip} '
                     # f"-i ${str(self._temp_ssh_key_dir)}/${self._temp_ssh_key_filename}"
                 )
 
