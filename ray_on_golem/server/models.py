@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from golem_core.core.activity_api import Activity
+from golem.resources import Activity
 from pydantic import BaseModel
 
 NodeId = str
