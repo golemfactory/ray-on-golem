@@ -243,7 +243,7 @@ class GolemService:
         manifest = get_manifest(image_url, image_hash)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
-        params = node_config.dict(exclude={"image_url", "image_hash", "image_tag"})
+        params = node_config.dict(exclude={"image_hash", "image_tag"})
         params["manifest"] = manifest
 
         payload = ManifestVmPayload(**params)
@@ -263,6 +263,11 @@ class GolemService:
             image_url = await self._get_image_url_from_hash(image_hash)
             return image_url, image_hash
 
+        if image_tag is None:
+            python_version = platform.python_version()
+            ray_version = ray.__version__
+            image_tag = f"golem/ray-on-golem:py{python_version}-ray{ray_version}"
+
         return await self._get_image_url_and_hash_from_tag(image_tag)
 
     @staticmethod
@@ -270,7 +275,7 @@ class GolemService:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"hash": image_hash},
+                params={"hash": image_hash, 'count': 'true'},
             ) as response:
                 response_data = await response.json()
 
@@ -282,27 +287,11 @@ class GolemService:
                     raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
     @staticmethod
-    async def _get_image_url_and_hash_from_tag(image_tag: Optional[str]) -> Tuple[URL, str]:
-        python_version = platform.python_version()
-        ray_version = ray.__version__
-
-        if image_tag is not None:
-            tag_python_version = image_tag.split("-")[0].split("py")[1]
-            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
-
-            if (python_version, ray_version) != (tag_python_version, tag_ray_version):
-                logging.warning(
-                    "WARNING: "
-                    f"Version of python and ray on your machine {(python_version, ray_version) = } "
-                    f"does not match tag version {(tag_python_version, tag_ray_version) = }"
-                )
-        else:
-            image_tag = f"py{python_version}-ray{ray_version}"
-
+    async def _get_image_url_and_hash_from_tag(image_tag: str) -> Tuple[URL, str]:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"tag": f"loop/golem-ray:{image_tag}"},
+                params={"tag": image_tag, 'count': 'true'},
             ) as response:
                 response_data = await response.json()
 
