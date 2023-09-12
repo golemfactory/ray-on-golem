@@ -31,7 +31,7 @@ provider:
       # image_tag: "py3.10.6-ray2.6.1-lib"
 
       # you can also provide the image hash directly (although it is not recommended :)
-      image_hash: "fd36e77b00465567f41a8e6d04cb8c0f972c3b0f0864cafb83f44ab1"
+      image_hash: "be4cbaaa611da06927e2daf892f31250cc8e9a6ccefd54fb849e7678"
 
       capabilities: ['vpn', 'inet', 'manifest-support']
       min_mem_gib: 0
