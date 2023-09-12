@@ -6,7 +6,7 @@ import platform
 from asyncio.subprocess import Process
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import aiohttp
 import async_timeout
@@ -157,7 +157,6 @@ class GolemService:
         await self._create_activities(tags=tags, count=count)
         await self._network.refresh_nodes()
         await self._add_my_key()
-        # await self._add_other_keys()  # TODO: Fix adding other keys
         self._print_ws_connection_data()
 
         if not self._reverse_ssh_process:
@@ -176,10 +175,6 @@ class GolemService:
                 ray_node_type = node.tags.get("ray-node-type")
                 if ray_node_type == "head":
                     return node
-
-    async def get_head_node_ip(self) -> IPv4Address:
-        head_node = await self._get_head_node()
-        return head_node.internal_ip
 
     async def _create_reverse_ssh_to_golem_network(self) -> Process:
         """
@@ -275,7 +270,7 @@ class GolemService:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"hash": image_hash, 'count': 'true'},
+                params={"hash": image_hash, "count": "true"},
             ) as response:
                 response_data = await response.json()
 
@@ -291,7 +286,7 @@ class GolemService:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"tag": image_tag, 'count': 'true'},
+                params={"tag": image_tag, "count": "true"},
             ) as response:
                 response_data = await response.json()
 
@@ -375,7 +370,7 @@ class GolemService:
             id_rsa_file_path = self._temp_ssh_key_dir / (self._temp_ssh_key_filename + ".pub")
 
             if not id_rsa_file_path.exists():
-                logger.error("{} not exists. SSH connection may fail.".format(id_rsa_file_path))
+                logger.error(f"{id_rsa_file_path} not exists. SSH connection may fail.")
                 return
 
             # TODO: Use async file handling
@@ -389,36 +384,6 @@ class GolemService:
             ]
 
             await asyncio.gather(*tasks)
-
-    async def _add_other_keys(self):
-        """
-        Adds all providers key to other providers machines
-        """
-        async with self._lock:
-            keys = {}
-            cluster_nodes = list(self._cluster_nodes.values())
-            for cluster_node in cluster_nodes:
-                if cluster_node.activity:
-                    batch = await cluster_node.activity.execute_commands(
-                        commands.Run(
-                            '[ -f /root/.ssh/id_rsa ] || ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'
-                        ),
-                        commands.Run("cat /root/.ssh/id_rsa.pub"),
-                    )
-                    await batch.wait()
-                    key = batch.events[-1].stdout.strip()
-                    logger.info(f"{cluster_node.node_id} - key: {key}")
-                    keys[cluster_node.node_id] = key
-
-            for cluster_node in cluster_nodes:
-                other_nodes: List[ClusterNode] = [
-                    node for node in cluster_nodes if node.node_id != cluster_node.node_id
-                ]
-
-                for other_node in other_nodes:
-                    other_activity_key = keys[other_node.node_id]
-                    if cluster_node.activity:
-                        await self._add_authorized_key(cluster_node.activity, other_activity_key)
 
     @staticmethod
     async def _negotiate(proposal):

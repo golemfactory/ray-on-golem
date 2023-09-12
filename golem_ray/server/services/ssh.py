@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from typing import Any, Awaitable, Callable, Tuple
+from typing import Awaitable, Callable, Tuple
 from urllib.parse import urlparse
 
 from golem_core.core.activity_api import BatchError, commands
@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 class SshService:
     @staticmethod
-    def create_ssh_connection(network: Network) -> Callable[[Activity], Awaitable[Tuple[str, str]]]:
-        async def _create_ssh_connection(activity: Activity) -> Tuple[Activity, Any, str]:
+    def create_ssh_connection(
+        network: Network,
+    ) -> Callable[[Activity], Awaitable[Tuple[Activity, str, str]]]:
+        async def _create_ssh_connection(activity: Activity) -> Tuple[Activity, str, str]:
             #   1.  Create node
             provider_id = activity.parent.parent.data.issuer_id
             assert provider_id is not None  # mypy
@@ -75,5 +77,6 @@ class SshService:
 
             logger.info(f"Ssh key for cluster '{cluster_name}' created on path '{ssh_key_path}'")
 
+        # TODO: async file handling
         with ssh_key_path.open("r") as f:
             return str(f.read())

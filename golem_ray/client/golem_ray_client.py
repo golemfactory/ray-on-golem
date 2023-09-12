@@ -1,5 +1,4 @@
 from http import HTTPStatus
-from ipaddress import IPv4Address
 from typing import Dict, List, Type, TypeVar
 
 import requests
@@ -182,13 +181,3 @@ class GolemRayClient:
         )
 
         return response.ssh_key_base64
-
-    def get_head_node_ip(self) -> IPv4Address:
-        response: models.GetNodeIpAddressResponseData = self._make_request(
-            url=settings.URL_GET_HEAD_NODE_IP,
-            request_data=models.EmptyRequestData(),
-            response_model=models.GetNodeIpAddressResponseData,
-            error_message="Couldn't get head node ip address",
-        )
-
-        return response.ip_address

@@ -173,21 +173,3 @@ class GolemNodeProvider(NodeProvider):
 
     def terminate_nodes(self, node_ids: List[NodeId]) -> None:
         return self._golem_ray_client.terminate_nodes(node_ids)
-
-    def prepare_for_head_node(self, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Returns a new cluster config with custom configs for head node."""
-        self.ray_head_ip = self._golem_ray_client.get_head_node_ip()
-
-        def replace_placeholders(obj):
-            if isinstance(obj, str):
-                obj = obj.replace("$RAY_HEAD_IP", str(self.ray_head_ip))
-                return obj
-            elif isinstance(obj, list):
-                return [replace_placeholders(item) for item in obj]
-            elif isinstance(obj, dict):
-                return {key: replace_placeholders(value) for key, value in obj.items()}
-            else:
-                return obj
-
-        final_config = replace_placeholders(cluster_config)
-        return final_config

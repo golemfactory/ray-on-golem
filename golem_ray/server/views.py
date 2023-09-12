@@ -158,14 +158,3 @@ async def get_or_create_ssh_key(request):
     response_data = models.GetOrCreateSshKeyResponseData(ssh_key_base64=ssh_key_base64)
 
     return web.Response(text=response_data.json())
-
-
-@routes.post(settings.URL_GET_HEAD_NODE_IP)
-async def get_head_node_ip(request):
-    golem_service: GolemService = request.app["golem_service"]
-
-    head_node_ip = await golem_service.get_head_node_ip()
-
-    response_data = models.GetNodeIpAddressResponseData(ip_address=head_node_ip)
-
-    return web.Response(text=response_data.json())

@@ -12,11 +12,11 @@ RUN apt-get update && apt-get install -y \
 		rsyslog \
 		rsync \
 		vim \
-    && rm -rf /var/lib/apt/lists/*
+	&& rm -rf /var/lib/apt/lists/*
 
 RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
-    echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
-    echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+	echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
+	echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 
 RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
@@ -26,7 +26,7 @@ COPY pyproject.toml README.md /app/
 COPY golem_ray/__init__.py /app/golem_ray/__init__.py
 
 RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi
+	poetry config virtualenvs.create false && \
+	poetry install --no-interaction --no-ansi
 
 COPY golem_ray /app/golem_ray/
