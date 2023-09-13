@@ -11,15 +11,11 @@ to get it out of the building - to start veryfing the potential to decide on fur
 This article contains a set of tasks that you can complete to broaden yout knowledge and help improve Golem Network.
 
 We have rewards for 10 people (USD 120 each) - we will be communicating via Upwork platform.
+We want to test Ray on Golem on Linux.
 
 If you have any questions, we encourage you to contact Ray on Golem team directy - join our community on [Discord](https://chat.golem.network) and find `#Ray on Golem` channel in Golem projects section.
 
 We also encourage you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
-
-**Below you will find the followin information:**
-
-- Available tasks
-- Useful links
 
 ## Available tasks
 
@@ -37,30 +33,13 @@ Go through the [Converting a real-life use case to Ray on Golem tutorial](https:
 
 We want to test how our solution behaves on different environments and how helpful our tutorial is.
  
-### #3 Parallelize hashcracker app with Ray and execute it on Ray on Golem
+### #3 Fill out the feedback form  
 
-Take a look at this [piece of code](https://github.com/golemfactory/golem-ray/blob/mateusz/preview_tasks/examples/hash_cracker_without_ray.py)
-
-It takes a sha256 hash and looks for a word that results in this hash.
-The code doesn't know anything about Golem nor Ray.
-
-```bash
-python hash_cracker_without_ray.py -l 4 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
-```
-```
-```
-
-You can find other hashes to crack in the code.
-
-
-Your task is to parallelize the code and execute it on Ray on Golem cluster.
-The goal is to benefit from distributed execution on Ray on Golem cluster so that it takes less time than executed locally.
-
-In this task we want how our documention help you to run arbitrary python code on Ray on Golem cluster.
-
-At the end we want you to send us the resulting code and console outputs from its execution.
+Please fill out Ray on [Golem feedback form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
+We are looking for meaningful and thought-out feedback that will help us drive the solution.
 
 ### Useful links
 
 - [Ray on Golem docs](https://docs.golem.network/docs/creators/ray)
 - [Ray docs](https://docs.ray.io)
+- [`#Ray on Golem` discord channel](https://chat.golem.network/) 
