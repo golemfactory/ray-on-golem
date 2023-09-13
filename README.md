@@ -21,6 +21,11 @@ If you have any questions, comments, insights, praises, or doubts about these do
 - [`#Ray on Golem` discord channel](https://chat.golem.network/) 
 - [Ray on Golem general feedback form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
 
+## Limitation
+
+Current version is `pre-alpha` which means the happy path is working on Linux on the Golem test network. 
+We use this version to show the direction and get feedback.
+
 ## Quickstart
 
 This [quickstart](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
