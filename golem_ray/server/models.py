@@ -1,6 +1,6 @@
 from enum import Enum
 from ipaddress import IPv4Address
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from golem_core.core.activity_api import Activity
 from pydantic import BaseModel, Field
@@ -61,7 +61,7 @@ class CreateClusterRequestData(BaseModel):
     cluster_name: str
     network: str
     budget: int
-    num_workers: int = 4
+    num_workers: int
     node_config: NodeConfigData
 
 
@@ -74,6 +74,7 @@ class NonTerminatedNodesRequestData(BaseModel):
 
 
 class CreateNodesRequestData(BaseModel):
+    node_config: Dict[str, Any]
     count: int
     tags: Tags
 

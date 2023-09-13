@@ -112,7 +112,7 @@ async def create_nodes(request: web.Request) -> web.Response:
 
     request_data = models.CreateNodesRequestData.parse_raw(await request.text())
 
-    await ray_service.create_nodes(request_data.count, request_data.tags)
+    await ray_service.create_nodes(request_data.node_config, request_data.count, request_data.tags)
     nodes = ray_service.get_all_nodes_dict()
 
     response_data = models.CreateNodesResponseData(nodes=nodes)

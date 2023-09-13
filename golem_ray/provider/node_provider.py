@@ -164,6 +164,7 @@ class GolemNodeProvider(NodeProvider):
         count: int,
     ) -> Dict[NodeId, Node]:
         return self._golem_ray_client.create_nodes(
+            node_config=node_config,
             count=count,
             tags=tags,
         )

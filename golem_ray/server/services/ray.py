@@ -1,14 +1,26 @@
+import logging
+from asyncio.subprocess import Process
 from ipaddress import IPv4Address
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 from golem_ray.server.exceptions import NodeNotFound, NodesNotFound
 from golem_ray.server.models import CreateClusterRequestData, Node, NodeId, NodeState, Tags
-from golem_ray.server.services import GolemService
+from golem_ray.server.services.golem import GolemService
+from golem_ray.server.services.ssh import SshService
+
+logger = logging.getLogger(__name__)
 
 
 class RayService:
-    def __init__(self, golem_service: GolemService):
+    def __init__(self, golem_service: GolemService, ssh_service: SshService):
         self._golem_service = golem_service
+        self._ssh_service = ssh_service
+
+        self._nodes = {}
+        self._head_node_to_webserver_tunel_process: Optional[Process] = None
+
+    async def shutdown(self) -> None:
+        await self._stop_head_node_to_webserver_tunel()
 
     def get_all_nodes_ids(self) -> List[NodeId]:
         return list(self._golem_service.cluster_nodes.keys())
@@ -70,13 +82,52 @@ class RayService:
             return
         raise NodeNotFound
 
-    async def create_nodes(self, count: int, tags: Tags) -> Dict:
+    async def create_nodes(self, node_config: Dict[str, Any], count: int, tags: Tags) -> Dict:
         await self._golem_service.get_providers(
             tags=tags,
             count=count,
         )
 
+        if not self._is_head_node_to_webserver_tunel_running():
+            await self._start_head_node_to_webserver_tunel()
+
         return self._golem_service.cluster_nodes
+
+    def _is_head_node_to_webserver_tunel_running(self) -> bool:
+        return self._head_node_to_webserver_tunel_process is not None
+
+    async def _start_head_node_to_webserver_tunel(self) -> None:
+        head_node = await self._golem_service._get_head_node()
+        proxy_command = self._golem_service.get_node_ssh_proxy_command(head_node.node_id)
+        private_key_path = (
+            self._golem_service._temp_ssh_key_dir / self._golem_service._temp_ssh_key_filename
+        )
+
+        self._head_node_to_webserver_tunel_process = await self._ssh_service.create_ssh_reverse_tunel(
+            str(head_node.internal_ip),
+            self._golem_service._golem_ray_port,
+            private_key_path=private_key_path,
+            proxy_command=proxy_command,
+        )
+
+        # TODO: Add log when process dies early
+
+        logger.info("Reverse tunel from remote head node to local webserver started")
+
+    async def _stop_head_node_to_webserver_tunel(self) -> None:
+        process = self._head_node_to_webserver_tunel_process
+
+        if process is None:
+            return
+
+        if process.returncode is None:
+            process.terminate()
+
+        await process.wait()
+
+        logger.info("Reverse tunel from remote head node to local webserver stopped")
+
+        self._head_node_to_webserver_tunel_process = None
 
     async def terminate_nodes(self, node_ids: List[NodeId]) -> None:
         if not all(element in node_ids for element in self._golem_service.cluster_nodes.keys()):

@@ -47,6 +47,8 @@ def create_application() -> web.Application:
         yagna_path=YAGNA_PATH,
     )
 
+    app["ssh_service"] = SshService()
+
     app["golem_service"] = GolemService(
         golem_ray_port=GOLEM_RAY_PORT,
         websocat_path=WEBSOCAT_PATH,
@@ -54,9 +56,8 @@ def create_application() -> web.Application:
 
     app["ray_service"] = RayService(
         golem_service=app["golem_service"],
+        ssh_service=app["ssh_service"],
     )
-
-    app["ssh_service"] = SshService()
 
     app.add_routes(routes)
     app.cleanup_ctx.append(golem_ray_ctx)
@@ -68,12 +69,14 @@ def create_application() -> web.Application:
 async def golem_ray_ctx(app: web.Application):
     yagna_service: YagnaService = app["yagna_service"]
     golem_service: GolemService = app["golem_service"]
+    ray_service: RayService = app["ray_service"]
 
     await yagna_service.init()
     await golem_service.init(yagna_appkey=yagna_service.yagna_appkey)
 
     yield  # before yield called on startup, after yield called on cleanup
 
+    await ray_service.shutdown()
     await golem_service.shutdown()
     await yagna_service.shutdown()
 

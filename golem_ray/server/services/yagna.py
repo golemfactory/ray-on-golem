@@ -33,8 +33,6 @@ class YagnaService:
         else:
             await self._run_yagna_service()
 
-        # await self._run_yagna_payment_fund()
-
     async def shutdown(self):
         if self._yagna_process is None:
             return

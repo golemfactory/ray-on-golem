@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Dict, List, Type, TypeVar
+from typing import Any, Dict, List, Type, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -145,10 +145,13 @@ class GolemRayClient:
             error_message="Couldn't terminate nodes",
         )
 
-    def create_nodes(self, count: int, tags: models.Tags) -> Dict[models.NodeId, models.Node]:
+    def create_nodes(
+        self, node_config: Dict[str, Any], count: int, tags: models.Tags
+    ) -> Dict[models.NodeId, models.Node]:
         response = self._make_request(
             url=settings.URL_CREATE_NODES,
             request_data=models.CreateNodesRequestData(
+                node_config=node_config,
                 count=count,
                 tags=tags,
             ),
