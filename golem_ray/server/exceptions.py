@@ -27,10 +27,6 @@ class DestroyActivityError(GolemRayServerError):
     message = "Can't destroy activity"
 
 
-class NodesCountExceeded(GolemRayServerError):
-    message = "Can't create more nodes"
-
-
 class CheckYagnaStatusError(GolemRayServerError):
     message = "Can't check yagna status"
 

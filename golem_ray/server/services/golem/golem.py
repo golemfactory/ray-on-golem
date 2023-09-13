@@ -1,15 +1,12 @@
 import asyncio
 import base64
-import hashlib
 import json
 import logging
 import platform
 from asyncio.subprocess import Process
-from getpass import getuser
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-from uuid import uuid4
+from typing import Dict, Optional, Tuple
 
 import aiohttp
 import async_timeout
@@ -43,6 +40,8 @@ from golem_ray.server.models import (
 )
 from golem_ray.server.services.golem.manifest import get_manifest
 from golem_ray.server.services.ssh import SshService
+from golem_ray.server.settings import TMP_PATH
+from golem_ray.utils import get_ssh_key_name
 
 logger = logging.getLogger(__name__)
 
@@ -99,15 +98,6 @@ class GolemService:
         )
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
 
-        key_hash = hashlib.md5(getuser().encode()).hexdigest()[:10]
-        self._temp_ssh_key_dir = Path("/tmp/golem-ray-ssh")
-        self._temp_ssh_key_filename = f"golem_ray_rsa_{key_hash}"
-
-        await SshService.create_temporary_ssh_key(
-            ssh_key_dir=self._temp_ssh_key_dir, ssh_key_filename=self._temp_ssh_key_filename
-        )
-        # await self._allocation.get_data()
-
     async def shutdown(self) -> None:
         """
         Terminates all activities and ray on head node.
@@ -129,10 +119,6 @@ class GolemService:
             logger.info(f"-----Reverse ssh to *:{self._golem_ray_port} closed.")
             self._reverse_ssh_process = None
 
-        await SshService.remove_temporary_ssh_key(
-            self._temp_ssh_key_dir, self._temp_ssh_key_filename
-        )
-
         await self._golem.aclose()
         self._golem = None
 
@@ -147,6 +133,9 @@ class GolemService:
             return
 
         self._num_workers = provider_config.num_workers
+        self._cluster_name = provider_config.cluster_name
+        self._temp_ssh_key_dir = TMP_PATH
+        self._temp_ssh_key_filename = get_ssh_key_name(self._cluster_name)
 
         payload = await self._create_payload(provider_config.node_config)
         self._demand = await self._golem.create_demand(
@@ -168,7 +157,6 @@ class GolemService:
         await self._create_activities(tags=tags, count=count)
         await self._network.refresh_nodes()
         await self._add_my_key()
-        await self._add_other_keys()  # TODO: Fix adding other keys
         self._print_ws_connection_data()
 
         if not self._reverse_ssh_process:
@@ -188,10 +176,6 @@ class GolemService:
                 if ray_node_type == "head":
                     return node
 
-    async def get_head_node_ip(self) -> IPv4Address:
-        head_node = await self._get_head_node()
-        return head_node.internal_ip
-
     async def _create_reverse_ssh_to_golem_network(self) -> Process:
         """
         Creates reverse tunnel to golem network
@@ -203,10 +187,11 @@ class GolemService:
         # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port} proxy@proxy.dev.golem.network"
         text_command = (
             f"ssh -N -R '*:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port}' "
-            f"-o StrictHostKeyChecking=no "
+            "-o StrictHostKeyChecking=no "
+            "-o UserKnownHostsFile=/dev/null "
             f'-o ProxyCommand="{proxy_command}" '
             f"-i {self._temp_ssh_key_dir / self._temp_ssh_key_filename} "
-            f"root@{uuid4().hex}"
+            f"root@{head_node.internal_ip}"
         )
 
         process = await asyncio.create_subprocess_shell(
@@ -253,7 +238,7 @@ class GolemService:
         manifest = get_manifest(image_url, image_hash)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
-        params = node_config.dict(exclude={"image_url", "image_hash", "image_tag"})
+        params = node_config.dict(exclude={"image_hash", "image_tag"})
         params["manifest"] = manifest
 
         payload = ManifestVmPayload(**params)
@@ -273,6 +258,11 @@ class GolemService:
             image_url = await self._get_image_url_from_hash(image_hash)
             return image_url, image_hash
 
+        if image_tag is None:
+            python_version = platform.python_version()
+            ray_version = ray.__version__
+            image_tag = f"golem/ray-on-golem:py{python_version}-ray{ray_version}"
+
         return await self._get_image_url_and_hash_from_tag(image_tag)
 
     @staticmethod
@@ -280,7 +270,7 @@ class GolemService:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"hash": image_hash},
+                params={"hash": image_hash, "count": "true"},
             ) as response:
                 response_data = await response.json()
 
@@ -292,27 +282,11 @@ class GolemService:
                     raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
     @staticmethod
-    async def _get_image_url_and_hash_from_tag(image_tag: Optional[str]) -> Tuple[URL, str]:
-        python_version = platform.python_version()
-        ray_version = ray.__version__
-
-        if image_tag is not None:
-            tag_python_version = image_tag.split("-")[0].split("py")[1]
-            tag_ray_version = image_tag.split("-")[1].split("ray")[1]
-
-            if (python_version, ray_version) != (tag_python_version, tag_ray_version):
-                logging.warning(
-                    "WARNING: "
-                    f"Version of python and ray on your machine {(python_version, ray_version) = } "
-                    f"does not match tag version {(tag_python_version, tag_ray_version) = }"
-                )
-        else:
-            image_tag = f"py{python_version}-ray{ray_version}"
-
+    async def _get_image_url_and_hash_from_tag(image_tag: str) -> Tuple[URL, str]:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"tag": f"loop/golem-ray:{image_tag}"},
+                params={"tag": image_tag, "count": "true"},
             ) as response:
                 response_data = await response.json()
 
@@ -332,10 +306,11 @@ class GolemService:
             if node.activity:
                 print(
                     "Connect with:\n"
-                    f"ssh "
-                    f"-o StrictHostKeyChecking=no "
+                    "ssh "
+                    "-o StrictHostKeyChecking=no "
+                    "-o UserKnownHostsFile=/dev/null "
                     f"-o ProxyCommand='{self._websocat_path} asyncstdio: {node.connection_uri}/22 --binary "
-                    f'-H=Authorization:"Bearer {self._golem._api_config.app_key}"\' root@{uuid4().hex} '
+                    f'-H=Authorization:"Bearer {self._golem._api_config.app_key}"\' root@{node.internal_ip} '
                     # f"-i ${str(self._temp_ssh_key_dir)}/${self._temp_ssh_key_filename}"
                 )
 
@@ -395,7 +370,7 @@ class GolemService:
             id_rsa_file_path = self._temp_ssh_key_dir / (self._temp_ssh_key_filename + ".pub")
 
             if not id_rsa_file_path.exists():
-                logger.error("{} not exists. SSH connection may fail.".format(id_rsa_file_path))
+                logger.error(f"{id_rsa_file_path} not exists. SSH connection may fail.")
                 return
 
             # TODO: Use async file handling
@@ -409,36 +384,6 @@ class GolemService:
             ]
 
             await asyncio.gather(*tasks)
-
-    async def _add_other_keys(self):
-        """
-        Adds all providers key to other providers machines
-        """
-        async with self._lock:
-            keys = {}
-            cluster_nodes = list(self._cluster_nodes.values())
-            for cluster_node in cluster_nodes:
-                if cluster_node.activity:
-                    batch = await cluster_node.activity.execute_commands(
-                        commands.Run(
-                            '[ -f /root/.ssh/id_rsa ] || ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa'
-                        ),
-                        commands.Run("cat /root/.ssh/id_rsa.pub"),
-                    )
-                    await batch.wait()
-                    key = batch.events[-1].stdout.strip()
-                    logger.info(f"{cluster_node.node_id} - key: {key}")
-                    keys[cluster_node.node_id] = key
-
-            for cluster_node in cluster_nodes:
-                other_nodes: List[ClusterNode] = [
-                    node for node in cluster_nodes if node.node_id != cluster_node.node_id
-                ]
-
-                for other_node in other_nodes:
-                    other_activity_key = keys[other_node.node_id]
-                    if cluster_node.activity:
-                        await self._add_authorized_key(cluster_node.activity, other_activity_key)
 
     @staticmethod
     async def _negotiate(proposal):
