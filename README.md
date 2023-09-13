@@ -21,18 +21,26 @@ If you have any questions, comments, insights, praises, or doubts about these do
 - [`#Ray on Golem` discord channel](https://chat.golem.network/) 
 - [Ray on Golem general feedback form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
 
-## Limitation
+
+## In this README
+
+- [Limitations](#limitations) Describes the current limitations of Ray on Golem
+- [Quickstart](#quickstart) Drives you through copy and paste installation and execution of the example Ray app on example Ray on Golem cluster
+- [Contributing](#contributing) Offers advice on building Golem images for Ray on Golem development purposes
+
+
+# Limitations
 
 Current version is `pre-alpha` which means the happy path is working on Linux on the Golem test network. 
 We use this version to show the direction and get feedback.
 
-## Quickstart
+# Quickstart
 
 This [quickstart](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
 It limits the explanation to the bare minimum - if you are looking for more details jump to [setup tutorial](/docs/creators/ray/setup-tutorial)
 
 
-### Install software
+## Install software
 
 The first step is installing Ray and Ray on Golem (recommended within a clean venv)
 
@@ -48,7 +56,7 @@ For now, you also need to download and install Golem node software representing 
 curl -sSf https://join.golem.network/as-requestor | bash -
 ```
 
-### Start `golem-ray` server
+## Start `golem-ray` server
 
 For the time being you need to manually run `golem-ray` server (in a separate terminal)
 
@@ -56,7 +64,7 @@ For the time being you need to manually run `golem-ray` server (in a separate te
 python golem_ray/server/run.py
 ```
 
-### Set the cluster up
+## Set the cluster up
 
 With the packages in place, you can download our sample golem cluster configuration yaml, and feed it to `ray up` to start up the cluster.
 It will give you a cluster of one node (which will expand when you feed it with work) on the Golem test network (free, but not very powerful)
@@ -74,7 +82,7 @@ ray up golem-cluster.yaml
 
 ```
 
-### Execute a Ray application
+## Execute a Ray application
 
 Download our example Ray app and execute it locally (a Ray instance will be created on your machine)
 
@@ -97,7 +105,7 @@ Feed the app to the cluster. Observe how Ray on Golem cluster expands during the
 ray submit golem-cluster.yaml simple-task.py 
 ```
 
-### Stop the cluster
+## Stop the cluster
 
 In the end, stop your cluster to free the Golem network providers and to avoid too much spending (the testnet is free, but good practice is a good practice)
 
@@ -108,7 +116,7 @@ ray down golem-cluster.yaml
 
 For the time being you also nee to stop `golem-ray` server (with `Control-C`).
 
-### Summary
+## Summary
 
 By completing the above quickstart you have successfully:
 - installed ray and golem-ray packages
@@ -119,12 +127,12 @@ By completing the above quickstart you have successfully:
 
 Congratulations!
 
-### Next steps
+## Next steps
 - [Ray on Golem docs](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app//docs/creators/ray)
 
-## Contributing
+# Contributing
 
-### Running code auto format
+## Running code auto format
 
 ```bash
 $ poetry run poe format
