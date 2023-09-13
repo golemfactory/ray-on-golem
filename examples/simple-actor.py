@@ -1,33 +1,32 @@
-import ray
-
-# ray.init()
-ray.init(address="ray://127.0.0.1:10001")
-
+import socket
 import time
 from collections import Counter
+
+import ray
+
+ray.init()
 
 
 @ray.remote
 class CounterActor:
     def __init__(self):
         self.value = 0
-        self.node_ids = []
+        self.node_ips = []
 
     def increment(self):
         time.sleep(0.5)
         self.value += 1
 
-        # ip = socket.gethostbyname(socket.gethostname())
-        node_id = ray.get_runtime_context().get_node_id()
-        self.node_ids.append(node_id)
+        node_ip = socket.gethostbyname(socket.gethostname())
+        self.node_ips.append(node_ip)
 
-        return node_id
+        return node_ip
 
     def get_counter(self):
         return self.value
 
-    def get_node_ids(self):
-        return self.node_ids
+    def get_node_ips(self):
+        return self.node_ips
 
 
 # Create ten Counter actors.
@@ -47,12 +46,12 @@ print("Actor calls executed")
 for ip_address, num_tasks in Counter(ip_addresses).items():
     print("    {} tasks on {}".format(num_tasks, ip_address))
 
-node_ids = ray.get([c.get_node_ids.remote() for c in counters])
+node_ips = ray.get([c.get_node_ips.remote() for c in counters])
 
 
 for i in range(len(counters)):
     print("Actor {} executed".format(counters[i]))
-    for node_id, num_tasks in Counter(node_ids[i]).items():
+    for node_id, num_tasks in Counter(node_ips[i]).items():
         print("    {} tasks on {}".format(num_tasks, node_id))
 
 # Increment the first Counter five times. These tasks are executed serially

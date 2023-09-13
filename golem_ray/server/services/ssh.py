@@ -47,10 +47,14 @@ class SshService:
                 )
                 raise
 
+            hostname = ip.replace(".", "-")
+
             batch = await activity.execute_commands(
                 commands.Start(),
                 commands.Run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment"),
-                commands.Run("hostname '{}'".format(ip.replace(".", "-"))),
+                commands.Run(f"hostname '{hostname}'"),
+                commands.Run(f"echo '{hostname}' > /etc/hostname"),
+                commands.Run(f"echo '{ip} {hostname}' >> /etc/hosts"),
                 commands.Run("service ssh start"),
             )
             await batch.wait(600)
