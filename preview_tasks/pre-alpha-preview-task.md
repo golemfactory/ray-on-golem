@@ -6,14 +6,14 @@ Thank you for your interest in the Preview Program.
 Its purpose is to test the new Ray on Golem solution with its documentation at https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray.
 
 The pre-alpha release is a sneak-peak, with only happy path working on our test network. We publish the release and run the preview program 
-to get it out of the building - to start veryfing the potential to decide on further investment in Ray on Golem. 
+to get it out of the building - to start verifying the potential to decide on further investment in Ray on Golem. 
 
-This article contains a set of tasks that you can complete to broaden yout knowledge and help improve Golem Network.
+This article contains a set of tasks that you can complete to broaden your knowledge and help improve the Golem Network.
 
-We have rewards for 10 people (USD 120 each) - we will be communicating via Upwork platform.
+We have rewards for 10 people (USD 120 each) - we will communicate via the Upwork platform.
 We want to test Ray on Golem on Linux.
 
-If you have any questions, we encourage you to contact Ray on Golem team directy - join our community on [Discord](https://chat.golem.network) and find `#Ray on Golem` channel in Golem projects section.
+If you have any questions, we encourage you to contact the Ray on Golem team directly - join our community on [Discord](https://chat.golem.network) and find the `#Ray on Golem` channel in the Golem projects section.
 
 We also encourage you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
 
@@ -23,15 +23,15 @@ There are three tasks. You need to complete them all to apply for the reward.
 
 ### #1 Setup tutorial
 
-Go through the [setup tutorial](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/setup-tutorial) and send us your console outputs (just copy the content of all the terminals you used and paste them to a text file)
+Go through the [setup tutorial](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/setup-tutorial) and send us your console outputs (copy the content of all the terminals you used and paste them to a text file)
 
-We want to test how our solution behaves on different environments and how helpful our tutorial is.
+We want to test how our solution behaves in different environments and how helpful our tutorial is.
 
 ### #2 Converting a real-life use case to Ray on Golem
 
 Go through the [converting a real-life use case to Ray on Golem tutorial](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/conversion-to-ray-on-golem-tutorial) and send us your console outputs (just copy the content of all the terminals you used and paste them to a text file)
 
-We want to test how our solution behaves on different environments and how helpful our tutorial is.
+We want to test how our solution behaves in different environments and how helpful our tutorial is.
  
 ### #3 Fill out the feedback form  
 
