@@ -1,0 +1,105 @@
+# Ray on Golem cluster name
+cluster_name: golem-cluster
+
+# The maximum number of workers the cluster will have at any given time
+max_workers: 10
+
+# The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
+idle_timeout_minutes: 5
+
+# The cloud provider-specific configuration properties.
+provider:
+  type: "external"
+  use_internal_ips: true
+  module: "golem_ray.provider.node_provider.GolemNodeProvider"
+  parameters:
+    # Port of golem webserver that has connection with golem network
+    webserver_port: 4578
+
+    # Blockchain used for payments. 
+    # Goerli means running free nodes on testnet, 
+    # Polygon is for mainnet operations.
+    network: "goerli"
+
+    # Maximum amount of GML that's going to be spent (not supported yet)
+    budget: 1
+
+    # Params for creating golem demands (same for head and workers)
+    node_config:
+      # if not provided, image_tag will be autodetected based on currently used python and ray versions
+      # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
+      # image_tag: "py3.10.6-ray2.6.1-lib"
+
+      # you can also provide the image hash directly (although it is not recommended :)
+      image_hash: "be4cbaaa611da06927e2daf892f31250cc8e9a6ccefd54fb849e7678"
+
+      capabilities: ['vpn', 'inet', 'manifest-support']
+      min_mem_gib: 0
+      min_cpu_threads: 0
+      min_storage_gib: 0
+
+# The files or directories to copy to the head and worker nodes
+file_mounts:
+  {
+    "/app/golem_ray": "./golem_ray",
+  }
+
+# Tells the autoscaler the allowed node types and the resources they provide
+available_node_types:
+  ray.head.default:
+    # The minimum number of worker nodes of this type to launch
+    min_workers: 0
+
+    # The maximum number of worker nodes of this type to launch
+    max_workers: 1
+
+    # The node type's CPU and GPU resources
+    resources: {"CPU": 1}
+
+    node_config:
+      # TODO: Demand description here
+      kind: Node
+  ray.worker.default:
+    min_workers: 3
+    max_workers: 10
+    resources: {"CPU": 1}
+    node_config:
+      kind: Node
+
+# List of commands that will be run to initialize the nodes (before `setup_commands`)
+#initialization_commands: [
+#  "pip install endplay",
+#]
+initialization_commands: [
+    "pip install pillow",
+]
+
+# List of shell commands to run to set up nodes
+setup_commands: []
+
+# Custom commands that will be run on the head node after common setup.
+head_setup_commands: []
+
+# Custom commands that will be run on worker nodes after common setup.
+worker_setup_commands: []
+
+# Command to start ray on the head node. You don't need to change this.
+head_start_ray_commands: [
+  "ray start --head --node-ip-address 192.168.0.3 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+]
+
+# Command to start ray on worker nodes. You don't need to change this.
+worker_start_ray_commands: [
+  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+]
+
+# Authentication credentials that Ray will use to launch nodes
+auth:
+  # TODO: try to remove explicit ssh_user field
+  ssh_user: 'root'
+
+  # If ssh_private_key will be not provided, temporary key will be created and used
+  # ssh_private_key: '~/.ssh/id_rsa'
+
+# A list of paths to the files or directories to copy from the head node to the worker nodes
+cluster_synced_files: []

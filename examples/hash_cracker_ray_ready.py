@@ -19,7 +19,6 @@ CHARS = [chr(c) for c in itertools.chain(
     range(ord("["), ord("`") + 1),
     range(ord("{"), ord("~") + 1),
 )]
-CHARS_INDEX = {c: i for i, c in zip(itertools.count(1), CHARS)}
 
 start_time = datetime.now()
 
@@ -54,7 +53,7 @@ def brute_force(max_len: int):
 def str_to_index(value: str) -> int:
     base = len(CHARS) + 1
     index = 0
-    for position, digit in zip(itertools.count(), [CHARS_INDEX[v] for v in reversed(value)]):
+    for position, digit in zip(itertools.count(), [CHARS.index(v) + 1 for v in reversed(value)]):
         index += digit * base ** position
 
     return index
