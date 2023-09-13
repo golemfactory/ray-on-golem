@@ -38,6 +38,8 @@ We want to test how our solution behaves in different environments and how helpf
 Please fill out [Ray on Golem feedback form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
 We are looking for meaningful and thought-out feedback that will help us drive the solution.
 
+The form will ask you to upload console logs from the first two tasks.
+
 ### Useful links
 
 - [Ray on Golem docs](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray)
