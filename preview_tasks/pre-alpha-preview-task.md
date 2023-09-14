@@ -56,7 +56,7 @@ As a result of this task, we'd like to learn whether, and how, our documentation
 
 ### #4 Fill out the feedback form  
 
-Please fill out [Ray on Golem feedback form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
+Please fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
 We are looking for meaningful and thought-out feedback that will help us drive the solution.
 
 The form will ask you to upload console logs from the first three tasks.
