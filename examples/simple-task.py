@@ -27,7 +27,7 @@ def f():
     return ray.get_runtime_context().get_node_id()
 
 
-object_ids = [f.remote() for _ in range(1000)]
+object_ids = [f.remote() for _ in range(100)]
 ip_addresses = ray.get(object_ids)
 
 print("Tasks executed")
