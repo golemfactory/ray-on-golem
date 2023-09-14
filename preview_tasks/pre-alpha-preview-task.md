@@ -54,7 +54,7 @@ The goal is to benefit from distributed execution on Ray on Golem cluster so tha
 
 As a result of this task, we'd like to learn whether, and how, our documentation helped you run such an arbitrary piece of python code on a Ray on Golem cluster.
 
-### #3 Fill out the feedback form  
+### #4 Fill out the feedback form  
 
 Please fill out [Ray on Golem feedback form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
 We are looking for meaningful and thought-out feedback that will help us drive the solution.
