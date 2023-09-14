@@ -19,7 +19,7 @@ We also encourage you to visit https://www.golem.network/, where you can find mo
 
 ## Available tasks
 
-There are three tasks. You need to complete them all to apply for the reward.
+There are four tasks. You need to complete them all to apply for the reward.
 
 ### #1 Setup tutorial
 
