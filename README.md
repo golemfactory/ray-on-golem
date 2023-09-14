@@ -2,7 +2,7 @@
 
 ## What is Golem, Ray and Ray on Golem
 
-Golem on is a decentralized marketplace for computing power, where the providers let the requestors use their machines for a small fee.
+Golem on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
 
 Ray on Golem makes it super easy to set up and use Golem Network to run your Ray application.
 
