@@ -40,6 +40,8 @@ It should work with any combination of local ray & python versions. Please let u
 The images include only basic libraries, if you need any dependencies, 
 you can use `pip` via [cluster yaml `initialization_commands`](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/cluster-yaml-reference#initializationcommands)
 
+We have tested Ray on Golem on Ubuntu and on WSL. It should work on MacOS and shouldn't on bare Windows.
+
 # Quickstart
 
 This [quickstart](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
