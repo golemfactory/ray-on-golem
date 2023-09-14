@@ -5,7 +5,7 @@ import logging.config
 from aiohttp import web
 
 from golem_ray.server.middlewares import error_middleware
-from golem_ray.server.services import GolemService, RayService, SshService, YagnaService
+from golem_ray.server.services import GolemService, RayService, YagnaService
 from golem_ray.server.settings import (
     GOLEM_RAY_PORT,
     LOGGING_CONFIG,
@@ -47,8 +47,6 @@ def create_application() -> web.Application:
         yagna_path=YAGNA_PATH,
     )
 
-    app["ssh_service"] = SshService()
-
     app["golem_service"] = GolemService(
         golem_ray_port=GOLEM_RAY_PORT,
         websocat_path=WEBSOCAT_PATH,
@@ -56,7 +54,7 @@ def create_application() -> web.Application:
 
     app["ray_service"] = RayService(
         golem_service=app["golem_service"],
-        ssh_service=app["ssh_service"],
+        tmp_path=TMP_PATH,
     )
 
     app.add_routes(routes)

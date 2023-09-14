@@ -14,11 +14,12 @@ from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 from requests import ConnectionError
 
+from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.provider.exceptions import GolemRayNodeProviderError
 from golem_ray.provider.ssh_command_runner import SSHCommandRunner
-from golem_ray.server.models import Node, NodeConfigData, NodeId
+from golem_ray.server.models import NodeConfigData, NodeId
 from golem_ray.server.settings import GOLEM_RAY_PORT, TMP_PATH, URL_HEALTH_CHECK
-from golem_ray.utils import get_golem_ray_client, get_ssh_key_name
+from golem_ray.utils import get_default_ssh_key_name
 
 PROJECT_ROOT = Path(__file__).parent.parent
 logger = logging.getLogger(__name__)
@@ -36,12 +37,12 @@ class GolemNodeProvider(NodeProvider):
 
         node_config = provider_parameters["node_config"]
 
-        self._golem_ray_client = get_golem_ray_client(provider_parameters["webserver_port"])
+        self._golem_ray_client = GolemRayClient.get_instance(provider_parameters["webserver_port"])
         self._golem_ray_client.get_running_or_create_cluster(
-            cluster_name=cluster_name,
             network=provider_parameters["network"],
             budget=provider_parameters["budget"],
             node_config=NodeConfigData(**node_config),
+            ssh_private_key=provider_parameters["ssh_private_key"],
         )
 
     @staticmethod
@@ -53,15 +54,19 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters.setdefault("network", "goerli")
         provider_parameters.setdefault("budget", 1)
 
-        golem_ray_client = get_golem_ray_client(provider_parameters["webserver_port"])
+        golem_ray_client = GolemRayClient.get_instance(provider_parameters["webserver_port"])
 
         auth: Dict = config["auth"]
         if "ssh_private_key" not in auth:
-            ssh_key_path = TMP_PATH / get_ssh_key_name(config["cluster_name"])
-            auth["ssh_private_key"] = str(ssh_key_path)
+            ssh_key_path = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
+            auth["ssh_private_key"] = provider_parameters["ssh_private_key"] = str(ssh_key_path)
 
             if not ssh_key_path.exists():
-                ssh_key_base64 = golem_ray_client.get_or_create_ssh_key(config["cluster_name"])
+                ssh_key_base64 = golem_ray_client.get_or_create_default_ssh_key(
+                    config["cluster_name"]
+                )
+
+                # FIXME: mitigate double file writing on local machine as get_or_create_default_ssh_key creates the file
                 ssh_key_path.parent.mkdir(parents=True, exist_ok=True)
                 with ssh_key_path.open("w") as f:
                     f.write(ssh_key_base64)
@@ -72,40 +77,6 @@ class GolemNodeProvider(NodeProvider):
         )
 
         return config
-
-    def _run_webserver(self) -> None:
-        if self._webserver_is_running():
-            logger.info("Webserver is already running")
-            return
-
-        run_path = PROJECT_ROOT / "server" / "run.py"
-        logger.info("Starting webserver...")
-        subprocess.Popen(
-            [sys.executable, run_path, str(self.provider_config["parameters"]["webserver_port"])],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-
-        sleep(2)
-
-        for _ in range(3):
-            if self._webserver_is_running():
-                logger.info("Webserver started")
-                return
-
-            logger.info("Webserver is not yet running, retrying in 2 seconds...")
-            sleep(2)
-
-        raise GolemRayNodeProviderError("Could not start webserver")
-
-    def _webserver_is_running(self) -> bool:
-        try:
-            response = requests.get(self._webserver_url / URL_HEALTH_CHECK.lstrip("/"), timeout=2)
-        except ConnectionError:
-            return False
-        else:
-            return response.status_code == 200 and response.text == "ok"
 
     def get_command_runner(
         self,
@@ -132,9 +103,20 @@ class GolemNodeProvider(NodeProvider):
 
         return SSHCommandRunner(**common_args)
 
-    @staticmethod
-    def _is_running_on_golem_network() -> bool:
-        return os.getenv("ON_GOLEM_NETWORK") is not None
+    def create_node(
+        self,
+        node_config: Dict[str, Any],
+        tags: Dict[str, str],
+        count: int,
+    ) -> Dict[NodeId, Dict]:
+        return self._golem_ray_client.create_nodes(
+            node_config=node_config,
+            count=count,
+            tags=tags,
+        )
+
+    def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
+        return self._golem_ray_client.terminate_node(node_id)
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
         return self._golem_ray_client.non_terminated_nodes(tag_filters)
@@ -157,20 +139,40 @@ class GolemNodeProvider(NodeProvider):
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
         self._golem_ray_client.set_node_tags(node_id, tags)
 
-    def create_node(
-        self,
-        node_config: Dict[str, Any],
-        tags: Dict[str, str],
-        count: int,
-    ) -> Dict[NodeId, Node]:
-        return self._golem_ray_client.create_nodes(
-            node_config=node_config,
-            count=count,
-            tags=tags,
+    @staticmethod
+    def _is_running_on_golem_network() -> bool:
+        return os.getenv("ON_GOLEM_NETWORK") is not None
+
+    def _run_webserver(self) -> None:
+        if self._is_webserver_running():
+            logger.info("Webserver is already running")
+            return
+
+        run_path = PROJECT_ROOT / "server" / "run.py"
+        logger.info("Starting webserver...")
+        subprocess.Popen(
+            [sys.executable, run_path, str(self.provider_config["parameters"]["webserver_port"])],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
         )
 
-    def terminate_node(self, node_id: NodeId) -> None:
-        return self._golem_ray_client.terminate_node(node_id)
+        sleep(2)
 
-    def terminate_nodes(self, node_ids: List[NodeId]) -> None:
-        return self._golem_ray_client.terminate_nodes(node_ids)
+        for _ in range(3):
+            if self._is_webserver_running():
+                logger.info("Webserver started")
+                return
+
+            logger.info("Webserver is not yet running, retrying in 2 seconds...")
+            sleep(2)
+
+        raise GolemRayNodeProviderError("Could not start webserver")
+
+    def _is_webserver_running(self) -> bool:
+        try:
+            response = requests.get(self._webserver_url / URL_HEALTH_CHECK.lstrip("/"), timeout=2)
+        except ConnectionError:
+            return False
+        else:
+            return response.status_code == 200 and response.text == "ok"

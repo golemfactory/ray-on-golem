@@ -1,113 +1,188 @@
+import asyncio
 import logging
 from asyncio.subprocess import Process
-from ipaddress import IPv4Address
-from typing import Any, Dict, List, Optional
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional
 
-from golem_ray.server.exceptions import NodeNotFound, NodesNotFound
+from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
+
+from golem_ray.server.exceptions import NodeNotFound
 from golem_ray.server.models import CreateClusterRequestData, Node, NodeId, NodeState, Tags
 from golem_ray.server.services.golem import GolemService
-from golem_ray.server.services.ssh import SshService
+from golem_ray.utils import (
+    are_dicts_equal,
+    get_default_ssh_key_name,
+    run_subprocess,
+    start_ssh_reverse_tunel_process,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class RayService:
-    def __init__(self, golem_service: GolemService, ssh_service: SshService):
+    def __init__(self, golem_service: GolemService, tmp_path: Path):
         self._golem_service = golem_service
-        self._ssh_service = ssh_service
+        self._tmp_path = tmp_path
 
-        self._nodes = {}
+        self._nodes: Dict[NodeId, Node] = {}
+        self._nodes_lock = asyncio.Lock()
+        self._nodes_id_counter = 0
+
         self._head_node_to_webserver_tunel_process: Optional[Process] = None
+
+        self._ssh_private_key_path: Optional[Path] = None
+        self._ssh_public_key_path: Optional[Path] = None
 
     async def shutdown(self) -> None:
         await self._stop_head_node_to_webserver_tunel()
 
-    def get_all_nodes_ids(self) -> List[NodeId]:
-        return list(self._golem_service.cluster_nodes.keys())
+        async with self._nodes_lock:
+            logger.info(f"Destroying {len(self._nodes)} activities...")
 
-    def get_all_nodes_dict(self) -> Dict[NodeId, Node]:
-        return {
-            k: Node(
-                node_id=v.node_id,
-                state=v.state,
-                tags=v.tags,
-                internal_ip=v.internal_ip,
-                external_ip=v.external_ip,
-            )
-            for (k, v) in self._golem_service.cluster_nodes.items()
-        }
+            for node in self._nodes.values():
+                await node.activity.destroy()
+
+            logger.info(f"Destroying {len(self._nodes)} activities done")
+
+            self._nodes.clear()
 
     async def create_cluster_on_golem(self, provider_config: CreateClusterRequestData) -> None:
+        self._ssh_private_key_path = Path(provider_config.ssh_private_key)
+        self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
+
         await self._golem_service.create_cluster(provider_config=provider_config)
 
-    def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeId]:
-        matched_ids = []
-        if not tags_to_match:
-            return [node_id for node_id, node in self._golem_service.cluster_nodes.items()]
-
-        for node_id, node in self._golem_service.cluster_nodes.items():
-            if self._are_dicts_equal(node.tags, tags_to_match):
-                matched_ids.append(node_id)
-
-        return matched_ids
-
-    def is_node_running(self, node_id: NodeId) -> bool:
-        node = self._golem_service.cluster_nodes.get(node_id)
-        if node:
-            return node.state == NodeState.running
-        raise NodeNotFound
-
-    def is_node_terminated(self, node_id: NodeId) -> bool:
-        node = self._golem_service.cluster_nodes.get(node_id)
-        if node:
-            return node.state not in [NodeState.pending, NodeState.running]
-        raise NodeNotFound
-
-    def get_node_tags(self, node_id: NodeId) -> Dict:
-        node = self._golem_service.cluster_nodes.get(node_id)
-        if node:
-            return node.tags
-        raise NodeNotFound
-
-    def get_node_internal_ip(self, node_id: NodeId) -> IPv4Address:
-        node = self._golem_service.cluster_nodes.get(node_id)
-        if node:
-            return node.internal_ip
-        raise NodeNotFound
-
-    def set_node_tags(self, node_id: NodeId, tags: Tags) -> None:
-        node = self._golem_service.cluster_nodes.get(node_id)
-        if node:
-            node.tags.update(tags)
-            return
-        raise NodeNotFound
-
-    async def create_nodes(self, node_config: Dict[str, Any], count: int, tags: Tags) -> Dict:
-        await self._golem_service.get_providers(
-            tags=tags,
+    async def create_nodes(
+        self, node_config: Dict[str, Any], count: int, tags: Tags
+    ) -> Dict[NodeId, Dict]:
+        # TODO: handle pending state
+        created_activities = await self._golem_service.create_activities(
+            node_config=node_config,
             count=count,
+            ssh_public_key_path=self._ssh_public_key_path,
         )
 
+        created_nodes = {}
+        for activity, ip, ssh_proxy_command in created_activities:
+            node_id = self._get_new_node_id()
+
+            created_nodes[node_id] = Node(
+                node_id=node_id,
+                state=NodeState.running,
+                tags=tags,
+                internal_ip=ip,
+                ssh_proxy_command=ssh_proxy_command,
+                activity=activity,
+            )
+
+        async with self._nodes_lock:
+            self._nodes.update(created_nodes)
+
+        # TODO: Consider running tunel on every head node
         if not self._is_head_node_to_webserver_tunel_running():
             await self._start_head_node_to_webserver_tunel()
 
-        return self._golem_service.cluster_nodes
+        return {
+            node_id: node.dict(
+                exclude={
+                    "activity",
+                }
+            )
+            for node_id, node in created_nodes.items()
+        }
+
+    def _get_new_node_id(self) -> NodeId:
+        node_id = f"node{self._nodes_id_counter}"
+        self._nodes_id_counter += 1
+        return node_id
+
+    async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
+        async with self._get_node_context(node_id) as node:
+            node.state = NodeState.stopping
+
+        await node.activity.destroy()
+
+        async with self._get_node_context(node_id) as node:
+            del self._nodes[node.node_id]
+
+            return {node.node_id: node.dict(exclude={"activity"})}
+
+    async def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeId]:
+        async with self._nodes_lock:
+            return [
+                node_id
+                for node_id, node in self._nodes.items()
+                if are_dicts_equal(node.tags, tags_to_match)
+            ]
+
+    async def is_node_running(self, node_id: NodeId) -> bool:
+        async with self._get_node_context(node_id) as node:
+            return node.state == NodeState.running
+
+    async def is_node_terminated(self, node_id: NodeId) -> bool:
+        async with self._get_node_context(node_id) as node:
+            return node.state not in [NodeState.pending, NodeState.running]
+
+    async def get_node_tags(self, node_id: NodeId) -> Dict:
+        async with self._get_node_context(node_id) as node:
+            return node.tags
+
+    async def get_node_internal_ip(self, node_id: NodeId) -> str:
+        async with self._get_node_context(node_id) as node:
+            return node.internal_ip
+
+    async def get_ssh_proxy_command(self, node_id: NodeId) -> str:
+        async with self._get_node_context(node_id) as node:
+            return node.ssh_proxy_command
+
+    async def set_node_tags(self, node_id: NodeId, tags: Tags) -> None:
+        async with self._get_node_context(node_id) as node:
+            node.tags.update(tags)
+
+    async def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
+        ssh_key_path = self._tmp_path / get_default_ssh_key_name(cluster_name)
+
+        if not ssh_key_path.exists():
+            ssh_key_path.parent.mkdir(parents=True, exist_ok=True)
+
+            await run_subprocess(
+                "ssh-keygen", "-t", "rsa", "-b", "4096", "-N", "", "-f", str(ssh_key_path)
+            )
+
+            logger.info(f"Ssh key for cluster '{cluster_name}' created on path '{ssh_key_path}'")
+
+        # TODO: async file handling
+        with ssh_key_path.open("r") as f:
+            return str(f.read())
+
+    @asynccontextmanager
+    async def _get_node_context(self, node_id: NodeId) -> Iterator[Node]:
+        async with self._nodes_lock:
+            node = self._nodes.get(node_id)
+
+            if node is None:
+                raise NodeNotFound
+
+            yield node
+
+    async def _get_head_node(self) -> Node:
+        async with self._nodes_lock:
+            for node in self._nodes.values():
+                if node.tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD:
+                    return node
 
     def _is_head_node_to_webserver_tunel_running(self) -> bool:
         return self._head_node_to_webserver_tunel_process is not None
 
     async def _start_head_node_to_webserver_tunel(self) -> None:
-        head_node = await self._golem_service._get_head_node()
-        proxy_command = self._golem_service.get_node_ssh_proxy_command(head_node.node_id)
-        private_key_path = (
-            self._golem_service._temp_ssh_key_dir / self._golem_service._temp_ssh_key_filename
-        )
+        head_node = await self._get_head_node()
 
-        self._head_node_to_webserver_tunel_process = await self._ssh_service.create_ssh_reverse_tunel(
+        self._head_node_to_webserver_tunel_process = await start_ssh_reverse_tunel_process(
             str(head_node.internal_ip),
             self._golem_service._golem_ray_port,
-            private_key_path=private_key_path,
-            proxy_command=proxy_command,
+            private_key_path=self._ssh_private_key_path,
+            proxy_command=head_node.ssh_proxy_command,
         )
 
         # TODO: Add log when process dies early
@@ -128,26 +203,3 @@ class RayService:
         logger.info("Reverse tunel from remote head node to local webserver stopped")
 
         self._head_node_to_webserver_tunel_process = None
-
-    async def terminate_nodes(self, node_ids: List[NodeId]) -> None:
-        if not all(element in node_ids for element in self._golem_service.cluster_nodes.keys()):
-            raise NodesNotFound(additional_message=f"Given ids: {node_ids}")
-        for node_id in node_ids:
-            await self._terminate_node(node_id)
-            self._golem_service.cluster_nodes.pop(node_id, None)
-
-    async def _terminate_node(self, node_id: NodeId) -> None:
-        node = self._golem_service.cluster_nodes.get(node_id)
-        if node:
-            await self._golem_service.destroy_activity(node)
-            return
-        raise NodeNotFound
-
-    @staticmethod
-    def _are_dicts_equal(dict1: Dict[str, str], dict2: Dict[str, str]) -> bool:
-        for key in dict1.keys():
-            if key in dict2:
-                if dict1[key] != dict2[key]:
-                    return False
-
-        return True

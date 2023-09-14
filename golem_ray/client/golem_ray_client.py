@@ -1,3 +1,4 @@
+from functools import lru_cache
 from http import HTTPStatus
 from typing import Any, Dict, List, Type, TypeVar
 
@@ -18,60 +19,74 @@ class GolemRayClient:
 
         self._session = requests.Session()
 
-    def _make_request(
-        self,
-        *,
-        url: str,
-        request_data: BaseModel,
-        response_model: Type[TResponseModel],
-        error_message: str,
-    ) -> TResponseModel:
-        response = self._session.post(
-            str(self._base_url / url.lstrip("/")), data=request_data.json()
-        )
+    @classmethod
+    @lru_cache()
+    def get_instance(cls, port: int) -> "GolemRayClient":
+        url = cls.get_url(port)
+        return GolemRayClient(url)
 
-        if response.status_code != HTTPStatus.OK:
-            raise GolemRayClientError(f"{error_message}: {response.text}")
-
-        try:
-            return response_model.parse_raw(response.text)
-        except ValidationError as e:
-            raise GolemRayClientValidationError(
-                "Couldn't validate response data",
-            ) from e
+    @staticmethod
+    def get_url(port: int) -> URL:
+        return URL("http://127.0.0.1").with_port(port)
 
     def get_running_or_create_cluster(
         self,
-        cluster_name: str,
         network: str,
         budget: int,
         node_config: NodeConfigData,
-    ) -> List[models.NodeId]:
-        response = self._make_request(
+        ssh_private_key: str,
+    ) -> None:
+        self._make_request(
             url=settings.URL_CREATE_CLUSTER,
             request_data=models.CreateClusterRequestData(
-                cluster_name=cluster_name,
                 network=network,
                 budget=budget,
                 node_config=node_config,
+                ssh_private_key=ssh_private_key,
             ),
-            response_model=models.CreateClusterResponseData,
+            response_model=models.EmptyResponseData,
             error_message="Couldn't create cluster",
         )
 
-        return response.nodes
+    def create_nodes(
+        self, node_config: Dict[str, Any], count: int, tags: models.Tags
+    ) -> Dict[models.NodeId, Dict]:
+        response = self._make_request(
+            url=settings.URL_CREATE_NODES,
+            request_data=models.CreateNodesRequestData(
+                node_config=node_config,
+                count=count,
+                tags=tags,
+            ),
+            response_model=models.CreateNodesResponseData,
+            error_message="Couldn't create node",
+        )
+
+        return response.created_nodes
+
+    def terminate_node(self, node_id: models.NodeId) -> Dict[models.NodeId, Dict]:
+        response = self._make_request(
+            url=settings.URL_TERMINATE_NODE,
+            request_data=models.SingleNodeRequestData(
+                node_id=node_id,
+            ),
+            response_model=models.TerminateNodeResponseData,
+            error_message="Couldn't terminate node",
+        )
+
+        return response.terminated_nodes
 
     def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
         response = self._make_request(
-            url=settings.URL_GET_NODES,
+            url=settings.URL_NON_TERMINATED_NODES,
             request_data=models.NonTerminatedNodesRequestData(
                 tags=tag_filters,
             ),
-            response_model=models.GetNodesResponseData,
+            response_model=models.NonTerminatedNodesResponseData,
             error_message="Couldn't get non terminated nodes",
         )
 
-        return response.nodes
+        return response.nodes_ids
 
     def is_running(self, node_id: models.NodeId) -> bool:
         response = self._make_request(
@@ -112,10 +127,10 @@ class GolemRayClient:
     def get_node_internal_ip(self, node_id: models.NodeId) -> str:
         response = self._make_request(
             url=settings.URL_INTERNAL_IP,
-            response_model=models.GetNodeIpAddressResponseData,
             request_data=models.SingleNodeRequestData(
                 node_id=node_id,
             ),
+            response_model=models.GetNodeIpAddressResponseData,
             error_message="Couldn't get node internal_ip",
         )
 
@@ -132,55 +147,48 @@ class GolemRayClient:
             error_message="Couldn't set tags for node",
         )
 
-    def terminate_node(self, node_id: models.NodeId) -> None:
-        self.terminate_nodes([node_id])
-
-    def terminate_nodes(self, node_ids: List[models.NodeId]) -> None:
-        self._make_request(
-            url=settings.URL_TERMINATE_NODES,
-            request_data=models.DeleteNodesRequestData(
-                node_ids=node_ids,
-            ),
-            response_model=models.EmptyResponseData,
-            error_message="Couldn't terminate nodes",
-        )
-
-    def create_nodes(
-        self, node_config: Dict[str, Any], count: int, tags: models.Tags
-    ) -> Dict[models.NodeId, models.Node]:
-        response = self._make_request(
-            url=settings.URL_CREATE_NODES,
-            request_data=models.CreateNodesRequestData(
-                node_config=node_config,
-                count=count,
-                tags=tags,
-            ),
-            response_model=models.CreateNodesResponseData,
-            error_message="Couldn't create node",
-        )
-
-        return response.nodes
-
     def get_ssh_proxy_command(self, node_id: str) -> str:
-        response: models.GetSshProxyCommandResponseData = self._make_request(
+        response = self._make_request(
             url=settings.URL_GET_SSH_PROXY_COMMAND,
             request_data=models.SingleNodeRequestData(
                 node_id=node_id,
             ),
             response_model=models.GetSshProxyCommandResponseData,
-            error_message="Cound't get ssh proxy command",
+            error_message="Couldn't get ssh proxy command",
         )
 
         return response.ssh_proxy_command
 
-    def get_or_create_ssh_key(self, cluster_name: str) -> str:
+    def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
         response = self._make_request(
-            url=settings.URL_GET_OR_CREATE_SSH_KEY,
-            request_data=models.GetOrCreateSshKeyRequestData(
+            url=settings.URL_GET_OR_CREATE_DEFAULT_SSH_KEY,
+            request_data=models.GetOrCreateDefaultSshKeyRequestData(
                 cluster_name=cluster_name,
             ),
-            response_model=models.GetOrCreateSshKeyResponseData,
-            error_message="Couldn't get ssh key",
+            response_model=models.GetOrCreateDefaultSshKeyResponseData,
+            error_message="Couldn't get or create default ssh key",
         )
 
         return response.ssh_key_base64
+
+    def _make_request(
+        self,
+        *,
+        url: str,
+        request_data: BaseModel,
+        response_model: Type[TResponseModel],
+        error_message: str,
+    ) -> TResponseModel:
+        response = self._session.post(
+            str(self._base_url / url.lstrip("/")), data=request_data.json()
+        )
+
+        if response.status_code != HTTPStatus.OK:
+            raise GolemRayClientError(f"{error_message}: {response.text}")
+
+        try:
+            return response_model.parse_raw(response.text)
+        except ValidationError as e:
+            raise GolemRayClientValidationError(
+                "Couldn't validate response data",
+            ) from e
