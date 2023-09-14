@@ -10,6 +10,7 @@ from hashlib import sha256
 # `be`:   46599c5bb5c33101f80cea8438e2228085513dbbb19b2f5ce97bd68494d3344d
 # `x`:    2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
 
+# the chars
 CHARS = [chr(c) for c in itertools.chain(
     range(ord("a"), ord("z") + 1),
     range(ord("A"), ord("Z") + 1),
@@ -23,31 +24,9 @@ CHARS = [chr(c) for c in itertools.chain(
 start_time = datetime.now()
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-w", "--words", type=str, help="dictionary file")
-parser.add_argument("-l", "--length", type=int, default=0, help="brute force length (if the `words` dictionary is not provided), default: %(default)s")
+parser.add_argument("-l", "--length", type=int, default=3, help="brute force length, default: %(default)s")
 parser.add_argument("hash", type=str)
 args = parser.parse_args()
-
-
-def word_file(words_file: str):
-    with open(words_file) as f:
-        for line in f:
-            yield bytes(line.strip(), "utf-8")
-
-
-def brute_force(max_len: int):
-
-    def brute_force_len(length: int):
-        for char in CHARS:
-            if length <= 1:
-                yield char
-            else:
-                for suffix in brute_force_len(length - 1):
-                    yield char + suffix
-
-    for l in range(1, max_len + 1):
-        for word in brute_force_len(l):
-            yield bytes(word, "utf-8")
 
 
 def str_to_index(value: str) -> int:
@@ -59,7 +38,7 @@ def str_to_index(value: str) -> int:
     return index
 
 
-def index_to_str(index: int) -> Optional[str]:
+def index_to_str(index: int, round_nulls = False) -> Optional[str]:
     div = index
     output = ""
     base = len(CHARS) + 1
@@ -67,6 +46,9 @@ def index_to_str(index: int) -> Optional[str]:
         div, mod = divmod(div, base)
         if mod > 0:
             output = CHARS[mod - 1] + output
+        elif round_nulls:
+            # "round up"
+            output = CHARS[0] * (len(output) + 1)
         else:
             return None
 
@@ -82,10 +64,7 @@ def brute_force_range(start_string: str, end_string: str):
 
 result = None
 
-if args.words:
-    words = word_file(args.words)
-else:
-    words = brute_force_range("a", "a" * (args.length + 1))
+words = brute_force_range("a", "a" * (args.length + 1))
 
 for word in words:
     word_hash = sha256(word).hexdigest()
@@ -93,4 +72,8 @@ for word in words:
         result = word.decode("utf-8")
         break
 
-print(f"finished in {datetime.now() - start_time},", f"match found: {result}" if result else f"match not found")
+
+print(
+    f"finished in {datetime.now() - start_time},",
+    f"match found: {result}" if result else f"match not found"
+)
