@@ -10,7 +10,7 @@ from hashlib import sha256
 # `be`:   46599c5bb5c33101f80cea8438e2228085513dbbb19b2f5ce97bd68494d3344d
 # `x`:    2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
 
-# the chars
+# the character table that we want to use to construct possible phrases
 CHARS = [chr(c) for c in itertools.chain(
     range(ord("a"), ord("z") + 1),
     range(ord("A"), ord("Z") + 1),
@@ -29,17 +29,39 @@ parser.add_argument("hash", type=str)
 args = parser.parse_args()
 
 
-def str_to_index(value: str) -> int:
+def str_to_int(value: str) -> int:
+    """
+    Convert a string to its numerical value.
+
+    Each character in the string is treated as a non-zero digit
+    (the value of which is the index in the CHARS table)
+    in a base equal to the length of the CHARS table.
+
+    :param value: the string of "digits" to convert
+    :return: its integer value after conversion from base[len(chars)]
+    """
+
     base = len(CHARS) + 1
-    index = 0
+    intval = 0
     for position, digit in zip(itertools.count(), [CHARS.index(v) + 1 for v in reversed(value)]):
-        index += digit * base ** position
+        intval += digit * base ** position
 
-    return index
+    return intval
 
 
-def index_to_str(index: int, round_nulls = False) -> Optional[str]:
-    div = index
+def int_to_str(intval: int, round_nulls = False) -> Optional[str]:
+    """
+    Convert an integer value back to the equivalent string.
+
+    Treats the CHARS table as a table of "digits" in
+    a numerical system with a base equal to the length of the CHARS table.
+
+    :param intval: the integer value to convert
+    :param round_nulls: whether to round a "number" containing null values to the closest proper string.
+        if set to False, `int_to_str` will just return a `None`
+    :return: the resultant string
+    """
+    div = intval
     output = ""
     base = len(CHARS) + 1
     while div > 0:
@@ -56,15 +78,15 @@ def index_to_str(index: int, round_nulls = False) -> Optional[str]:
 
 
 def brute_force_range(start_string: str, end_string: str):
-    for i in range(str_to_index(start_string), str_to_index(end_string)):
-        s = index_to_str(i)
+    for i in range(str_to_int(start_string), str_to_int(end_string)):
+        s = int_to_str(i)
         if s:
             yield bytes(s, "utf-8")
 
 
 result = None
 
-words = brute_force_range("a", "a" * (args.length + 1))
+words = brute_force_range(CHARS[0], CHARS[0] * (args.length + 1))
 
 for word in words:
     word_hash = sha256(word).hexdigest()
