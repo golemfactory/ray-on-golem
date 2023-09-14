@@ -6,7 +6,7 @@ Golem on is a decentralized marketplace for computing power, where providers let
 
 Ray on Golem makes it super easy to set up and use Golem Network to run your Ray applications.
 
-Ray on the other hand is an open-source framework for scaling Python applications. 
+Ray on the other hand is an open-source framework dedicated to scaling Python workloads. 
 It specializes in tooling for AI/ML applications, but at the same time, it is based on Ray Core which understands every piece of generic Python code.
 
 Ray uses concepts of tasks, actors, and objects for building and scaling distributed applications.
