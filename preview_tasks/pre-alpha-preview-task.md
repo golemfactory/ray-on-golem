@@ -56,7 +56,7 @@ You can find other hashes to crack in the code.
 Your task is to parallelize the code and execute it on Ray on Golem cluster.
 The goal is to benefit from distributed execution on Ray on Golem cluster so that it takes less time than executed locally.
 
-In this task we want how our documention help you to run arbitrary python code on Ray on Golem cluster.
+As a result of this task, we'd like to learn whether, and how, our documentation helped you run such an arbitrary piece of python code on a Ray on Golem cluster.
 
 At the end we want you to send us the resulting code and console outputs from its execution.
 
