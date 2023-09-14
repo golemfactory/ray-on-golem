@@ -50,7 +50,7 @@ python hash_cracker_without_ray.py -l 4 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b
 ```
 ```
 
-You can find other hashes to crack in the code.
+You can find a couple of other hashes to crack in the code's comments.
 
 
 Your task is to parallelize the code and execute it on Ray on Golem cluster.
