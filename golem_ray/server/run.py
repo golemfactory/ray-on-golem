@@ -1,17 +1,17 @@
 import argparse
 import logging
 import logging.config
-from pathlib import Path
 
 from aiohttp import web
 
 from golem_ray.server.middlewares import error_middleware
-from golem_ray.server.services import GolemService, RayService, YagnaService
+from golem_ray.server.services import GolemService, RayService, SshService, YagnaService
 from golem_ray.server.settings import (
+    GOLEM_RAY_PORT,
     LOGGING_CONFIG,
+    TMP_PATH,
     WEBSOCAT_PATH,
     YAGNA_PATH,
-    GOLEM_RAY_PORT,
 )
 from golem_ray.server.views import routes
 
@@ -19,14 +19,19 @@ logger = logging.getLogger(__name__)
 
 
 def parse_sys_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Golem Ray's webserver.")
-    parser.add_argument("port", type=int, help="port which be used for webserver to listen to")
+    parser = argparse.ArgumentParser(description="Ray on Golem's webserver.")
+    parser.add_argument(
+        "-p", "--port",
+        type=int,
+        help="port for Ray on Golem's webserver to listen on, default: %(default)s",
+        default=4578,
+    )
     return parser.parse_args()
 
 
 def prepare_tmp_dir():
     try:
-        Path("/tmp/golem").mkdir(parents=True, exist_ok=True)
+        TMP_PATH.mkdir(parents=True, exist_ok=True)
     except OSError:
         pass
 
@@ -50,6 +55,8 @@ def create_application() -> web.Application:
     app["ray_service"] = RayService(
         golem_service=app["golem_service"],
     )
+
+    app["ssh_service"] = SshService()
 
     app.add_routes(routes)
     app.cleanup_ctx.append(golem_ray_ctx)
