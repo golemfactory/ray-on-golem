@@ -37,7 +37,7 @@ Go through the [Converting a real-life use case to Ray on Golem tutorial](https:
 
 We want to test how our solution behaves on different environments and how helpful our tutorial is.
  
-### #3 Parallelize hashcracker app with Ray and execute it on Ray on Golem
+### #3 Parallelize the hash cracker script with Ray and execute it on Ray on Golem
 
 Take a look at this [piece of code](https://github.com/golemfactory/golem-ray/blob/mateusz/preview_tasks/examples/hash_cracker_without_ray.py)
 
