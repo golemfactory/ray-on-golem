@@ -1,3 +1,4 @@
+# Ray on Golem cluster name
 cluster_name: golem-cluster
 
 # The maximum number of workers the cluster will have at any given time
@@ -15,20 +16,23 @@ provider:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
 
-    # Golem network on which we will launch nodes
+    # Blockchain used for payments.
+    # Goerli means running free nodes on testnet,
+    # Polygon is for mainnet operations.
     network: "goerli"
 
-    # Maximum amount of GML that's going to be spent
+    # Maximum amount of GML that's going to be spent (not supported yet)
     budget: 1
 
     # Params for creating golem demands (same for head and workers)
     node_config:
-      # if not provided, image_tag will be resolved based on currently used
-      # check available versions at https://registry.golem.network/explore/loop/golem-ray
-      # image_tag: "py3.10.6-ray2.6.1-lib"
+      # if not provided, image_tag will be autodetected based on currently used python and ray versions
+      # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
+      image_tag: "approxit/ray-test:py3.10.12-ray2.3.1"
+      # image_tag: "approxit/ray-test:py3.10.12-ray2.4.0"
 
-      # or image_hash may be provided version of python and ray
-      image_hash: "fd36e77b00465567f41a8e6d04cb8c0f972c3b0f0864cafb83f44ab1"
+      # you can also provide the image hash directly (although it is not recommended :)
+      # image_hash: "c6fc9b12da19d56a998eace84b6df961852360b37479e93ef4ce3913" # approxit/ray-test:py3.10.12-ray2.3.1
 
       capabilities: ['vpn', 'inet', 'manifest-support']
       min_mem_gib: 0
@@ -48,7 +52,7 @@ available_node_types:
     min_workers: 0
 
     # The maximum number of worker nodes of this type to launch
-    max_workers: 1
+    max_workers: 0
 
     # The node type's CPU and GPU resources
     resources: {"CPU": 1}
@@ -57,13 +61,16 @@ available_node_types:
       # TODO: Demand description here
       kind: Node
   ray.worker.default:
-    min_workers: 3
+    min_workers: 1
     max_workers: 10
     resources: {"CPU": 1}
     node_config:
       kind: Node
 
-# List of commands that will be run before `setup_commands`
+# List of commands that will be run to initialize the nodes (before `setup_commands`)
+#initialization_commands: [
+#  "pip install endplay",
+#]
 initialization_commands: []
 
 # List of shell commands to run to set up nodes
@@ -77,12 +84,12 @@ worker_setup_commands: []
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands: [
-  "ray start --head --node-ip-address 192.168.0.3 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "ray start --head --node-ip-address 192.168.0.3 --include-dashboard=True --dashboard-host 0.0.0.0 --disable-usage-stats --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
 
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [
-  "ray start --address 192.168.0.3:6379 --dashboard-port 8266 --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "ray start --address 192.168.0.3:6379",
 ]
 
 # Authentication credentials that Ray will use to launch nodes

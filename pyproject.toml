@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "golem-ray"
-version = "0.1.0"
-description = "Golem Netowrk (https://www.golem.network/) integration with Ray (https://ray.io/)"
+name = "ray-on-golem"
+version = "0.1.0-alpha.0"
+description = "Golem Network (https://www.golem.network/) integration with Ray (https://ray.io/)"
 authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
 packages = [{include = "golem_ray"}]
@@ -9,7 +9,7 @@ packages = [{include = "golem_ray"}]
 [tool.poetry.dependencies]
 python = "^3.8"
 
-ray = {version="^2.6", extras=["default"]}
+ray = {version="<2.4", extras=["default"]}
 golem-api-python = "^0.1.1"
 aiohttp = "^3"
 requests = "^2"
@@ -17,6 +17,10 @@ click = "^8"
 pydantic = "<2"
 
 setuptools = "*"
+
+[tool.poetry.scripts]
+ray-on-golem = "golem_ray.server.run:main"
+
 
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.22.0"

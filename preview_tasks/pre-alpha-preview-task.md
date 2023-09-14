@@ -33,12 +33,33 @@ Go through the [converting a real-life use case to Ray on Golem tutorial](https:
 
 We want to test how our solution behaves in different environments and how helpful our tutorial is.
  
+### #3 Parallelize the hash cracker script with Ray and execute it on Ray on Golem
+
+Take a look at this [piece of code](https://github.com/golemfactory/golem-ray/blob/mateusz/preview_tasks/examples/hash_cracker_without_ray.py)
+
+It takes a sha256 hash of some unknown word as an input and looks for a word that results in a match.
+The code doesn't know anything about Golem nor Ray.
+
+```bash
+python hash_cracker_without_ray.py -l 4 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+```
+```
+```
+
+You can find a couple of other hashes to crack in the code's comments.
+
+
+Your task is to parallelize the code and execute it on Ray on Golem cluster.
+The goal is to benefit from distributed execution on Ray on Golem cluster so that it takes less time than executed locally.
+
+As a result of this task, we'd like to learn whether, and how, our documentation helped you run such an arbitrary piece of python code on a Ray on Golem cluster.
+
 ### #3 Fill out the feedback form  
 
 Please fill out [Ray on Golem feedback form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
 We are looking for meaningful and thought-out feedback that will help us drive the solution.
 
-The form will ask you to upload console logs from the first two tasks.
+The form will ask you to upload console logs from the first three tasks.
 
 ### Useful links
 
