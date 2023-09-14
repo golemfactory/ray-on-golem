@@ -34,6 +34,12 @@ If you have any questions, comments, insights, praises, or doubts about these do
 Current version is `pre-alpha` which means the happy path is working on Linux on the Golem test network. 
 We use this version to show the direction and get feedback.
 
+There is one Ray on Golem image. It contains `ray 2.3.1` and `python 3.10.12`.
+It should work with any combination of local ray & python versions. Please let us know if you have any troubles because of that (on [`#Ray on Golem` discord channel](https://chat.golem.network/))
+
+The images include only basic libraries, if you need any dependencies, 
+you can use `pip` via [cluster yaml `initialization_commands`](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/cluster-yaml-reference#initializationcommands)
+
 # Quickstart
 
 This [quickstart](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
