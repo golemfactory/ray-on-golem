@@ -2,11 +2,11 @@
 
 ## What is Golem, Ray and Ray on Golem
 
-Golem on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
+[Golem](https://golem.network) on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
 
 Ray on Golem makes it super easy to set up and use Golem Network to run your Ray applications.
 
-Ray on the other hand is an open-source framework dedicated to scaling Python workloads. 
+[Ray](https://ray.io) on the other hand is an open-source framework dedicated to scaling Python workloads. 
 It specializes in tooling for AI/ML applications, but at the same time, it is based on Ray Core which understands every piece of generic Python code.
 
 Ray uses concepts of tasks, actors, and objects to enable building and scaling distributed software.
