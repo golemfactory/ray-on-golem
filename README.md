@@ -13,7 +13,7 @@ $ yagna service run
 ```
 Run Server
 ```bash
-$ python golem_ray/server/run.py
+$ ray-on-golem
 ```
 Start ray
 ```bash
