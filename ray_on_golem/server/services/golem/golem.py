@@ -120,10 +120,10 @@ class GolemService:
 
         # fix for golem-core-python missing subnet_tag constraint and `debit-notes.accept-timeout?` property
         @dataclass
-        class RayOnGolemManifestVmPayload(ManifestVmPayload):
+        class Payload(ManifestVmPayload):
             subnet_constraint: str = constraint("golem.node.debug.subnet", "=", default=SUBNET)
             debit_notes_accept_timeout: int = prop(
-                "golem.com.payment.debit-notes.accept-timeout?", default=30
+                "golem.com.payment.debit-notes.accept-timeout?", default=240
             )
 
         image_url, image_hash = await self._get_image_url_and_hash(node_config)
@@ -134,7 +134,7 @@ class GolemService:
         params = node_config.dict(exclude={"image_hash", "image_tag"})
         params["manifest"] = manifest
 
-        payload = RayOnGolemManifestVmPayload(**params)
+        payload = Payload(**params)
 
         return payload
 
