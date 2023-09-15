@@ -1,6 +1,6 @@
 from aiohttp import web
 
-from golem_ray.server.exceptions import GolemRayServerError
+from ray_on_golem.server.exceptions import RayOnGolemServerError
 
 
 @web.middleware
@@ -10,7 +10,7 @@ async def error_middleware(request, handler):
     except web.HTTPException as e:
         message = e.reason
         status_code = e.status_code
-    except GolemRayServerError as e:
+    except RayOnGolemServerError as e:
         message = e.message
         status_code = 400
     else:

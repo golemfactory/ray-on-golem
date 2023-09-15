@@ -6,14 +6,14 @@ import requests
 from pydantic import BaseModel, ValidationError
 from yarl import URL
 
-from golem_ray.client.exceptions import GolemRayClientError, GolemRayClientValidationError
-from golem_ray.server import models, settings
-from golem_ray.server.models import NodeConfigData
+from ray_on_golem.client.exceptions import RayOnGolemClientError, RayOnGolemClientValidationError
+from ray_on_golem.server import models, settings
+from ray_on_golem.server.models import NodeConfigData
 
 TResponseModel = TypeVar("TResponseModel")
 
 
-class GolemRayClient:
+class RayOnGolemClient:
     def __init__(self, base_url: URL) -> None:
         self._base_url = base_url
 
@@ -21,9 +21,9 @@ class GolemRayClient:
 
     @classmethod
     @lru_cache()
-    def get_instance(cls, port: int) -> "GolemRayClient":
+    def get_instance(cls, port: int) -> "RayOnGolemClient":
         url = cls.get_url(port)
-        return GolemRayClient(url)
+        return RayOnGolemClient(url)
 
     @staticmethod
     def get_url(port: int) -> URL:
@@ -184,11 +184,11 @@ class GolemRayClient:
         )
 
         if response.status_code != HTTPStatus.OK:
-            raise GolemRayClientError(f"{error_message}: {response.text}")
+            raise RayOnGolemClientError(f"{error_message}: {response.text}")
 
         try:
             return response_model.parse_raw(response.text)
         except ValidationError as e:
-            raise GolemRayClientValidationError(
+            raise RayOnGolemClientValidationError(
                 "Couldn't validate response data",
             ) from e

@@ -5,16 +5,16 @@ from asyncio.subprocess import Process
 from pathlib import Path
 from typing import Optional
 
-from golem_ray.exceptions import GolemRayError
-from golem_ray.server.settings import YAGNA_APPKEY
-from golem_ray.utils import run_subprocess
+from ray_on_golem.exceptions import RayOnGolemError
+from ray_on_golem.server.settings import YAGNA_APPKEY
+from ray_on_golem.utils import run_subprocess
 
 logger = logging.getLogger(__name__)
 
-YAGNA_APPNAME = "golem-ray"
+YAGNA_APPNAME = "ray-on-golem"
 
 
-class YagnaServiceError(GolemRayError):
+class YagnaServiceError(RayOnGolemError):
     pass
 
 
@@ -54,7 +54,7 @@ class YagnaService:
     async def _check_if_yagna_is_running(self) -> bool:
         try:
             await run_subprocess(self._yagna_path, "id", "show")
-        except GolemRayError:
+        except RayOnGolemError:
             return False
 
         return True
@@ -62,7 +62,7 @@ class YagnaService:
     async def _run_yagna_payment_fund(self) -> bool:
         try:
             await run_subprocess(self._yagna_path, "payment", "fund")
-        except GolemRayError:
+        except RayOnGolemError:
             return False
 
         return True

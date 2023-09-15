@@ -4,7 +4,7 @@ from asyncio.subprocess import Process
 from pathlib import Path
 from typing import Dict, Optional
 
-from golem_ray.exceptions import GolemRayError
+from ray_on_golem.exceptions import RayOnGolemError
 
 
 async def run_subprocess(*args) -> bytes:
@@ -17,7 +17,7 @@ async def run_subprocess(*args) -> bytes:
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
-        raise GolemRayError(stderr)
+        raise RayOnGolemError(stderr)
 
     return stdout
 
@@ -32,7 +32,7 @@ def are_dicts_equal(dict1: Dict, dict2: Dict) -> bool:
 
 
 def get_default_ssh_key_name(cluster_name: str) -> str:
-    return "golem_ray_rsa_{}".format(hashlib.md5(cluster_name.encode()).hexdigest()[:10])
+    return "ray_on_golem_rsa_{}".format(hashlib.md5(cluster_name.encode()).hexdigest()[:10])
 
 
 async def start_ssh_reverse_tunel_process(
@@ -56,7 +56,7 @@ async def start_ssh_reverse_tunel_process(
 
     command_parts.append(f"root@{remote_host}")
 
-    # FIXME: Use subprocess running from golem-ray's utils
+    # FIXME: Use subprocess running from ray-on-golem's utils
     process = await asyncio.create_subprocess_shell(
         " ".join(command_parts),
         stderr=asyncio.subprocess.PIPE,

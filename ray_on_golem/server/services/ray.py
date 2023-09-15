@@ -7,10 +7,10 @@ from typing import Any, Dict, Iterator, List, Optional
 
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
 
-from golem_ray.server.exceptions import NodeNotFound
-from golem_ray.server.models import CreateClusterRequestData, Node, NodeId, NodeState, Tags
-from golem_ray.server.services.golem import GolemService
-from golem_ray.utils import (
+from ray_on_golem.server.exceptions import NodeNotFound
+from ray_on_golem.server.models import CreateClusterRequestData, Node, NodeId, NodeState, Tags
+from ray_on_golem.server.services.golem import GolemService
+from ray_on_golem.utils import (
     are_dicts_equal,
     get_default_ssh_key_name,
     run_subprocess,
@@ -180,7 +180,7 @@ class RayService:
 
         self._head_node_to_webserver_tunel_process = await start_ssh_reverse_tunel_process(
             str(head_node.internal_ip),
-            self._golem_service._golem_ray_port,
+            self._golem_service._ray_on_golem_port,
             private_key_path=self._ssh_private_key_path,
             proxy_command=head_node.ssh_proxy_command,
         )
