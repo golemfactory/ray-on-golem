@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 def parse_sys_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ray on Golem's webserver.")
     parser.add_argument(
-        "-p", "--port",
+        "-p",
+        "--port",
         type=int,
         help="port for Ray on Golem's webserver to listen on, default: %(default)s",
         default=4578,
