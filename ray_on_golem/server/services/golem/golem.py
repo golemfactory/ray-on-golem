@@ -3,6 +3,8 @@ import base64
 import json
 import logging
 import platform
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -10,13 +12,14 @@ import aiohttp
 import async_timeout
 import ray
 from golem_core.core.activity_api import Activity, BatchError, commands
-from golem_core.core.golem_node import GolemNode
+from golem_core.core.golem_node import SUBNET, GolemNode
 from golem_core.core.market_api import Demand, ManifestVmPayload
 from golem_core.core.market_api.pipeline import (
     default_create_activity,
     default_create_agreement,
     default_negotiate,
 )
+from golem_core.core.market_api.resources.demand.demand_offer_base.model import constraint, prop
 from golem_core.core.network_api import Network
 from golem_core.core.payment_api import Allocation
 from golem_core.managers.payment.default import DefaultPaymentManager
@@ -101,7 +104,10 @@ class GolemService:
 
         payload = await self._create_payload(provider_config.node_config)
         self._demand = await self._golem.create_demand(
-            payload, allocations=[self._allocation], autostart=True
+            payload,
+            allocations=[self._allocation],
+            autostart=True,
+            expiration=datetime.now(timezone.utc) + timedelta(hours=8),
         )
 
     async def _create_payload(self, node_config: NodeConfigData) -> ManifestVmPayload:
@@ -111,6 +117,15 @@ class GolemService:
         :param node_config: dictionary containing image_hash and num_workers
         :return:
         """
+
+        # fix for golem-core-python missing subnet_tag constraint and `debit-notes.accept-timeout?` property
+        @dataclass
+        class Payload(ManifestVmPayload):
+            subnet_constraint: str = constraint("golem.node.debug.subnet", "=", default=SUBNET)
+            debit_notes_accept_timeout: int = prop(
+                "golem.com.payment.debit-notes.accept-timeout?", default=240
+            )
+
         image_url, image_hash = await self._get_image_url_and_hash(node_config)
 
         manifest = get_manifest(image_url, image_hash)
@@ -119,7 +134,7 @@ class GolemService:
         params = node_config.dict(exclude={"image_hash", "image_tag"})
         params["manifest"] = manifest
 
-        payload = ManifestVmPayload(**params)
+        payload = Payload(**params)
 
         return payload
 
