@@ -1,10 +1,9 @@
 import asyncio
 import hashlib
-from functools import lru_cache
+from asyncio.subprocess import Process
+from pathlib import Path
+from typing import Dict, Optional
 
-from yarl import URL
-
-from golem_ray.client.golem_ray_client import GolemRayClient
 from golem_ray.exceptions import GolemRayError
 
 
@@ -23,15 +22,46 @@ async def run_subprocess(*args) -> bytes:
     return stdout
 
 
-def get_golem_ray_client_url(port: int) -> URL:
-    return URL("http://127.0.0.1").with_port(port)
+def are_dicts_equal(dict1: Dict, dict2: Dict) -> bool:
+    for key in dict1.keys():
+        if key in dict2:
+            if dict1[key] != dict2[key]:
+                return False
+
+    return True
 
 
-@lru_cache()
-def get_golem_ray_client(port: int) -> GolemRayClient:
-    url = get_golem_ray_client_url(port)
-    return GolemRayClient(url)
-
-
-def get_ssh_key_name(cluster_name: str) -> str:
+def get_default_ssh_key_name(cluster_name: str) -> str:
     return "golem_ray_rsa_{}".format(hashlib.md5(cluster_name.encode()).hexdigest()[:10])
+
+
+async def start_ssh_reverse_tunel_process(
+    remote_host: str,
+    port: int,
+    *,
+    private_key_path: Optional[Path] = None,
+    proxy_command: Optional[str] = None,
+) -> Process:
+    command_parts = [
+        f"ssh -N -R '*:{port}:127.0.0.1:{port}'",
+        "-o StrictHostKeyChecking=no",
+        "-o UserKnownHostsFile=/dev/null",
+    ]
+
+    if proxy_command is not None:
+        command_parts.append(f'-o ProxyCommand="{proxy_command}"')
+
+    if private_key_path is not None:
+        command_parts.append(f"-i {private_key_path}")
+
+    command_parts.append(f"root@{remote_host}")
+
+    # FIXME: Use subprocess running from golem-ray's utils
+    process = await asyncio.create_subprocess_shell(
+        " ".join(command_parts),
+        stderr=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stdin=asyncio.subprocess.PIPE,
+    )
+
+    return process

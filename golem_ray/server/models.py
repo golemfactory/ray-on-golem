@@ -1,11 +1,10 @@
 from enum import Enum
-from ipaddress import IPv4Address
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from golem_core.core.activity_api import Activity
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-NodeId = int
+NodeId = str
 Tags = Dict[str, str]
 
 
@@ -19,29 +18,12 @@ class Node(BaseModel):
     node_id: NodeId
     state: NodeState
     tags: Tags
-    internal_ip: IPv4Address
-    external_ip: Optional[IPv4Address] = None
-
-
-class ClusterNode(BaseModel):
-    node_id: NodeId
-    internal_ip: IPv4Address
-    external_ip: Optional[IPv4Address] = None
-    state: Optional[NodeState] = None
-    connection_uri: Optional[str] = None
-    tags: Tags = Field(default_factory=dict)
-    activity: Optional[Activity] = None
+    internal_ip: str
+    ssh_proxy_command: str
+    activity: Activity
 
     class Config:
         arbitrary_types_allowed = True
-
-
-class GetNodeRequestData(BaseModel):
-    node_id: NodeId
-
-
-class GetNodeResponseData(BaseModel):
-    node: Node
 
 
 class SingleNodeRequestData(BaseModel):
@@ -58,28 +40,28 @@ class NodeConfigData(BaseModel):
 
 
 class CreateClusterRequestData(BaseModel):
-    cluster_name: str
     network: str
     budget: int
-    num_workers: int = 4
     node_config: NodeConfigData
-
-
-class CreateClusterResponseData(BaseModel):
-    nodes: List[NodeId]
+    ssh_private_key: str
 
 
 class NonTerminatedNodesRequestData(BaseModel):
     tags: Tags
 
 
+class NonTerminatedNodesResponseData(BaseModel):
+    nodes_ids: List[NodeId]
+
+
 class CreateNodesRequestData(BaseModel):
+    node_config: Dict[str, Any]
     count: int
     tags: Tags
 
 
-class DeleteNodesRequestData(BaseModel):
-    node_ids: List[NodeId]
+class CreateNodesResponseData(BaseModel):
+    created_nodes: Dict[NodeId, Dict]
 
 
 class SetNodeTagsRequestData(BaseModel):
@@ -87,12 +69,8 @@ class SetNodeTagsRequestData(BaseModel):
     tags: Tags
 
 
-class CreateNodesResponseData(BaseModel):
-    nodes: Dict[NodeId, Node]
-
-
-class GetNodesResponseData(BaseModel):
-    nodes: List[NodeId]
+class TerminateNodeResponseData(BaseModel):
+    terminated_nodes: Dict[NodeId, Dict]
 
 
 class IsRunningResponseData(BaseModel):
@@ -108,28 +86,20 @@ class GetNodeTagsResponseData(BaseModel):
 
 
 class GetNodeIpAddressResponseData(BaseModel):
-    ip_address: IPv4Address
-
-
-class EmptyRequestData(BaseModel):
-    pass
+    ip_address: str
 
 
 class EmptyResponseData(BaseModel):
     pass
 
 
-class GetNodePortResponseData(BaseModel):
-    port: int
-
-
 class GetSshProxyCommandResponseData(BaseModel):
     ssh_proxy_command: str
 
 
-class GetOrCreateSshKeyRequestData(BaseModel):
+class GetOrCreateDefaultSshKeyRequestData(BaseModel):
     cluster_name: str
 
 
-class GetOrCreateSshKeyResponseData(BaseModel):
+class GetOrCreateDefaultSshKeyResponseData(BaseModel):
     ssh_key_base64: str

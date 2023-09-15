@@ -1,3 +1,4 @@
+import socket
 import time
 from collections import Counter
 
@@ -20,11 +21,7 @@ print(
 def f():
     time.sleep(0.5)
 
-    # Return IP address. (should work when Golem providers have hostname)
-    # return socket.gethostbyname(socket.gethostname())
-
-    # use this line if you prefer to see node ids instead of node ips
-    return ray.get_runtime_context().get_node_id()
+    return socket.gethostbyname(socket.gethostname())
 
 
 object_ids = [f.remote() for _ in range(100)]

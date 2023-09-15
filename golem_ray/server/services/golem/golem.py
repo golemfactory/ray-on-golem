@@ -3,15 +3,13 @@ import base64
 import json
 import logging
 import platform
-from asyncio.subprocess import Process
-from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
 import async_timeout
 import ray
-from golem_core.core.activity_api import commands
+from golem_core.core.activity_api import Activity, BatchError, commands
 from golem_core.core.golem_node import GolemNode
 from golem_core.core.market_api import Demand, ManifestVmPayload
 from golem_core.core.market_api.pipeline import (
@@ -27,26 +25,13 @@ from yarl import URL
 
 from golem_ray.server.exceptions import (
     CreateActivitiesTimeout,
-    DestroyActivityError,
     GolemRayServerError,
     RegistryRequestError,
 )
-from golem_ray.server.models import (
-    ClusterNode,
-    CreateClusterRequestData,
-    NodeConfigData,
-    NodeId,
-    NodeState,
-)
+from golem_ray.server.models import CreateClusterRequestData, NodeConfigData
 from golem_ray.server.services.golem.manifest import get_manifest
-from golem_ray.server.services.ssh import SshService
-from golem_ray.server.settings import TMP_PATH
-from golem_ray.utils import get_ssh_key_name
 
 logger = logging.getLogger(__name__)
-
-
-# "ssh -R '*:3001:127.0.0.1:6379' proxy@proxy.dev.golem.network"
 
 
 class GolemService:
@@ -58,23 +43,13 @@ class GolemService:
         self._demand: Optional[Demand] = None
         self._allocation: Optional[Allocation] = None
         self._network: Optional[Network] = None
-        self._num_workers: Optional[int] = None
-        self._head_node_process: Optional[Process] = None
-        self._reverse_ssh_process: Optional[Process] = None
-        self._cluster_nodes: Dict[NodeId, ClusterNode] = {}
         self._payment_manager: Optional[DefaultPaymentManager] = None
         self._yagna_appkey: Optional[str] = None
-        self._temp_ssh_key_dir: Optional[Path] = None
-        self._temp_ssh_key_filename: Optional[str] = None
         self._lock = asyncio.Lock()
 
     @property
     def golem(self):
         return self._golem
-
-    @property
-    def cluster_nodes(self):
-        return self._cluster_nodes
 
     @property
     def payment_manager(self) -> DefaultPaymentManager:
@@ -86,7 +61,7 @@ class GolemService:
         await self._golem.start()
 
         async def on_event(event) -> None:
-            logger.debug(f"-----EVENT: {event}")
+            logger.debug(f"----- EVENT: {event}")
 
         self._golem.event_bus.listen(on_event)
         self._network = await self._golem.create_network(
@@ -106,18 +81,10 @@ class GolemService:
         :return:
         """
         await self.payment_manager.terminate_agreements()
+
+        logger.info(f"----- Waiting for all invoices...")
         await self.payment_manager.wait_for_invoices()
-
-        tasks = [node.activity.destroy() for node in self._cluster_nodes.values() if node.activity]
-        if tasks:
-            await asyncio.gather(*tasks)
-            logger.info(f"-----{len(tasks)} activities stopped")
-
-        if self._reverse_ssh_process and self._reverse_ssh_process.returncode is None:
-            self._reverse_ssh_process.terminate()
-            await self._reverse_ssh_process.wait()
-            logger.info(f"-----Reverse ssh to *:{self._golem_ray_port} closed.")
-            self._reverse_ssh_process = None
+        logger.info(f"----- All invoices paid")
 
         await self._golem.aclose()
         self._golem = None
@@ -132,99 +99,10 @@ class GolemService:
             logger.info("Cluster was created already.")
             return
 
-        self._num_workers = provider_config.num_workers
-        self._cluster_name = provider_config.cluster_name
-        self._temp_ssh_key_dir = TMP_PATH
-        self._temp_ssh_key_filename = get_ssh_key_name(self._cluster_name)
-
         payload = await self._create_payload(provider_config.node_config)
         self._demand = await self._golem.create_demand(
             payload, allocations=[self._allocation], autostart=True
         )
-
-    async def get_providers(
-        self,
-        tags: Dict,
-        count: int,
-    ) -> None:
-        """
-        Creates activities (demand providers) in golem network
-        :param tags: tags from ray
-        :param count: number of nodes to create
-        :param current_nodes_count: current count of running nodes
-        :return:
-        """
-        await self._create_activities(tags=tags, count=count)
-        await self._network.refresh_nodes()
-        await self._add_my_key()
-        self._print_ws_connection_data()
-
-        if not self._reverse_ssh_process:
-            self._reverse_ssh_process = await self._create_reverse_ssh_to_golem_network()
-
-    @staticmethod
-    async def destroy_activity(node: ClusterNode):
-        try:
-            await node.activity.destroy()
-        except Exception:
-            raise DestroyActivityError
-
-    async def _get_head_node(self) -> ClusterNode:
-        async with self._lock:
-            for node in self._cluster_nodes.values():
-                ray_node_type = node.tags.get("ray-node-type")
-                if ray_node_type == "head":
-                    return node
-
-    async def _create_reverse_ssh_to_golem_network(self) -> Process:
-        """
-        Creates reverse tunnel to golem network
-
-        :return: shell subprocess which runs reverse tunnel
-        """
-        head_node = await self._get_head_node()
-        proxy_command = self.get_node_ssh_proxy_command(head_node.node_id)
-        # text_command = f"ssh -N -R -o StrictHostKeyChecking=no *:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port} proxy@proxy.dev.golem.network"
-        text_command = (
-            f"ssh -N -R '*:{self._golem_ray_port}:127.0.0.1:{self._golem_ray_port}' "
-            "-o StrictHostKeyChecking=no "
-            "-o UserKnownHostsFile=/dev/null "
-            f'-o ProxyCommand="{proxy_command}" '
-            f"-i {self._temp_ssh_key_dir / self._temp_ssh_key_filename} "
-            f"root@{head_node.internal_ip}"
-        )
-
-        process = await asyncio.create_subprocess_shell(
-            text_command,
-            stderr=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stdin=asyncio.subprocess.PIPE,
-        )
-        logger.info(
-            f"Reverse ssh tunnel from 127.0.0.1:{self._golem_ray_port} to *:{self._golem_ray_port} created."
-        )
-
-        return process
-
-    @staticmethod
-    async def _add_authorized_key(activity, key):
-        # TODO: Creating temporary key for ray cluster instance
-        """
-        Adds local machine ssh key to providers machine
-        :param activity: Activity object from golem
-        :param key: Key you want to add to authorized_keys on provider machine
-        """
-        batch = await activity.execute_commands(
-            commands.Run("mkdir -p /root/.ssh"),
-            commands.Run("touch /root/.ssh/authorized_keys"),
-            commands.Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
-        )
-        try:
-            await batch.wait(15)
-            logger.info("Added local ssh key to provider with id: {}".format(activity.id))
-        except Exception:
-            print(batch.events)
-            raise
 
     async def _create_payload(self, node_config: NodeConfigData) -> ManifestVmPayload:
         """
@@ -297,94 +175,140 @@ class GolemService:
                 else:
                     raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
-    def _print_ws_connection_data(self) -> None:
-        """
-        Prints command which allows to manually ssh on providers machines
-        :return:
-        """
-        for node in self._cluster_nodes.values():
-            if node.activity:
-                print(
-                    "Connect with:\n"
-                    "ssh "
-                    "-o StrictHostKeyChecking=no "
-                    "-o UserKnownHostsFile=/dev/null "
-                    f"-o ProxyCommand='{self._websocat_path} asyncstdio: {node.connection_uri}/22 --binary "
-                    f'-H=Authorization:"Bearer {self._golem._api_config.app_key}"\' root@{node.internal_ip} '
-                    # f"-i ${str(self._temp_ssh_key_dir)}/${self._temp_ssh_key_filename}"
-                )
-
-    def get_node_ssh_proxy_command(self, node_id: NodeId) -> str:
-        node = self._cluster_nodes.get(node_id)
-
+    def get_ssh_proxy_command(self, connection_uri: URL) -> str:
         # Using single quotes for JWT token as double quotes are causing problems with CLI character escaping in ray
-        return f"{self._websocat_path} asyncstdio: {node.connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
+        return f"{self._websocat_path} asyncstdio: {connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
 
-    async def _create_activities(self, count: int, tags: Dict = None) -> None:
-        """
-        This functions manages demands, negotiations, agreements, creates activities
-        and creates ssh connection to nodes.
+    async def create_activities(
+        self, node_config: Dict[str, Any], count: int, ssh_public_key_path: Path
+    ) -> List[Tuple[Activity, str, str]]:
+        demand = self._demand  # FIXME: Use demand for proper node_config
 
-        :param connection_timeout: Currently not used
-        :return:
-        """
         async with self._lock:
-            try:  # TODO: upload golem_ray files
+            try:
                 async with async_timeout.timeout(int(150)):
                     chain = Chain(
-                        self._demand.initial_proposals(),
+                        demand.initial_proposals(),
                         # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
                         Map(self._negotiate),
                         Map(default_create_agreement),
                         Map(default_create_activity),
-                        Map(SshService.create_ssh_connection(self._network)),
+                        Map(self._deploy_with_vpn_and_start),
+                        Map(self._bootstrap_host),
                         Buffer(1),
                         Limit(count),
                     )
 
-                    async for activity, ip, connection_uri in chain:
-                        node_id = len(self._cluster_nodes)
-                        cluster_node = ClusterNode(
-                            node_id=node_id,
-                            activity=activity,
-                            internal_ip=IPv4Address(ip),
-                            connection_uri=connection_uri,
-                            tags=tags,
-                            state=NodeState.pending,
-                        )
-                        found = next(
-                            (x for x in self.cluster_nodes.values() if x.internal_ip == ip), None
-                        )
-                        if not found:
-                            self._cluster_nodes[node_id] = cluster_node
-                            logger.debug(f"-----ACTIVITY YIELDED: {str(activity)}")
+                    results = []
+                    async for activity, ip in chain:
+                        connection_uri = self._get_connection_uri(ip)
+                        ssh_proxy_command = self.get_ssh_proxy_command(connection_uri)
+                        self._print_ssh_command(ip, ssh_proxy_command, ssh_public_key_path)
+
+                        await self._add_public_ssh_key(activity, ssh_public_key_path)
+
+                        results.append((activity, ip, ssh_proxy_command))
+
+                    await self._network.refresh_nodes()
+
+                    return results
 
             except asyncio.TimeoutError:
                 raise CreateActivitiesTimeout
 
-    async def _add_my_key(self):
-        """
-        Add local ssh key to all providers
-        """
-        async with self._lock:
-            id_rsa_file_path = self._temp_ssh_key_dir / (self._temp_ssh_key_filename + ".pub")
-
-            if not id_rsa_file_path.exists():
-                logger.error(f"{id_rsa_file_path} not exists. SSH connection may fail.")
-                return
-
-            # TODO: Use async file handling
-            with id_rsa_file_path.open() as f:
-                my_key = f.readline().strip()
-
-            tasks = [
-                self._add_authorized_key(value.activity, my_key)
-                for value in self._cluster_nodes.values()
-                if value.activity
-            ]
-
-            await asyncio.gather(*tasks)
-
     @staticmethod
     async def _negotiate(proposal):
         return await asyncio.wait_for(default_negotiate(proposal), timeout=10)
+
+    async def _deploy_with_vpn_and_start(self, activity: Activity) -> Tuple[Activity, str]:
+        provider_id = activity.parent.parent.data.issuer_id
+        assert provider_id is not None  # mypy
+        ip = await self._network.create_node(provider_id)
+
+        deploy_args = {"net": [self._network.deploy_args(ip)]}
+
+        batch = await activity.execute_commands(
+            commands.Deploy(deploy_args),
+            commands.Start(),
+        )
+
+        try:
+            await batch.wait(600)
+        except BatchError:
+            # FIXME: image_url should be freely available instead of decoding manifest
+            provider_name = activity.parent.parent.data.properties["golem.node.id.name"]
+            manifest = json.loads(
+                base64.b64decode(
+                    activity.parent.parent.demand.data.properties["golem.srv.comp.payload"]
+                )
+            )
+            image_url = manifest["payload"][0]["urls"][0]
+            print(
+                f"Provider '{provider_name}' deploy failed on image '{image_url}' with batch id: '{batch.id}'"
+            )
+            raise
+
+        return activity, ip
+
+    async def _bootstrap_host(self, activity: Activity, ip: str) -> Tuple[Activity, str]:
+        hostname = ip.replace(".", "-")
+
+        batch = await activity.execute_commands(
+            commands.Run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment"),
+            commands.Run(f"hostname '{hostname}'"),
+            commands.Run(f"echo '{hostname}' > /etc/hostname"),
+            commands.Run(f"echo '{ip} {hostname}' >> /etc/hosts"),
+            commands.Run("service ssh start"),
+        )
+        await batch.wait(15)
+
+        return activity, ip
+
+    def _get_connection_uri(self, ip: str) -> URL:
+        network_url = URL(self._network.node._api_config.net_url)
+        return network_url.with_scheme("ws") / "net" / self._network.id / "tcp" / ip
+
+    def _print_ssh_command(
+        self, ip: str, ssh_proxy_command: str, ssh_public_key_path: Path
+    ) -> None:
+        print(
+            f"Connect to {ip} with:\n"
+            "ssh "
+            "-o StrictHostKeyChecking=no "
+            "-o UserKnownHostsFile=/dev/null "
+            f"-o ProxyCommand='{ssh_proxy_command}' "
+            f"-i {ssh_public_key_path} "
+            f"root@{ip}"
+        )
+
+    async def _add_public_ssh_key(self, activity: Activity, ssh_public_key_path: Path):
+        """
+        Add local ssh key to all providers
+        """
+        if not ssh_public_key_path.exists():
+            logger.error(f"{ssh_public_key_path} not exists. SSH connection may fail.")
+            return
+
+        # TODO: Use async file handling
+        with ssh_public_key_path.open() as f:
+            public_ssh_key = f.readline().strip()
+
+        await self._add_authorized_key(activity, public_ssh_key)
+
+    @staticmethod
+    async def _add_authorized_key(activity: Activity, key: str) -> None:
+        """
+        Adds local machine ssh key to providers machine
+        :param activity: Activity object from golem
+        :param key: Key you want to add to authorized_keys on provider machine
+        """
+        batch = await activity.execute_commands(
+            commands.Run("mkdir -p /root/.ssh"),
+            commands.Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
+        )
+        try:
+            await batch.wait(15)
+            logger.info("Added local ssh key to provider with id: {}".format(activity.id))
+        except Exception:
+            print(batch.events)
+            raise

@@ -6,8 +6,7 @@ import ray
 # os.environ["RAY_OVERRIDE_RESOURCES"] = "{}"
 # Let's start Ray
 ray.init()
-print(f"{ray.available_resources() = }")
-# ray.init(address="auto")
+print(f"{ray.available_resources()=}")
 
 SAMPLES = 1000000
 
