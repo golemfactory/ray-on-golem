@@ -1,7 +1,7 @@
 from aiohttp import web
 
-from golem_ray.server import models, settings
-from golem_ray.server.services import RayService
+from ray_on_golem.server import models, settings
+from ray_on_golem.server.services import RayService
 
 routes = web.RouteTableDef()
 

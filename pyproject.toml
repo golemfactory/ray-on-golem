@@ -4,7 +4,7 @@ version = "0.1.0-alpha.0"
 description = "Golem Network integration with Ray"
 authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
-packages = [{include = "golem_ray"}]
+packages = [{include = "ray_on_golem"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -19,7 +19,7 @@ pydantic = "<2"
 setuptools = "*"
 
 [tool.poetry.scripts]
-ray-on-golem = "golem_ray.server.run:main"
+ray-on-golem = "ray_on_golem.server.run:main"
 
 
 [tool.poetry.group.dev.dependencies]

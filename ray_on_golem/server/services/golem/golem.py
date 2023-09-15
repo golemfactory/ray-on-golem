@@ -23,20 +23,20 @@ from golem_core.managers.payment.default import DefaultPaymentManager
 from golem_core.pipeline import Buffer, Chain, Limit, Map
 from yarl import URL
 
-from golem_ray.server.exceptions import (
+from ray_on_golem.server.exceptions import (
     CreateActivitiesTimeout,
-    GolemRayServerError,
+    RayOnGolemServerError,
     RegistryRequestError,
 )
-from golem_ray.server.models import CreateClusterRequestData, NodeConfigData
-from golem_ray.server.services.golem.manifest import get_manifest
+from ray_on_golem.server.models import CreateClusterRequestData, NodeConfigData
+from ray_on_golem.server.services.golem.manifest import get_manifest
 
 logger = logging.getLogger(__name__)
 
 
 class GolemService:
-    def __init__(self, golem_ray_port: int, websocat_path: Path):
-        self._golem_ray_port = golem_ray_port
+    def __init__(self, ray_on_golem_port: int, websocat_path: Path):
+        self._ray_on_golem_port = ray_on_golem_port
         self._websocat_path = websocat_path
 
         self._golem: Optional[GolemNode] = None
@@ -128,7 +128,7 @@ class GolemService:
         image_hash = node_config.image_hash
 
         if image_tag is not None and image_hash is not None:
-            raise GolemRayServerError(
+            raise RayOnGolemServerError(
                 "Only one of 'image_tag' and 'image_hash' parameter should be defined!"
             )
 
