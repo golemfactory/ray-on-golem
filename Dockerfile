@@ -18,6 +18,7 @@ RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
 	echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
 	echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 
+RUN pip install -U pip
 RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
 WORKDIR /app
