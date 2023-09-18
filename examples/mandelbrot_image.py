@@ -1,10 +1,10 @@
 import argparse
-from datetime import datetime, timezone
 import math
-from typing import Tuple, NamedTuple
+from datetime import datetime, timezone
+from typing import NamedTuple, Tuple
 
-from PIL import Image
 import ray
+from PIL import Image
 
 ZOOM_BASE = 2.0
 
@@ -30,7 +30,6 @@ def mandel(x0, y0, max_iter):
         i += 1
 
     return draw_pixel(i / max_iter)
-
 
 
 def calculate_mandel(
@@ -66,7 +65,7 @@ def draw_mandelbrot(
     y_range: Tuple[float, float],
     max_iter: int,
     num_chunks: int = 1,
-    use_ray: bool=True,
+    use_ray: bool = True,
 ):
     chunks = list()
 
@@ -130,7 +129,8 @@ def draw_mandelbrot(
 def argument_parser():
     parser = argparse.ArgumentParser("mandelbrot on ray")
     parser.add_argument(
-        "-s", "--size",
+        "-s",
+        "--size",
         nargs=2,
         metavar=("X", "Y"),
         help="size of the output image, default=%(default)s",
@@ -138,27 +138,31 @@ def argument_parser():
         default=(500, 500),
     )
     parser.add_argument(
-        "-c", "--center",
+        "-c",
+        "--center",
         nargs=2,
         metavar=("X", "Y"),
         help="center of the drawn region, default=%(default)s",
         type=float,
-        default=(-.743643135, .131825963),
+        default=(-0.743643135, 0.131825963),
     )
     parser.add_argument(
-        "-z", "--zoom",
+        "-z",
+        "--zoom",
         help="magnification of the drawn region, default=%(default)s",
         type=float,
-        default=200000
+        default=200000,
     )
     parser.add_argument(
-        "-i", "--max-iterations",
+        "-i",
+        "--max-iterations",
         help="maximum number of iterations to perform per pixel, default=%(default)s",
         type=int,
         default=500,
     )
     parser.add_argument(
-        "-n", "--num-chunks",
+        "-n",
+        "--num-chunks",
         help="number of chunks to divide output into, default=%(default)s",
         type=int,
         default=16,
@@ -168,13 +172,14 @@ def argument_parser():
         help="number of CPUs for ray to use",
         type=int,
     )
-    parser.add_argument("-r", "--use-ray", action='store_true', help="use ray")
+    parser.add_argument("-r", "--use-ray", action="store_true", help="use ray")
     parser.add_argument(
-        "-R", "--no-use-ray", dest='use_ray', action='store_false', help="don't use ray"
+        "-R", "--no-use-ray", dest="use_ray", action="store_false", help="don't use ray"
     )
     parser.set_defaults(use_ray=True)
 
     return parser
+
 
 ####
 
@@ -196,7 +201,7 @@ draw_mandelbrot(
     x_range=(args.center[0] - ZOOM_BASE / args.zoom, args.center[0] + ZOOM_BASE / args.zoom),
     y_range=(
         args.center[1] - ZOOM_BASE / (args.zoom * aspect_ratio),
-        args.center[1] + ZOOM_BASE / (args.zoom * aspect_ratio)
+        args.center[1] + ZOOM_BASE / (args.zoom * aspect_ratio),
     ),
     max_iter=args.max_iterations,
     num_chunks=args.num_chunks,

@@ -1,8 +1,8 @@
 import argparse
-from datetime import datetime
 import itertools
-from typing import Optional
+from datetime import datetime
 from hashlib import sha256
+from typing import Optional
 
 # `test`: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
 # `foo`:  2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
@@ -11,20 +11,25 @@ from hashlib import sha256
 # `x`:    2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
 
 # the character table that we want to use to construct possible phrases
-CHARS = [chr(c) for c in itertools.chain(
-    range(ord("a"), ord("z") + 1),
-    range(ord("A"), ord("Z") + 1),
-    range(ord("0"), ord("9") + 1),
-    range(ord(" "), ord("/") + 1),
-    range(ord(":"), ord("@") + 1),
-    range(ord("["), ord("`") + 1),
-    range(ord("{"), ord("~") + 1),
-)]
+CHARS = [
+    chr(c)
+    for c in itertools.chain(
+        range(ord("a"), ord("z") + 1),
+        range(ord("A"), ord("Z") + 1),
+        range(ord("0"), ord("9") + 1),
+        range(ord(" "), ord("/") + 1),
+        range(ord(":"), ord("@") + 1),
+        range(ord("["), ord("`") + 1),
+        range(ord("{"), ord("~") + 1),
+    )
+]
 
 start_time = datetime.now()
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-l", "--length", type=int, default=3, help="brute force length, default: %(default)s")
+parser.add_argument(
+    "-l", "--length", type=int, default=3, help="brute force length, default: %(default)s"
+)
 parser.add_argument("hash", type=str)
 args = parser.parse_args()
 
@@ -44,12 +49,12 @@ def str_to_int(value: str) -> int:
     base = len(CHARS) + 1
     intval = 0
     for position, digit in zip(itertools.count(), [CHARS.index(v) + 1 for v in reversed(value)]):
-        intval += digit * base ** position
+        intval += digit * base**position
 
     return intval
 
 
-def int_to_str(intval: int, round_nulls = False) -> Optional[str]:
+def int_to_str(intval: int, round_nulls=False) -> Optional[str]:
     """
     Convert an integer value back to the equivalent string.
 
@@ -97,5 +102,5 @@ for word in words:
 
 print(
     f"finished in {datetime.now() - start_time},",
-    f"match found: {result}" if result else f"match not found"
+    f"match found: {result}" if result else f"match not found",
 )
