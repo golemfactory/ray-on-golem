@@ -11,7 +11,7 @@ idle_timeout_minutes: 5
 provider:
   type: "external"
   use_internal_ips: true
-  module: "golem_ray.provider.node_provider.GolemNodeProvider"
+  module: "ray_on_golem.provider.node_provider.GolemNodeProvider"
   parameters:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
@@ -28,11 +28,10 @@ provider:
     node_config:
       # if not provided, image_tag will be autodetected based on currently used python and ray versions
       # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-      # image_tag: "approxit/ray-test:py3.10.12-ray2.3.1"
-      # image_tag: "approxit/ray-test:py3.10.12-ray2.4.0"
+      image_tag: "lucjandudek/ray-on-golem:py3.10.12-ray2.3.1"
 
       # you can also provide the image hash directly (although it is not recommended :)
-      image_hash: "be4cbaaa611da06927e2daf892f31250cc8e9a6ccefd54fb849e7678"
+      # image_hash: "c6fc9b12da19d56a998eace84b6df961852360b37479e93ef4ce3913" # approxit/ray-test:py3.10.12-ray2.3.1
 
       capabilities: ['vpn', 'inet', 'manifest-support']
       min_mem_gib: 0
@@ -42,7 +41,7 @@ provider:
 # The files or directories to copy to the head and worker nodes
 file_mounts:
   {
-    "/app/golem_ray": "./golem_ray",
+    #    "/app/ray_on_golem": "/tmp/ray-on-golem",
   }
 
 # Tells the autoscaler the allowed node types and the resources they provide
