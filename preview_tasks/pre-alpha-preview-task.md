@@ -17,7 +17,7 @@ If you have any questions, we encourage you to contact the Ray on Golem team dir
 
 We also encourage you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
 
-## Available tasks
+## Preview tasks
 
 There are four tasks. You need to complete them all to apply for the reward.
 
