@@ -85,9 +85,9 @@ class GolemService:
         """
         await self.payment_manager.terminate_agreements()
 
-        logger.info(f"----- Waiting for all invoices...")
+        logger.info(f"Waiting for all invoices...")
         await self.payment_manager.wait_for_invoices()
-        logger.info(f"----- All invoices paid")
+        logger.info(f"Waiting for all invoices done")
 
         await self._golem.aclose()
         self._golem = None

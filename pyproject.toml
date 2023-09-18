@@ -21,7 +21,6 @@ setuptools = "*"
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.server.run:main"
 
-
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.22.0"
 

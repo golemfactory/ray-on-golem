@@ -38,6 +38,10 @@ class RayService:
         await self._stop_head_node_to_webserver_tunel()
 
         async with self._nodes_lock:
+            if not self._nodes:
+                logger.info(f"No need to destroy activities, as no activities are running")
+                return
+
             logger.info(f"Destroying {len(self._nodes)} activities...")
 
             for node in self._nodes.values():

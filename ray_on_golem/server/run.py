@@ -1,6 +1,7 @@
 import argparse
 import logging
 import logging.config
+from functools import partial
 
 from aiohttp import web
 
@@ -37,11 +38,11 @@ def prepare_tmp_dir():
         pass
 
 
-async def print_hello(app: web.Application) -> None:
-    logger.info("Server started")
+async def print_hello(app: web.Application, port: int) -> None:
+    logger.info(f"Server started on port {port}")
 
 
-def create_application() -> web.Application:
+def create_application(port: int) -> web.Application:
     app = web.Application(middlewares=[error_middleware])
 
     app["yagna_service"] = YagnaService(
@@ -59,25 +60,38 @@ def create_application() -> web.Application:
     )
 
     app.add_routes(routes)
-    app.cleanup_ctx.append(ray_on_golem_ctx)
-    app.on_startup.append(print_hello)
+    app.cleanup_ctx.append(yagna_service_ctx)
+    app.cleanup_ctx.append(golem_service_ctx)
+    app.cleanup_ctx.append(ray_service_ctx)
+    app.on_startup.append(partial(print_hello, port=port))
 
     return app
 
-
-async def ray_on_golem_ctx(app: web.Application):
+async def yagna_service_ctx(app: web.Application) -> None:
     yagna_service: YagnaService = app["yagna_service"]
-    golem_service: GolemService = app["golem_service"]
-    ray_service: RayService = app["ray_service"]
 
     await yagna_service.init()
+
+    yield
+
+    await yagna_service.shutdown()
+
+async def golem_service_ctx(app: web.Application) -> None:
+    golem_service: GolemService = app["golem_service"]
+    yagna_service: YagnaService = app["yagna_service"]
+
     await golem_service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield  # before yield called on startup, after yield called on cleanup
+    yield
+
+    await golem_service.shutdown()
+
+async def ray_service_ctx(app: web.Application) -> None:
+    ray_service: RayService = app["ray_service"]
+
+    yield
 
     await ray_service.shutdown()
-    await golem_service.shutdown()
-    await yagna_service.shutdown()
 
 
 def main():
@@ -86,8 +100,8 @@ def main():
     args = parse_sys_args()
     prepare_tmp_dir()
 
-    app = create_application()
-    web.run_app(app, port=args.port)
+    app = create_application(args.port)
+    web.run_app(app, port=args.port, print=None)
 
 
 if __name__ == "__main__":
