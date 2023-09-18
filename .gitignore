@@ -7,3 +7,5 @@ venv*
 poetry.lock
 *.gvmi
 *.gvmi.descr.bin
+.requirements.txt
+.python-version

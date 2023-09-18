@@ -18,15 +18,16 @@ RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
 	echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
 	echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 
+RUN pip install -U pip
 RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
 WORKDIR /app
 
 COPY pyproject.toml README.md /app/
-COPY golem_ray/__init__.py /app/golem_ray/__init__.py
+COPY ray_on_golem/__init__.py /app/ray_on_golem/__init__.py
 
 RUN pip install poetry && \
 	poetry config virtualenvs.create false && \
 	poetry install --no-interaction --no-ansi
 
-COPY golem_ray /app/golem_ray/
+COPY ray_on_golem /app/ray_on_golem/

@@ -1,9 +1,8 @@
 from datetime import datetime
 
-DEAL_COUNT = 50
-
 import ray
 
+DEAL_COUNT = 50
 # endplay library dependency
 runtime_env = {"pip": ["endplay==0.4.11b0"]}
 
