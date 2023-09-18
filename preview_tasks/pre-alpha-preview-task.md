@@ -39,7 +39,7 @@ We want to test how our solution behaves on different environments and how helpf
  
 ### #3 Parallelize the hash cracker script with Ray and execute it on Ray on Golem
 
-Take a look at this [piece of code](https://github.com/golemfactory/golem-ray/blob/mateusz/preview_tasks/examples/hash_cracker_without_ray.py)
+Take a look at this [piece of code](https://github.com/golemfactory/ray-on-golem/blob/mateusz/preview_tasks/examples/hash_cracker_without_ray.py)
 
 It takes a sha256 hash of some unknown word as an input and looks for a word that results in a match.
 The code doesn't know anything about Golem nor Ray.

@@ -4,16 +4,16 @@ import logging.config
 
 from aiohttp import web
 
-from golem_ray.server.middlewares import error_middleware
-from golem_ray.server.services import GolemService, RayService, SshService, YagnaService
-from golem_ray.server.settings import (
-    GOLEM_RAY_PORT,
+from ray_on_golem.server.middlewares import error_middleware
+from ray_on_golem.server.services import GolemService, RayService, YagnaService
+from ray_on_golem.server.settings import (
     LOGGING_CONFIG,
+    RAY_ON_GOLEM_SERVER_PORT,
     TMP_PATH,
     WEBSOCAT_PATH,
     YAGNA_PATH,
 )
-from golem_ray.server.views import routes
+from ray_on_golem.server.views import routes
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 def parse_sys_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ray on Golem's webserver.")
     parser.add_argument(
-        "-p", "--port",
+        "-p",
+        "--port",
         type=int,
         help="port for Ray on Golem's webserver to listen on, default: %(default)s",
         default=4578,
@@ -48,32 +49,33 @@ def create_application() -> web.Application:
     )
 
     app["golem_service"] = GolemService(
-        golem_ray_port=GOLEM_RAY_PORT,
+        ray_on_golem_port=RAY_ON_GOLEM_SERVER_PORT,
         websocat_path=WEBSOCAT_PATH,
     )
 
     app["ray_service"] = RayService(
         golem_service=app["golem_service"],
+        tmp_path=TMP_PATH,
     )
 
-    app["ssh_service"] = SshService()
-
     app.add_routes(routes)
-    app.cleanup_ctx.append(golem_ray_ctx)
+    app.cleanup_ctx.append(ray_on_golem_ctx)
     app.on_startup.append(print_hello)
 
     return app
 
 
-async def golem_ray_ctx(app: web.Application):
+async def ray_on_golem_ctx(app: web.Application):
     yagna_service: YagnaService = app["yagna_service"]
     golem_service: GolemService = app["golem_service"]
+    ray_service: RayService = app["ray_service"]
 
     await yagna_service.init()
     await golem_service.init(yagna_appkey=yagna_service.yagna_appkey)
 
     yield  # before yield called on startup, after yield called on cleanup
 
+    await ray_service.shutdown()
     await golem_service.shutdown()
     await yagna_service.shutdown()
 

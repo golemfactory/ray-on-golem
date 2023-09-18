@@ -2,11 +2,11 @@
 
 ## What is Golem, Ray and Ray on Golem
 
-Golem on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
+[Golem](https://golem.network) on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
 
 Ray on Golem makes it super easy to set up and use Golem Network to run your Ray applications.
 
-Ray on the other hand is an open-source framework dedicated to scaling Python workloads. 
+[Ray](https://ray.io) on the other hand is an open-source framework dedicated to scaling Python workloads. 
 It specializes in tooling for AI/ML applications, but at the same time, it is based on Ray Core which understands every piece of generic Python code.
 
 Ray uses concepts of tasks, actors, and objects to enable building and scaling distributed software.
@@ -80,7 +80,7 @@ It will give you a cluster of one node (which will expand when you feed it with 
 
 ```bash
 # Download the golem-cluster.yaml
-wget https://github.com/golemfactory/golem-ray/blob/main/golem-cluster.yaml
+wget https://github.com/golemfactory/ray-on-golem/blob/main/golem-cluster.yaml
 
 # In this command:
 # * yagna starts in the background (if not running)
@@ -96,7 +96,7 @@ Download our example Ray app and execute it locally (a Ray instance will be crea
 
 ```bash
 # Download the example Ray app
-wget https://github.com/golemfactory/golem-ray/blob/main/examples/simple-task.py
+wget https://github.com/golemfactory/ray-on-golem/blob/main/examples/simple-task.py
 
 # Execute the app locally by starting a local ray instance on your computer
 python simple-task.py
