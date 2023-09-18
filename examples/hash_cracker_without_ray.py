@@ -1,7 +1,7 @@
 import argparse
 from datetime import datetime
-from itertools import chain
 from hashlib import sha256
+from itertools import chain
 
 # `test`: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
 # `foo`:  2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
@@ -9,21 +9,30 @@ from hashlib import sha256
 # `be`:   46599c5bb5c33101f80cea8438e2228085513dbbb19b2f5ce97bd68494d3344d
 # `x`:    2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881
 
-CHARS = [chr(c) for c in chain(
-    range(ord("a"), ord("z") + 1),
-    range(ord("A"), ord("Z") + 1),
-    range(ord("0"), ord("9") + 1),
-    range(ord(" "), ord("/") + 1),
-    range(ord(":"), ord("@") + 1),
-    range(ord("["), ord("`") + 1),
-    range(ord("{"), ord("~") + 1),
-)]
+CHARS = [
+    chr(c)
+    for c in chain(
+        range(ord("a"), ord("z") + 1),
+        range(ord("A"), ord("Z") + 1),
+        range(ord("0"), ord("9") + 1),
+        range(ord(" "), ord("/") + 1),
+        range(ord(":"), ord("@") + 1),
+        range(ord("["), ord("`") + 1),
+        range(ord("{"), ord("~") + 1),
+    )
+]
 
 start_time = datetime.now()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-w", "--words", type=str, help="dictionary file")
-parser.add_argument("-l", "--length", type=int, default=0, help="brute force length (if the `words` dictionary is not provided), default: %(default)s")
+parser.add_argument(
+    "-l",
+    "--length",
+    type=int,
+    default=0,
+    help="brute force length (if the `words` dictionary is not provided), default: %(default)s",
+)
 parser.add_argument("hash", type=str)
 args = parser.parse_args()
 
@@ -35,7 +44,6 @@ def word_file(words_file: str):
 
 
 def brute_force(max_len: int):
-
     def brute_force_len(length: int):
         for char in CHARS:
             if length <= 1:
@@ -62,4 +70,7 @@ for word in words:
         result = word.decode("utf-8")
         break
 
-print(f"finished in {datetime.now() - start_time},", f"match found: {result}" if result else f"match not found")
+print(
+    f"finished in {datetime.now() - start_time},",
+    f"match found: {result}" if result else f"match not found",
+)
