@@ -5,7 +5,7 @@ Welcome to the Ray on Golem pre-alpha Preview Program description!
 Thank you for your interest in the Preview Program. 
 Its purpose is to test the new Ray on Golem solution with its documentation at https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray.
 
-The pre-alpha release is a sneak-peak, with only happy path working on our test network. We publish the release and run the preview program 
+The pre-alpha release is a sneak-peak, with happy path working on our test network. We publish the release and run the preview program 
 to get it out of the building - to start verifying the potential to decide on further investment in Ray on Golem. 
 
 This article contains a set of tasks that you can complete to broaden your knowledge and help improve the Golem Network.
