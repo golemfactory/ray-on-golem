@@ -24,6 +24,7 @@ ray-on-golem = "ray_on_golem.server.run:main"
 
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.22.0"
+liccheck = "^0.9.1"
 
 black = "^23.7.0"
 isort = "^5.12.0"
@@ -38,6 +39,10 @@ format = {sequence = ["_format_autoflake", "_format_isort", "_format_black"], he
 _format_autoflake = "autoflake ."
 _format_isort = "isort ."
 _format_black = "black ."
+check_license = {sequence = ["_check_license_export", "_check_license_verify"], help = "Check license compatibility"}
+_check_license_export = "poetry export -f requirements.txt -o .requirements.txt"
+_check_license_verify = "liccheck -r .requirements.txt"
+
 
 [tool.isort]
 profile = "black"
@@ -53,3 +58,29 @@ ignore-init-module-imports = true
 [tool.black]
 line-length = 100
 target-version = ['py38']
+
+[tool.liccheck]
+authorized_licenses = [
+  "bsd",
+  "new bsd",
+  "bsd license",
+  "3-Clause BSD",
+  "apache 2",
+  "apache",
+  "Apache Software",
+  "Apache Software License",
+  "Apache 2.0",
+  "MPL-2.0",
+  "Mozilla Public License 2.0 (MPL 2.0)",
+  "MIT",
+  "MIT License",
+  "LGPL",
+  "LGPL-3.0-or-later",
+  "GNU Lesser General Public License v3 or later (LGPLv3+)",
+  "GNU Lesser General Public License v3 (LGPLv3)",
+  "GNU Library or Lesser General Public License (LGPL)",
+  "Python Software Foundation",
+  "ISC",
+  "ISC License (ISCL)",
+  "The Unlicense (Unlicense)",
+]
