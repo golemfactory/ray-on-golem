@@ -125,6 +125,7 @@ while not result:
         result = ray.get(r)
         if result:
             print("found!")
+            break
         else:
             print("miss...")
 
