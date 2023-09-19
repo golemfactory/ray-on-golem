@@ -1,9 +1,11 @@
 import argparse
 import itertools
+import math
 from datetime import datetime
 from hashlib import sha256
 from typing import Optional
 
+# '9Lm!': de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec
 # `test`: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
 # `foo`:  2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
 # `glm`:  2bf548d8056029c73e6e28132d19a3a277a49daf32b1c1ba7b0b7fc7e78bf5cd
@@ -29,6 +31,13 @@ start_time = datetime.now()
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "-l", "--length", type=int, default=3, help="brute force length, default: %(default)s"
+)
+parser.add_argument(
+    "-n",
+    "--num-chunks",
+    help="number of chunks to divide the range into, default=%(default)s",
+    type=int,
+    default=16,
 )
 parser.add_argument("hash", type=str)
 args = parser.parse_args()
@@ -82,21 +91,28 @@ def int_to_str(intval: int, round_nulls=False) -> Optional[str]:
     return output
 
 
-def brute_force_range(start_string: str, end_string: str):
-    for i in range(str_to_int(start_string), str_to_int(end_string)):
-        s = int_to_str(i)
-        if s:
-            yield bytes(s, "utf-8")
+def scan_range(searched_hash: str, start: int, end: int):
+    print(f"scanning: {searched_hash}: {int_to_str(start, True)}, {int_to_str(end, True)}",)
+    for i in range(start, end):
+        word = int_to_str(i)
+        if word:
+            word_hash = sha256(bytes(word, "utf-8")).hexdigest()
+            if word_hash == searched_hash:
+                return word
 
 
 result = None
 
-words = brute_force_range(CHARS[0], CHARS[0] * (args.length + 1))
+start_space = str_to_int(CHARS[0])
+end_space = str_to_int(CHARS[0] * (args.length + 1))
+chunk_size = math.ceil((end_space - start_space) / args.num_chunks)
 
-for word in words:
-    word_hash = sha256(word).hexdigest()
-    if word_hash == args.hash:
-        result = word.decode("utf-8")
+for c in range(0, args.num_chunks):
+    start_chunk = start_space + c * chunk_size
+    end_chunk = min(end_space, start_chunk + chunk_size)
+    chunk_result = scan_range(args.hash, start_chunk, end_chunk)
+    if chunk_result:
+        result = chunk_result
         break
 
 
