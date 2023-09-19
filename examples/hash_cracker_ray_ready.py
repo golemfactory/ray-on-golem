@@ -92,6 +92,7 @@ def int_to_str(intval: int, round_nulls=False) -> Optional[str]:
 
 
 def scan_range(searched_hash: str, start: int, end: int):
+    print(f"scanning: {searched_hash}: {int_to_str(start, True)}, {int_to_str(end, True)}",)
     for i in range(start, end):
         word = int_to_str(i)
         if word:
