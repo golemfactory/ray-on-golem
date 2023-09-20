@@ -31,7 +31,9 @@ If you have any questions, comments, insights, praises, or doubts about these do
 
 # Limitations
 
-Current version is `pre-alpha` which means the happy path is working on Linux on the Golem test network. 
+Current version is `pre-alpha` which means the happy path is working on Ubuntu on the Golem test network.
+We have tested Ray on Golem on Ubuntu and on WSL. It should work on other Linux distributuions, might work on MacOS and shouldn't on bare Windows.
+ 
 We use this version to show the direction and get feedback.
 
 There is one Ray on Golem image. It contains `ray 2.3.1` and `python 3.10.12`.
@@ -53,8 +55,8 @@ It limits the explanation to the bare minimum - if you are looking for more deta
 The first step is installing Ray and Ray on Golem (recommended within a clean venv)
 
 ```bash
-# install ray & ray-on-golem
-pip install -U ray[default] ray-on-golem
+# install ray & ray-on-golem (recommended within a clean venv)
+pip3 install -U ray[default] ray-on-golem
 ```
 
 For now, you also need to download and install Golem node software representing you in the Golem network.
@@ -99,7 +101,7 @@ Download our example Ray app and execute it locally (a Ray instance will be crea
 wget https://github.com/golemfactory/ray-on-golem/blob/main/examples/simple-task.py
 
 # Execute the app locally by starting a local ray instance on your computer
-python simple-task.py
+python3 simple-task.py
 ```
 
 Feed the app to the cluster. Observe how Ray on Golem cluster expands during the computation
