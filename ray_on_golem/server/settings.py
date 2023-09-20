@@ -1,5 +1,8 @@
 import os
+from datetime import timedelta
 from pathlib import Path
+
+from yarl import URL
 
 RAY_ON_GOLEM_PATH = Path(os.getenv("RAY_ON_GOLEM_PATH", "ray-on-golem"))
 YAGNA_PATH = Path(os.getenv("YAGNA_PATH", "yagna"))
@@ -44,7 +47,13 @@ LOGGING_CONFIG = {
 }
 
 YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
-RAY_ON_GOLEM_SERVER_PORT = int(os.getenv("RAY_ON_GOLEM_SERVER_PORT", 4578))
+YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
+YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
+
+RAY_ON_GOLEM_PORT = int(os.getenv("RAY_ON_GOLEM_PORT", 4578))
+RAY_ON_GOLEM_START_DEADLINE = timedelta(seconds=30)
+RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
+RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=10)
 
 URL_HEALTH_CHECK = "/health_check"
 URL_CREATE_CLUSTER = "/create_cluster"

@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
 
+# FIXME: This route should be a default root URL with basic server info instead of
+#  custom URL with custom payload
 @routes.get(settings.URL_HEALTH_CHECK)
 async def health_check(request: web.Request) -> web.Response:
     return web.Response(text="ok")
@@ -182,9 +184,10 @@ async def self_shutdown(request):
         shutdown_state = ShutdownState.WILL_SHUTDOWN
 
     if shutdown_state == ShutdownState.WILL_SHUTDOWN:
-        logger.info("Received self shutdown request, exiting in 10 seconds...")
+        shutdown_seconds = int(settings.RAY_ON_GOLEM_SHUTDOWN_DELAY.total_seconds())
+        logger.info(f"Received a self-shutdown request, exiting in {shutdown_seconds} seconds...")
         loop = asyncio.get_event_loop()
-        loop.call_later(10, sys.exit)
+        loop.call_later(shutdown_seconds, sys.exit)
 
     response_data = models.SelfShutdownResponseData(shutdown_state=shutdown_state)
 

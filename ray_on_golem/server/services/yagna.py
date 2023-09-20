@@ -6,16 +6,12 @@ from pathlib import Path
 from typing import Optional
 
 import aiohttp
-from yarl import URL
 
 from ray_on_golem.exceptions import RayOnGolemError
-from ray_on_golem.server.settings import YAGNA_APPKEY
+from ray_on_golem.server.settings import YAGNA_API_URL, YAGNA_APPKEY, YAGNA_APPNAME
 from ray_on_golem.utils import run_subprocess
 
 logger = logging.getLogger(__name__)
-
-YAGNA_APPNAME = "ray-on-golem"
-YAGNA_API_URL = URL("http://127.0.0.1:7465")
 
 
 class YagnaServiceError(RayOnGolemError):
@@ -34,7 +30,7 @@ class YagnaService:
             logger.info("Yagna service is already running")
         else:
             await self._run_yagna_service()
-            await self._run_yagna_payment_fund()  # FIXME
+            await self._run_yagna_payment_init()
 
         self.yagna_appkey = await self._get_or_create_yagna_appkey()
 
@@ -58,17 +54,11 @@ class YagnaService:
         except aiohttp.ClientError:
             return False
 
-    async def _run_yagna_payment_fund(self) -> bool:
-        try:
-            await run_subprocess(self._yagna_path, "payment", "fund")
-        except RayOnGolemError:
-            return False
-
-        return True
-
-    async def _run_yagna_service(self):
+    async def _run_yagna_service(self) -> None:
         logger.info("Starting Yagna service...")
 
+        # TODO: Add explicit logs when subprocess fails instantly (for e.g. when yagna_path
+        #  is incorrect)
         process = await asyncio.create_subprocess_exec(
             self._yagna_path,
             "service",
@@ -87,7 +77,7 @@ class YagnaService:
 
     async def _stop_yagna_service(self):
         if self._yagna_process is None:
-            logger.info("No need to stop Yagna service, as it was ran externally")
+            logger.info("No need to stop Yagna service, as it was started externally")
             return
 
         logger.info("Stopping Yagna service...")
@@ -98,6 +88,9 @@ class YagnaService:
         await self._yagna_process.wait()
 
         logger.info("Stopping Yagna service done")
+
+    async def _run_yagna_payment_init(self) -> None:
+        await run_subprocess(self._yagna_path, "payment", "init")
 
     async def _get_or_create_yagna_appkey(self):
         if YAGNA_APPKEY:

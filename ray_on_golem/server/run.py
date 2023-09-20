@@ -1,7 +1,6 @@
 import argparse
 import logging
 import logging.config
-from functools import partial
 
 from aiohttp import web
 
@@ -9,7 +8,7 @@ from ray_on_golem.server.middlewares import error_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
     LOGGING_CONFIG,
-    RAY_ON_GOLEM_SERVER_PORT,
+    RAY_ON_GOLEM_PORT,
     TMP_PATH,
     WEBSOCAT_PATH,
     YAGNA_PATH,
@@ -32,7 +31,7 @@ def parse_sys_args() -> argparse.Namespace:
         "--self-shutdown",
         action="store_true",
         default=False,
-        help="flag to enable self shutdown after last node termination, default: %(default)s",
+        help="flag to enable self-shutdown after last node termination, default: %(default)s",
     )
     return parser.parse_args()
 
@@ -44,13 +43,10 @@ def prepare_tmp_dir():
         pass
 
 
-async def print_hello(app: web.Application, port: int) -> None:
-    logger.info(f"Server started on port {port}")
-
-
 def create_application(port: int, self_shutdown: bool) -> web.Application:
     app = web.Application(middlewares=[error_middleware])
 
+    app["port"] = port
     app["self_shutdown"] = self_shutdown
 
     app["yagna_service"] = YagnaService(
@@ -58,7 +54,7 @@ def create_application(port: int, self_shutdown: bool) -> web.Application:
     )
 
     app["golem_service"] = GolemService(
-        ray_on_golem_port=RAY_ON_GOLEM_SERVER_PORT,
+        ray_on_golem_port=RAY_ON_GOLEM_PORT,
         websocat_path=WEBSOCAT_PATH,
     )
 
@@ -71,9 +67,18 @@ def create_application(port: int, self_shutdown: bool) -> web.Application:
     app.cleanup_ctx.append(yagna_service_ctx)
     app.cleanup_ctx.append(golem_service_ctx)
     app.cleanup_ctx.append(ray_service_ctx)
-    app.on_startup.append(partial(print_hello, port=port))
+    app.on_startup.append(startup_print)
+    app.on_shutdown.append(shutdown_print)
 
     return app
+
+
+async def startup_print(app: web.Application) -> None:
+    logger.info("Starting server done, listening on port {}".format(app["port"]))
+
+
+async def shutdown_print(app: web.Application) -> None:
+    logger.info("Stopping server...")
 
 
 async def yagna_service_ctx(app: web.Application) -> None:
@@ -112,9 +117,12 @@ def main():
     prepare_tmp_dir()
 
     app = create_application(args.port, args.self_shutdown)
-    web.run_app(app, port=args.port, print=None)
 
-    logger.info(f"Server stopped, bye!")
+    logger.info("Starting server...")
+
+    web.run_app(app, port=app["port"], print=None)
+
+    logger.info("Server stopped, bye!")
 
 
 if __name__ == "__main__":
