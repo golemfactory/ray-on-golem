@@ -38,6 +38,10 @@ class RayService:
         await self._stop_head_node_to_webserver_tunel()
 
         async with self._nodes_lock:
+            if not self._nodes:
+                logger.info(f"No need to destroy activities, as no activities are running")
+                return
+
             logger.info(f"Destroying {len(self._nodes)} activities...")
 
             for node in self._nodes.values():
@@ -108,8 +112,13 @@ class RayService:
 
             return {node.node_id: node.dict(exclude={"activity"})}
 
-    async def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeId]:
+    async def get_non_terminated_nodes_ids(
+        self, tags_to_match: Optional[Dict[str, str]] = None
+    ) -> List[NodeId]:
         async with self._nodes_lock:
+            if tags_to_match is None:
+                return list(self._nodes.keys())
+
             return [
                 node_id
                 for node_id, node in self._nodes.items()

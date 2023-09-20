@@ -8,7 +8,7 @@ from ray_on_golem.server.middlewares import error_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
     LOGGING_CONFIG,
-    RAY_ON_GOLEM_SERVER_PORT,
+    RAY_ON_GOLEM_PORT,
     TMP_PATH,
     WEBSOCAT_PATH,
     YAGNA_PATH,
@@ -24,8 +24,14 @@ def parse_sys_args() -> argparse.Namespace:
         "-p",
         "--port",
         type=int,
-        help="port for Ray on Golem's webserver to listen on, default: %(default)s",
         default=4578,
+        help="port for Ray on Golem's webserver to listen on, default: %(default)s",
+    )
+    parser.add_argument(
+        "--self-shutdown",
+        action="store_true",
+        default=False,
+        help="flag to enable self-shutdown after last node termination, default: %(default)s",
     )
     return parser.parse_args()
 
@@ -37,19 +43,18 @@ def prepare_tmp_dir():
         pass
 
 
-async def print_hello(app: web.Application) -> None:
-    logger.info("Server started")
-
-
-def create_application() -> web.Application:
+def create_application(port: int, self_shutdown: bool) -> web.Application:
     app = web.Application(middlewares=[error_middleware])
+
+    app["port"] = port
+    app["self_shutdown"] = self_shutdown
 
     app["yagna_service"] = YagnaService(
         yagna_path=YAGNA_PATH,
     )
 
     app["golem_service"] = GolemService(
-        ray_on_golem_port=RAY_ON_GOLEM_SERVER_PORT,
+        ray_on_golem_port=RAY_ON_GOLEM_PORT,
         websocat_path=WEBSOCAT_PATH,
     )
 
@@ -59,25 +64,50 @@ def create_application() -> web.Application:
     )
 
     app.add_routes(routes)
-    app.cleanup_ctx.append(ray_on_golem_ctx)
-    app.on_startup.append(print_hello)
+    app.cleanup_ctx.append(yagna_service_ctx)
+    app.cleanup_ctx.append(golem_service_ctx)
+    app.cleanup_ctx.append(ray_service_ctx)
+    app.on_startup.append(startup_print)
+    app.on_shutdown.append(shutdown_print)
 
     return app
 
 
-async def ray_on_golem_ctx(app: web.Application):
+async def startup_print(app: web.Application) -> None:
+    logger.info("Starting server done, listening on port {}".format(app["port"]))
+
+
+async def shutdown_print(app: web.Application) -> None:
+    logger.info("Stopping server...")
+
+
+async def yagna_service_ctx(app: web.Application) -> None:
     yagna_service: YagnaService = app["yagna_service"]
-    golem_service: GolemService = app["golem_service"]
-    ray_service: RayService = app["ray_service"]
 
     await yagna_service.init()
+
+    yield
+
+    await yagna_service.shutdown()
+
+
+async def golem_service_ctx(app: web.Application) -> None:
+    golem_service: GolemService = app["golem_service"]
+    yagna_service: YagnaService = app["yagna_service"]
+
     await golem_service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield  # before yield called on startup, after yield called on cleanup
+    yield
+
+    await golem_service.shutdown()
+
+
+async def ray_service_ctx(app: web.Application) -> None:
+    ray_service: RayService = app["ray_service"]
+
+    yield
 
     await ray_service.shutdown()
-    await golem_service.shutdown()
-    await yagna_service.shutdown()
 
 
 def main():
@@ -86,8 +116,13 @@ def main():
     args = parse_sys_args()
     prepare_tmp_dir()
 
-    app = create_application()
-    web.run_app(app, port=args.port)
+    app = create_application(args.port, args.self_shutdown)
+
+    logger.info("Starting server...")
+
+    web.run_app(app, port=app["port"], print=None)
+
+    logger.info("Server stopped, bye!")
 
 
 if __name__ == "__main__":

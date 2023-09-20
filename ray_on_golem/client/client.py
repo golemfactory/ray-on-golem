@@ -1,5 +1,4 @@
 from functools import lru_cache
-from http import HTTPStatus
 from typing import Any, Dict, List, Type, TypeVar
 
 import requests
@@ -21,13 +20,8 @@ class RayOnGolemClient:
 
     @classmethod
     @lru_cache()
-    def get_instance(cls, port: int) -> "RayOnGolemClient":
-        url = cls.get_url(port)
+    def get_instance(cls, url: URL) -> "RayOnGolemClient":
         return RayOnGolemClient(url)
-
-    @staticmethod
-    def get_url(port: int) -> URL:
-        return URL("http://127.0.0.1").with_port(port)
 
     def get_running_or_create_cluster(
         self,
@@ -171,6 +165,16 @@ class RayOnGolemClient:
 
         return response.ssh_key_base64
 
+    def shutdown_webserver(self) -> models.ShutdownState:
+        response = self._make_request(
+            url=settings.URL_SELF_SHUTDOWN,
+            request_data=models.SelfShutdownRequestData(),
+            response_model=models.SelfShutdownResponseData,
+            error_message="Couldn't send a self-shutdown request",
+        )
+
+        return response.shutdown_state
+
     def _make_request(
         self,
         *,
@@ -183,7 +187,7 @@ class RayOnGolemClient:
             str(self._base_url / url.lstrip("/")), data=request_data.json()
         )
 
-        if response.status_code != HTTPStatus.OK:
+        if response.status_code != 200:
             raise RayOnGolemClientError(f"{error_message}: {response.text}")
 
         try:
