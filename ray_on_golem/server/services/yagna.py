@@ -15,7 +15,7 @@ from ray_on_golem.utils import run_subprocess
 logger = logging.getLogger(__name__)
 
 YAGNA_APPNAME = "ray-on-golem"
-YAGNA_API_URL = URL('http://127.0.0.1:7465')
+YAGNA_API_URL = URL("http://127.0.0.1:7465")
 
 
 class YagnaServiceError(RayOnGolemError):
@@ -67,10 +67,12 @@ class YagnaService:
         return True
 
     async def _run_yagna_service(self):
-        logger.info('Starting Yagna service...')
+        logger.info("Starting Yagna service...")
 
         process = await asyncio.create_subprocess_exec(
-            self._yagna_path, "service", "run",
+            self._yagna_path,
+            "service",
+            "run",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -79,23 +81,23 @@ class YagnaService:
 
         if is_running:
             self._yagna_process = process
-            logger.info('Starting Yagna service done')
+            logger.info("Starting Yagna service done")
         else:
-            logger.error('Starting Yagna service failed!')
+            logger.error("Starting Yagna service failed!")
 
     async def _stop_yagna_service(self):
         if self._yagna_process is None:
-            logger.info('No need to stop Yagna service, as it was ran externally')
+            logger.info("No need to stop Yagna service, as it was ran externally")
             return
 
-        logger.info('Stopping Yagna service...')
+        logger.info("Stopping Yagna service...")
 
         if self._yagna_process.returncode is None:
             self._yagna_process.terminate()
 
         await self._yagna_process.wait()
 
-        logger.info('Stopping Yagna service done')
+        logger.info("Stopping Yagna service done")
 
     async def _get_or_create_yagna_appkey(self):
         if YAGNA_APPKEY:

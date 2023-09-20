@@ -1,14 +1,20 @@
+# TODO: Consider moving this package to ray_on_golem/provider/client because of cli_logger usage
+import subprocess
 from functools import lru_cache
 from http import HTTPStatus
+from time import sleep
 from typing import Any, Dict, List, Type, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
+from ray.autoscaler._private.cli_logger import cli_logger
 from yarl import URL
 
 from ray_on_golem.client.exceptions import RayOnGolemClientError, RayOnGolemClientValidationError
 from ray_on_golem.server import models, settings
-from ray_on_golem.server.models import NodeConfigData
+from ray_on_golem.server.models import NodeConfigData, ShutdownState
+from ray_on_golem.server.settings import RAY_ON_GOLEM_PATH, URL_HEALTH_CHECK
+from ray_on_golem.utils import is_running_on_golem_network
 
 TResponseModel = TypeVar("TResponseModel")
 
@@ -18,6 +24,9 @@ class RayOnGolemClient:
         self._base_url = base_url
 
         self._session = requests.Session()
+
+        if not is_running_on_golem_network():
+            self._start_webserver()
 
     @classmethod
     @lru_cache()
@@ -73,6 +82,8 @@ class RayOnGolemClient:
             response_model=models.TerminateNodeResponseData,
             error_message="Couldn't terminate node",
         )
+
+        self._stop_webserver()
 
         return response.terminated_nodes
 
@@ -192,3 +203,62 @@ class RayOnGolemClient:
             raise RayOnGolemClientValidationError(
                 "Couldn't validate response data",
             ) from e
+
+    def _start_webserver(self) -> None:
+        with cli_logger.group("Ray On Golem webserver"):
+            if self._is_webserver_running():
+                cli_logger.print("Webserver is already running")
+                return
+
+            cli_logger.print("Starting webserver...")
+            subprocess.Popen(
+                [RAY_ON_GOLEM_PATH, "-p", str(self._base_url.port), "--self-shutdown"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+            )
+
+            for _ in range(10):
+                sleep(2)
+
+                if self._is_webserver_running():
+                    cli_logger.print("Starting webserver done")
+                    return
+
+                cli_logger.print("Webserver is not yet running, waiting additional 2 seconds...")
+
+            cli_logger.abort("Starting webserver failed!")
+
+    def _stop_webserver(self) -> None:
+        with cli_logger.group("Ray On Golem webserver"):
+            if not self._is_webserver_running():
+                cli_logger.print("Webserver is already stopped")
+                return
+
+            cli_logger.print("Requesting webserver stop...")
+
+            response = self._make_request(
+                url=settings.URL_SELF_SHUTDOWN,
+                request_data=models.SelfShutdownRequestData(),
+                response_model=models.SelfShutdownResponseData,
+                error_message="Couldn't send self shutdown request",
+            )
+
+            if response.shutdown_state == ShutdownState.NOT_ENABLED:
+                cli_logger.print("No need to stop webserver, as it was ran externally")
+                return
+            elif response.shutdown_state == ShutdownState.CLUSTER_NOT_EMPTY:
+                cli_logger.print("No need to stop webserver, as cluster is not empty")
+                return
+
+            cli_logger.print("Requesting webserver done, will stop soon")
+
+    def _is_webserver_running(self) -> bool:
+        try:
+            response = self._session.get(
+                str(self._base_url / URL_HEALTH_CHECK.lstrip("/")), timeout=2
+            )
+        except requests.ConnectionError:
+            return False
+        else:
+            return response.status_code == HTTPStatus.OK and response.text == "ok"

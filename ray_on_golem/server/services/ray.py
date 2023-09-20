@@ -112,8 +112,13 @@ class RayService:
 
             return {node.node_id: node.dict(exclude={"activity"})}
 
-    async def get_non_terminated_nodes_ids(self, tags_to_match: Dict[str, str]) -> List[NodeId]:
+    async def get_non_terminated_nodes_ids(
+        self, tags_to_match: Optional[Dict[str, str]] = None
+    ) -> List[NodeId]:
         async with self._nodes_lock:
+            if tags_to_match is None:
+                return list(self._nodes.keys())
+
             return [
                 node_id
                 for node_id, node in self._nodes.items()
