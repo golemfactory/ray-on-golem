@@ -52,11 +52,11 @@ It limits the explanation to the bare minimum - if you are looking for more deta
 
 ## Install software
 
-The first step is installing Ray and Ray on Golem (recommended within a clean venv)
+The first step is installing Ray on Golem (recommended within a clean venv). It will install Ray as a dependency.
 
 ```bash
-# install ray & ray-on-golem (recommended within a clean venv)
-pip3 install -U ray[default] ray-on-golem
+# install ray-on-golem and ray (recommended within a clean venv)
+pip3 install -U ray-on-golem
 ```
 
 For now, you also need to download and install Golem node software representing you in the Golem network.
