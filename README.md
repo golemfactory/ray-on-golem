@@ -59,6 +59,9 @@ The first step is installing Ray on Golem (recommended within a clean venv). It 
 pip3 install -U ray-on-golem
 ```
 
+Additonally, a tool named websocat is needed to wrap connections between your machine and Ray on Golem cluster.
+You can install websocat using instructions on its website: https://lib.rs/crates/websocat
+
 For now, you also need to download and install Golem node software representing you in the Golem network.
 
 ```bash
@@ -66,9 +69,22 @@ For now, you also need to download and install Golem node software representing 
 curl -sSf https://join.golem.network/as-requestor | bash -
 ```
 
+## Start and initialize `yagna` service
+
+For the time being, you need to manually run `yagna` service (in a separate terminal) - it is a Golem node representing you in the Golem network
+
+```bash
+yagna service run
+```
+
+Leave it running, and in a separate terminal, initialize testnet payments.
+```bash
+yagna payment fund
+```
+
 ## Start `ray-on-golem` server
 
-For the time being you need to manually run `ray-on-golem` server (in a separate terminal)
+For the time being you need to manually run `ray-on-golem` server -leave it running in a separate terminal.
 
 ```bash
 ray-on-golem
