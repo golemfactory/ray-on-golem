@@ -30,9 +30,20 @@ def parse_sys_args() -> argparse.Namespace:
     parser.add_argument(
         "--self-shutdown",
         action="store_true",
-        default=False,
         help="flag to enable self-shutdown after last node termination, default: %(default)s",
     )
+    parser.add_argument("--no-self-shutdown", action="store_false", dest="self_shutdown")
+    parser.add_argument(
+        "--registry-stats",
+        action="store_true",
+        help="flag to enable collection of Golem Registry stats about resolved images, default: %(default)s",
+    )
+    parser.add_argument(
+        "--no-registry-stats",
+        action="store_false",
+        dest="registry_stats",
+    )
+    parser.set_defaults(self_shutdown=False, registry_stats=True)
     return parser.parse_args()
 
 
@@ -43,11 +54,12 @@ def prepare_tmp_dir():
         pass
 
 
-def create_application(port: int, self_shutdown: bool) -> web.Application:
+def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> web.Application:
     app = web.Application(middlewares=[error_middleware])
 
     app["port"] = port
     app["self_shutdown"] = self_shutdown
+    app["registry_stats"] = registry_stats
 
     app["yagna_service"] = YagnaService(
         yagna_path=YAGNA_PATH,
@@ -56,6 +68,7 @@ def create_application(port: int, self_shutdown: bool) -> web.Application:
     app["golem_service"] = GolemService(
         ray_on_golem_port=RAY_ON_GOLEM_PORT,
         websocat_path=WEBSOCAT_PATH,
+        registry_stats=app["registry_stats"],
     )
 
     app["ray_service"] = RayService(
@@ -116,13 +129,15 @@ def main():
     args = parse_sys_args()
     prepare_tmp_dir()
 
-    app = create_application(args.port, args.self_shutdown)
+    app = create_application(args.port, args.self_shutdown, args.registry_stats)
 
-    logger.info("Starting server...")
+    logger.info(
+        "Starting server... {}".format(", ".join(f"{k}={v}" for k, v in args.__dict__.items()))
+    )
 
     web.run_app(app, port=app["port"], print=None)
 
-    logger.info("Server stopped, bye!")
+    logger.info("Stopping server done, bye!")
 
 
 if __name__ == "__main__":

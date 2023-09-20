@@ -35,11 +35,15 @@ class RayService:
         self._ssh_public_key_path: Optional[Path] = None
 
     async def shutdown(self) -> None:
+        logger.info("Stopping RayService...")
+
         await self._stop_head_node_to_webserver_tunel()
 
         async with self._nodes_lock:
             if not self._nodes:
-                logger.info(f"No need to destroy activities, as no activities are running")
+                logger.info(
+                    "Stopping RayService done, no need to destroy activities, as no activities are running"
+                )
                 return
 
             logger.info(f"Destroying {len(self._nodes)} activities...")
@@ -50,6 +54,8 @@ class RayService:
             logger.info(f"Destroying {len(self._nodes)} activities done")
 
             self._nodes.clear()
+
+        logger.info("Stopping RayService done")
 
     async def create_cluster_on_golem(self, provider_config: CreateClusterRequestData) -> None:
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)

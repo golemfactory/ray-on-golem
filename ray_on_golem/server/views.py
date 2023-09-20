@@ -1,12 +1,12 @@
 import asyncio
 import logging
-import sys
 
 from aiohttp import web
 
 from ray_on_golem.server import models, settings
 from ray_on_golem.server.models import ShutdownState
 from ray_on_golem.server.services import RayService
+from ray_on_golem.utils import raise_graceful_exit
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ async def self_shutdown(request):
         shutdown_seconds = int(settings.RAY_ON_GOLEM_SHUTDOWN_DELAY.total_seconds())
         logger.info(f"Received a self-shutdown request, exiting in {shutdown_seconds} seconds...")
         loop = asyncio.get_event_loop()
-        loop.call_later(shutdown_seconds, sys.exit)
+        loop.call_later(shutdown_seconds, raise_graceful_exit)
 
     response_data = models.SelfShutdownResponseData(shutdown_state=shutdown_state)
 
