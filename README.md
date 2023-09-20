@@ -4,7 +4,7 @@
   <a href='https://docs.golem.network/docs/creators/ray'><img
       width='500px'
       alt=''
-      src="https://github.com/golemfactory/ray-on-golem/raw/mateusz/dcos-fixes-after-jacek/Ray_on_Golem.jpg" /></a>
+      src="https://github.com/golemfactory/ray-on-golem/raw/main/Ray_on_Golem.jpg" /></a>
 </h5>
 
 ## What is Golem, Ray and Ray on Golem
