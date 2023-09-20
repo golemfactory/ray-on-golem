@@ -1,5 +1,12 @@
 # Ray on Golem
 
+<h5 align="center">
+  <a href='https://docs.golem.network/docs/creators/ray'><img
+      width='500px'
+      alt=''
+      src="https://github.com/golemfactory/ray-on-golem/raw/main/Ray_on_Golem.jpg" /></a>
+</h5>
+
 ## What is Golem, Ray and Ray on Golem
 
 [Golem](https://golem.network) on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
