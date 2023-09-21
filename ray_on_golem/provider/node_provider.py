@@ -2,16 +2,15 @@ import logging
 import subprocess
 from copy import deepcopy
 from datetime import datetime
+from functools import lru_cache
 from time import sleep
 from types import ModuleType
 from typing import Any, Dict, List, Optional
 
-import requests
 from ray.autoscaler._private.cli_logger import cli_logger
 from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
-from yarl import URL
 
 from ray_on_golem.client.client import RayOnGolemClient
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
@@ -22,7 +21,6 @@ from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_PORT,
     RAY_ON_GOLEM_START_DEADLINE,
     TMP_PATH,
-    URL_HEALTH_CHECK,
 )
 from ray_on_golem.utils import get_default_ssh_key_name, is_running_on_golem_network
 
@@ -35,14 +33,11 @@ class GolemNodeProvider(NodeProvider):
         super().__init__(provider_config, cluster_name)
 
         provider_parameters = provider_config["parameters"]
-        self._webserver_url = URL("http://127.0.0.1").with_port(
-            provider_parameters["webserver_port"]
+
+        self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
+            provider_parameters["webserver_port"],
+            provider_parameters["enable_registry_stats"],
         )
-
-        if not is_running_on_golem_network():
-            self._start_webserver(provider_parameters["enable_registry_stats"])
-
-        self._ray_on_golem_client = RayOnGolemClient.get_instance(self._webserver_url)
         self._ray_on_golem_client.get_running_or_create_cluster(
             network=provider_parameters["network"],
             budget=provider_parameters["budget"],
@@ -50,8 +45,8 @@ class GolemNodeProvider(NodeProvider):
             ssh_private_key=provider_parameters["ssh_private_key"],
         )
 
-    @staticmethod
-    def bootstrap_config(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+    @classmethod
+    def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         config = deepcopy(cluster_config)
 
         provider_parameters: Dict = config["provider"]["parameters"]
@@ -60,7 +55,10 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters.setdefault("network", "goerli")
         provider_parameters.setdefault("budget", 1)
 
-        ray_on_golem_client = RayOnGolemClient.get_instance(provider_parameters["webserver_port"])
+        ray_on_golem_client = cls._get_ray_on_golem_client_instance(
+            provider_parameters["webserver_port"],
+            provider_parameters["enable_registry_stats"],
+        )
 
         auth: Dict = config["auth"]
         auth.setdefault("ssh_user", "root")
@@ -85,6 +83,16 @@ class GolemNodeProvider(NodeProvider):
         )
 
         return config
+
+    @classmethod
+    @lru_cache()
+    def _get_ray_on_golem_client_instance(cls, webserver_port: int, enable_registry_stats: bool):
+        ray_on_golem_client = RayOnGolemClient(webserver_port)
+
+        if not is_running_on_golem_network():
+            cls._start_webserver(ray_on_golem_client, webserver_port, enable_registry_stats)
+
+        return ray_on_golem_client
 
     def get_command_runner(
         self,
@@ -128,7 +136,7 @@ class GolemNodeProvider(NodeProvider):
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         terminated_nodes = self._ray_on_golem_client.terminate_node(node_id)
 
-        self._stop_webserver()
+        self._stop_webserver(self._ray_on_golem_client)
 
         return terminated_nodes
 
@@ -153,9 +161,12 @@ class GolemNodeProvider(NodeProvider):
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
         self._ray_on_golem_client.set_node_tags(node_id, tags)
 
-    def _start_webserver(self, registry_stats: bool) -> None:
+    @staticmethod
+    def _start_webserver(
+        ray_on_golem_client: RayOnGolemClient, port: int, registry_stats: bool
+    ) -> None:
         with cli_logger.group(WEBSERVER_LOG_GROUP):
-            if self._is_webserver_running():
+            if ray_on_golem_client.is_webserver_running():
                 cli_logger.print("Webserver is already running")
                 return
 
@@ -165,7 +176,7 @@ class GolemNodeProvider(NodeProvider):
                 [
                     RAY_ON_GOLEM_PATH,
                     "-p",
-                    str(self._webserver_url.port),
+                    str(port),
                     "--registry-stats" if registry_stats else "--no-registry-stats",
                     "--self-shutdown",
                 ],
@@ -179,7 +190,7 @@ class GolemNodeProvider(NodeProvider):
             while datetime.now() < start_deadline:
                 sleep(check_seconds)
 
-                if self._is_webserver_running():
+                if ray_on_golem_client.is_webserver_running():
                     cli_logger.print("Starting webserver done")
                     return
 
@@ -191,15 +202,16 @@ class GolemNodeProvider(NodeProvider):
                 f"Starting webserver failed! Deadline of {RAY_ON_GOLEM_START_DEADLINE} reached."
             )
 
-    def _stop_webserver(self) -> None:
+    @staticmethod
+    def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:
         with cli_logger.group(WEBSERVER_LOG_GROUP):
-            if not self._is_webserver_running():
+            if not ray_on_golem_client.is_webserver_running():
                 cli_logger.print("Webserver is already not running")
                 return
 
             cli_logger.print("Requesting webserver shutdown...")
 
-            shutdown_state = self._ray_on_golem_client.shutdown_webserver()
+            shutdown_state = ray_on_golem_client.shutdown_webserver()
 
             if shutdown_state == ShutdownState.NOT_ENABLED:
                 cli_logger.print("No need to stop the webserver, as it was started externally")
@@ -209,14 +221,3 @@ class GolemNodeProvider(NodeProvider):
                 return
 
             cli_logger.print("Requesting webserver shutdown done, will stop soon")
-
-    def _is_webserver_running(self) -> bool:
-        try:
-            response = requests.get(
-                str(self._webserver_url / URL_HEALTH_CHECK.lstrip("/")),
-                timeout=RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds(),
-            )
-        except requests.ConnectionError:
-            return False
-        else:
-            return response.status_code == 200 and response.text == "ok"
