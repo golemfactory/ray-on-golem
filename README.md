@@ -39,7 +39,7 @@ If you have any questions, comments, insights, praises, or doubts about these do
 # Limitations
 
 Current version is `pre-alpha` which means the happy path is working on Ubuntu on the Golem test network.
-We have tested Ray on Golem on Ubuntu and on WSL. It should work on other Linux distributuions, might work on MacOS and shouldn't on bare Windows.
+We have tested Ray on Golem on Ubuntu and on WSL, but it should work on other Linux distributions. At the moment, we don't support MacOS or bare Windows.
  
 We use this version to show the direction and get feedback.
 
