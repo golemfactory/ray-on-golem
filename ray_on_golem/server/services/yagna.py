@@ -31,7 +31,7 @@ class YagnaService:
             logger.info("Yagna service is already running")
         else:
             await self._run_yagna_service()
-            await self._run_yagna_payment_init()
+            await self._run_yagna_payment_fund()
 
         self.yagna_appkey = await self._get_or_create_yagna_appkey()
 
@@ -91,8 +91,8 @@ class YagnaService:
 
         logger.info("Stopping Yagna service done")
 
-    async def _run_yagna_payment_init(self) -> None:
-        await run_subprocess(self._yagna_path, "payment", "init")
+    async def _run_yagna_payment_fund(self) -> None:
+        await run_subprocess(self._yagna_path, "payment", "fund")
 
     async def _get_or_create_yagna_appkey(self):
         if YAGNA_APPKEY:

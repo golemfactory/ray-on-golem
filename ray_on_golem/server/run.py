@@ -124,10 +124,10 @@ async def ray_service_ctx(app: web.Application) -> None:
 
 
 def main():
+    prepare_tmp_dir()
     logging.config.dictConfig(LOGGING_CONFIG)
 
     args = parse_sys_args()
-    prepare_tmp_dir()
 
     app = create_application(args.port, args.self_shutdown, args.registry_stats)
 
