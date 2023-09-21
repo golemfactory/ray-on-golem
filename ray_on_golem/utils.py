@@ -5,6 +5,8 @@ from asyncio.subprocess import Process
 from pathlib import Path
 from typing import Dict, Optional
 
+from aiohttp.web_runner import GracefulExit
+
 from ray_on_golem.exceptions import RayOnGolemError
 
 
@@ -68,3 +70,7 @@ async def start_ssh_reverse_tunel_process(
     )
 
     return process
+
+
+def raise_graceful_exit() -> None:
+    raise GracefulExit()

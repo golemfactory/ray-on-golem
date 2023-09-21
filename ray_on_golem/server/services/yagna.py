@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from asyncio.subprocess import Process
 from pathlib import Path
 from typing import Optional
@@ -65,6 +66,7 @@ class YagnaService:
             "run",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
+            preexec_fn=os.setpgrp,  # https://stackoverflow.com/a/5446982/1993670
         )
 
         is_running = await self._wait_for_yagna_api()

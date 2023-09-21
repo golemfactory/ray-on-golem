@@ -11,7 +11,7 @@ TMP_PATH = Path("/tmp/ray_on_golem")
 
 LOGGING_CONFIG = {
     "version": 1,
-    "disable_existing_loggers": True,
+    "disable_existing_loggers": False,
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",

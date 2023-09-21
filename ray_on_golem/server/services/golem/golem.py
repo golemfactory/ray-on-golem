@@ -38,9 +38,10 @@ logger = logging.getLogger(__name__)
 
 
 class GolemService:
-    def __init__(self, ray_on_golem_port: int, websocat_path: Path):
+    def __init__(self, ray_on_golem_port: int, websocat_path: Path, registry_stats: bool):
         self._ray_on_golem_port = ray_on_golem_port
         self._websocat_path = websocat_path
+        self._registry_stats = registry_stats
 
         self._golem: Optional[GolemNode] = None
         self._demand: Optional[Demand] = None
@@ -50,15 +51,9 @@ class GolemService:
         self._yagna_appkey: Optional[str] = None
         self._lock = asyncio.Lock()
 
-    @property
-    def golem(self):
-        return self._golem
-
-    @property
-    def payment_manager(self) -> DefaultPaymentManager:
-        return self._payment_manager
-
     async def init(self, yagna_appkey: str) -> None:
+        logger.info("Starting GolemService...")
+
         self._golem = GolemNode(app_key=yagna_appkey)
         self._yagna_appkey = yagna_appkey
         await self._golem.start()
@@ -76,6 +71,8 @@ class GolemService:
         )
         self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
 
+        logger.info("Starting GolemService done")
+
     async def shutdown(self) -> None:
         """
         Terminates all activities and ray on head node.
@@ -83,14 +80,18 @@ class GolemService:
 
         :return:
         """
-        await self.payment_manager.terminate_agreements()
+        logger.info("Stopping GolemService...")
+
+        await self._payment_manager.terminate_agreements()
 
         logger.info(f"Waiting for all invoices...")
-        await self.payment_manager.wait_for_invoices()
+        await self._payment_manager.wait_for_invoices()
         logger.info(f"Waiting for all invoices done")
 
         await self._golem.aclose()
         self._golem = None
+
+        logger.info("Stopping GolemService done")
 
     async def create_cluster(self, provider_config: CreateClusterRequestData):
         """
@@ -158,12 +159,11 @@ class GolemService:
 
         return await self._get_image_url_and_hash_from_tag(image_tag)
 
-    @staticmethod
-    async def _get_image_url_from_hash(image_hash: str) -> URL:
+    async def _get_image_url_from_hash(self, image_hash: str) -> URL:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"hash": image_hash, "count": "true"},
+                params={"hash": image_hash, "count": str(self._registry_stats).lower()},
             ) as response:
                 response_data = await response.json()
 
@@ -174,12 +174,11 @@ class GolemService:
                 else:
                     raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
-    @staticmethod
-    async def _get_image_url_and_hash_from_tag(image_tag: str) -> Tuple[URL, str]:
+    async def _get_image_url_and_hash_from_tag(self, image_tag: str) -> Tuple[URL, str]:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"https://registry.golem.network/v1/image/info",
-                params={"tag": image_tag, "count": "true"},
+                params={"tag": image_tag, "count": str(self._registry_stats).lower()},
             ) as response:
                 response_data = await response.json()
 

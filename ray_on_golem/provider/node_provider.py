@@ -40,7 +40,7 @@ class GolemNodeProvider(NodeProvider):
         )
 
         if not is_running_on_golem_network():
-            self._start_webserver()
+            self._start_webserver(provider_parameters["enable_registry_stats"])
 
         self._ray_on_golem_client = RayOnGolemClient.get_instance(self._webserver_url)
         self._ray_on_golem_client.get_running_or_create_cluster(
@@ -56,12 +56,15 @@ class GolemNodeProvider(NodeProvider):
 
         provider_parameters: Dict = config["provider"]["parameters"]
         provider_parameters.setdefault("webserver_port", RAY_ON_GOLEM_PORT)
+        provider_parameters.setdefault("enable_registry_stats", True)
         provider_parameters.setdefault("network", "goerli")
         provider_parameters.setdefault("budget", 1)
 
         ray_on_golem_client = RayOnGolemClient.get_instance(provider_parameters["webserver_port"])
 
         auth: Dict = config["auth"]
+        auth.setdefault("ssh_user", "root")
+
         if "ssh_private_key" not in auth:
             ssh_key_path = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
             auth["ssh_private_key"] = provider_parameters["ssh_private_key"] = str(ssh_key_path)
@@ -150,7 +153,7 @@ class GolemNodeProvider(NodeProvider):
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
         self._ray_on_golem_client.set_node_tags(node_id, tags)
 
-    def _start_webserver(self) -> None:
+    def _start_webserver(self, registry_stats: bool) -> None:
         with cli_logger.group(WEBSERVER_LOG_GROUP):
             if self._is_webserver_running():
                 cli_logger.print("Webserver is already running")
@@ -159,7 +162,13 @@ class GolemNodeProvider(NodeProvider):
             cli_logger.print("Starting webserver...")
 
             subprocess.Popen(
-                [RAY_ON_GOLEM_PATH, "-p", str(self._webserver_url.port), "--self-shutdown"],
+                [
+                    RAY_ON_GOLEM_PATH,
+                    "-p",
+                    str(self._webserver_url.port),
+                    "--registry-stats" if registry_stats else "--no-registry-stats",
+                    "--self-shutdown",
+                ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
