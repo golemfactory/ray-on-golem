@@ -53,4 +53,4 @@ print(
     )
 )
 
-print("[WITH RAY] deal count:", len(results), "time:", datetime.now() - start)
+print("deal count:", len(results), "time:", datetime.now() - start)

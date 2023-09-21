@@ -24,4 +24,4 @@ start = datetime.now()
 results = get_lots_of_deals()
 print(results)
 
-print("[WITHOUT RAY] deal count:", len(results), "time:", datetime.now() - start)
+print("deal count:", len(results), "time:", datetime.now() - start)

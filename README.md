@@ -1,5 +1,12 @@
 # Ray on Golem
 
+<h5 align="center">
+  <a href='https://docs.golem.network/docs/creators/ray'><img
+      width='500px'
+      alt=''
+      src="https://github.com/golemfactory/ray-on-golem/raw/main/Ray_on_Golem.jpg" /></a>
+</h5>
+
 ## What is Golem, Ray and Ray on Golem
 
 [Golem](https://golem.network) on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
@@ -31,10 +38,12 @@ If you have any questions, comments, insights, praises, or doubts about these do
 
 # Limitations
 
-Current version is `pre-alpha` which means the happy path is working on Linux on the Golem test network. 
+Current version is `pre-alpha` which means the happy path is working on Ubuntu on the Golem test network.
+We have tested Ray on Golem on Ubuntu and on WSL, but it should work on other Linux distributions. At the moment, we don't support MacOS or bare Windows.
+ 
 We use this version to show the direction and get feedback.
 
-There is one Ray on Golem image. It contains `ray 2.3.1` and `python 3.10.12`.
+There is one Ray on Golem image. It contains `ray 2.3` and `python 3.10`.
 It should work with any combination of local ray & python versions. Please let us know if you have any troubles because of that (on [`#Ray on Golem` discord channel](https://chat.golem.network/))
 
 The images include only basic libraries, if you need any dependencies, 
@@ -50,12 +59,15 @@ It limits the explanation to the bare minimum - if you are looking for more deta
 
 ## Install software
 
-The first step is installing Ray and Ray on Golem (recommended within a clean venv)
+The first step is installing Ray on Golem (recommended within a clean venv). It will install Ray as a dependency.
 
 ```bash
-# install ray & ray-on-golem
-pip install -U ray[default] ray-on-golem
+# install ray-on-golem and ray (recommended within a clean venv)
+pip3 install -U ray-on-golem
 ```
+
+Additonally, a tool named [websocat](https://lib.rs/crates/websocat) is needed to wrap connections between your machine and Ray on Golem cluster.
+You can install websocat using [these instructions](https://lindevs.com/install-websocat-on-ubuntu/).
 
 For now, you also need to download and install Golem node software representing you in the Golem network.
 
@@ -64,9 +76,22 @@ For now, you also need to download and install Golem node software representing 
 curl -sSf https://join.golem.network/as-requestor | bash -
 ```
 
-## Start `ray-on-golem` server
+## Start and initialize yagna service
 
-For the time being you need to manually run `ray-on-golem` server (in a separate terminal)
+For the time being, you need to manually run `yagna` service (in a separate terminal) - it is a Golem node representing you in the Golem network
+
+```bash
+yagna service run
+```
+
+Leave it running, and in a separate terminal, initialize testnet payments.
+```bash
+yagna payment fund
+```
+
+## Start ray-on-golem server
+
+For the time being you need to manually run `ray-on-golem` server -leave it running in a separate terminal.
 
 ```bash
 ray-on-golem
@@ -99,7 +124,7 @@ Download our example Ray app and execute it locally (a Ray instance will be crea
 wget https://github.com/golemfactory/ray-on-golem/blob/main/examples/simple-task.py
 
 # Execute the app locally by starting a local ray instance on your computer
-python simple-task.py
+python3 simple-task.py
 ```
 
 Feed the app to the cluster. Observe how Ray on Golem cluster expands during the computation
