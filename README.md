@@ -51,7 +51,7 @@ you can use `pip` via [cluster yaml `initialization_commands`](https://golem-doc
 
 We have tested Ray on Golem on Ubuntu and on WSL. It should work on MacOS and shouldn't on bare Windows.
 
-# Quickstart
+# QuickStart
 
 This [quickstart](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
 It limits the explanation to the bare minimum - if you are looking for more details jump to [setup tutorial](/docs/creators/ray/setup-tutorial)
@@ -74,27 +74,6 @@ For now, you also need to download and install Golem node software representing 
 ```bash
 # install yagna - golem network daemon
 curl -sSf https://join.golem.network/as-requestor | bash -
-```
-
-## Start and initialize yagna service
-
-For the time being, you need to manually run `yagna` service (in a separate terminal) - it is a Golem node representing you in the Golem network
-
-```bash
-yagna service run
-```
-
-Leave it running, and in a separate terminal, initialize testnet payments.
-```bash
-yagna payment fund
-```
-
-## Start ray-on-golem server
-
-For the time being you need to manually run `ray-on-golem` server -leave it running in a separate terminal.
-
-```bash
-ray-on-golem
 ```
 
 ## Set the cluster up
@@ -146,8 +125,6 @@ In the end, stop your cluster to free the Golem network providers and to avoid t
 # Tear down the cluster.
 ray down golem-cluster.yaml
 ```
-
-For the time being you also nee to stop `ray-on-golem` server (with `Control-C`).
 
 ## Summary
 
