@@ -112,7 +112,9 @@ def scan_range(searched_hash: str, start: int, end: int) -> Optional[str]:
     :return: a matching word, or `None` if no match was found within the range
     """
 
-    print(f"scanning: {searched_hash}: {int_to_str(start, True)}, {int_to_str(end, True)}",)
+    print(
+        f"scanning: {searched_hash}: {int_to_str(start, True)}, {int_to_str(end, True)}",
+    )
     for i in range(start, end):
         word = int_to_str(i)
         if word:

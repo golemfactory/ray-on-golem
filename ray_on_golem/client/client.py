@@ -1,4 +1,3 @@
-from functools import lru_cache
 from typing import Any, Dict, List, Type, TypeVar
 
 import requests
@@ -13,15 +12,10 @@ TResponseModel = TypeVar("TResponseModel")
 
 
 class RayOnGolemClient:
-    def __init__(self, base_url: URL) -> None:
-        self._base_url = base_url
+    def __init__(self, port: int) -> None:
+        self._base_url = URL("http://127.0.0.1").with_port(port)
 
         self._session = requests.Session()
-
-    @classmethod
-    @lru_cache()
-    def get_instance(cls, url: URL) -> "RayOnGolemClient":
-        return RayOnGolemClient(url)
 
     def get_running_or_create_cluster(
         self,
@@ -174,6 +168,17 @@ class RayOnGolemClient:
         )
 
         return response.shutdown_state
+
+    def is_webserver_running(self) -> bool:
+        try:
+            response = requests.get(
+                str(self._base_url / settings.URL_HEALTH_CHECK.lstrip("/")),
+                timeout=settings.RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds(),
+            )
+        except requests.ConnectionError:
+            return False
+        else:
+            return response.status_code == 200 and response.text == "ok"
 
     def _make_request(
         self,
