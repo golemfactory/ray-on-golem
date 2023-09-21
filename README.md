@@ -76,7 +76,7 @@ For now, you also need to download and install Golem node software representing 
 curl -sSf https://join.golem.network/as-requestor | bash -
 ```
 
-## Start and initialize `yagna` service
+## Start and initialize yagna service
 
 For the time being, you need to manually run `yagna` service (in a separate terminal) - it is a Golem node representing you in the Golem network
 
@@ -89,7 +89,7 @@ Leave it running, and in a separate terminal, initialize testnet payments.
 yagna payment fund
 ```
 
-## Start `ray-on-golem` server
+## Start ray-on-golem server
 
 For the time being you need to manually run `ray-on-golem` server -leave it running in a separate terminal.
 
