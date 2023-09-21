@@ -43,7 +43,7 @@ We have tested Ray on Golem on Ubuntu and on WSL, but it should work on other Li
  
 We use this version to show the direction and get feedback.
 
-There is one Ray on Golem image. It contains `ray 2.3.1` and `python 3.10.12`.
+There is one Ray on Golem image. It contains `ray 2.3` and `python 3.10`.
 It should work with any combination of local ray & python versions. Please let us know if you have any troubles because of that (on [`#Ray on Golem` discord channel](https://chat.golem.network/))
 
 The images include only basic libraries, if you need any dependencies, 
