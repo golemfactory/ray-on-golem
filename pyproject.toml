@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ray-on-golem"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 description = "Golem Network integration with Ray"
 authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
@@ -20,7 +20,6 @@ setuptools = "*"
 
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.server.run:main"
-
 
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.22.0"

@@ -1,8 +1,11 @@
 import asyncio
 import hashlib
+import os
 from asyncio.subprocess import Process
 from pathlib import Path
 from typing import Dict, Optional
+
+from aiohttp.web_runner import GracefulExit
 
 from ray_on_golem.exceptions import RayOnGolemError
 
@@ -31,6 +34,10 @@ def are_dicts_equal(dict1: Dict, dict2: Dict) -> bool:
     return True
 
 
+def is_running_on_golem_network() -> bool:
+    return os.getenv("ON_GOLEM_NETWORK") is not None
+
+
 def get_default_ssh_key_name(cluster_name: str) -> str:
     return "ray_on_golem_rsa_{}".format(hashlib.md5(cluster_name.encode()).hexdigest()[:10])
 
@@ -56,12 +63,14 @@ async def start_ssh_reverse_tunel_process(
 
     command_parts.append(f"root@{remote_host}")
 
-    # FIXME: Use subprocess running from ray-on-golem's utils
     process = await asyncio.create_subprocess_shell(
         " ".join(command_parts),
-        stderr=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stdin=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.DEVNULL,
     )
 
     return process
+
+
+def raise_graceful_exit() -> None:
+    raise GracefulExit()

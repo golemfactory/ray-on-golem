@@ -16,6 +16,8 @@ provider:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
 
+    enable_registry_stats: false
+
     # Blockchain used for payments.
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
@@ -39,8 +41,11 @@ provider:
       min_storage_gib: 0
 
 # The files or directories to copy to the head and worker nodes
-# file_mounts:
-  # <remote_path>: <local_path>
+file_mounts:
+  # remote_path: local_path
+  {
+    "/app/ray_on_golem": "./ray_on_golem",
+  }
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:

@@ -14,6 +14,12 @@ class NodeState(Enum):
     stopping = "stopping"
 
 
+class ShutdownState(Enum):
+    NOT_ENABLED = "not_enabled"
+    CLUSTER_NOT_EMPTY = "cluster_not_empty"
+    WILL_SHUTDOWN = "will_shutdown"
+
+
 class Node(BaseModel):
     node_id: NodeId
     state: NodeState
@@ -103,3 +109,11 @@ class GetOrCreateDefaultSshKeyRequestData(BaseModel):
 
 class GetOrCreateDefaultSshKeyResponseData(BaseModel):
     ssh_key_base64: str
+
+
+class SelfShutdownRequestData(BaseModel):
+    pass
+
+
+class SelfShutdownResponseData(BaseModel):
+    shutdown_state: ShutdownState

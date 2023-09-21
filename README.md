@@ -39,11 +39,11 @@ If you have any questions, comments, insights, praises, or doubts about these do
 # Limitations
 
 Current version is `pre-alpha` which means the happy path is working on Ubuntu on the Golem test network.
-We have tested Ray on Golem on Ubuntu and on WSL. It should work on other Linux distributuions, might work on MacOS and shouldn't on bare Windows.
+We have tested Ray on Golem on Ubuntu and on WSL, but it should work on other Linux distributions. At the moment, we don't support MacOS or bare Windows.
  
 We use this version to show the direction and get feedback.
 
-There is one Ray on Golem image. It contains `ray 2.3.1` and `python 3.10.12`.
+There is one Ray on Golem image. It contains `ray 2.3` and `python 3.10`.
 It should work with any combination of local ray & python versions. Please let us know if you have any troubles because of that (on [`#Ray on Golem` discord channel](https://chat.golem.network/))
 
 The images include only basic libraries, if you need any dependencies, 
@@ -139,47 +139,3 @@ Congratulations!
 
 ## Next steps
 - [Ray on Golem docs](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app//docs/creators/ray)
-
-# Contributing
-
-## Running code auto format
-
-```bash
-$ poetry run poe format
-```
-
-
-## Creating docker images for use with providers
-
-### Requirements
-
-```text
-- docker
-- gvmkit-build
-```
-
-### Select python and ray versions in pyproject.toml
-
-```toml
-python = "3.9.2"
-ray = "2.6.1"
-```
-
-### Select python version in Dockerfile
-
-```yaml
-FROM python:3.9.2-slim # slim images preferred due to their size
-```
-
-### Build docker image
-
-```bash
-$ docker image build -t py3.9.2-ray2.6.1 .
-```
-
-### Build and push image to golem registry
-
-```bash
-$ gvmkit-build py3.9.2-ray2.6.1 --push-to user/repo_name:py3.9.2-ray2.6.1
-```
-
