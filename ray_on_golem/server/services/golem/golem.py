@@ -66,10 +66,6 @@ class GolemService:
             "192.168.0.1/24"
         )  # will be retrieved from provider_config
         await self._golem.add_to_network(self._network)
-        self._allocation = await self._golem.create_allocation(
-            amount=1, network="goerli", autoclose=True
-        )
-        self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
 
         logger.info("Starting GolemService done")
 
@@ -82,11 +78,14 @@ class GolemService:
         """
         logger.info("Stopping GolemService...")
 
-        await self._payment_manager.terminate_agreements()
+        if self._payment_manager is None:
+            logger.info(f"No need to wait for invoices, as cluster was not started")
+        else:
+            await self._payment_manager.terminate_agreements()
 
-        logger.info(f"Waiting for all invoices...")
-        await self._payment_manager.wait_for_invoices()
-        logger.info(f"Waiting for all invoices done")
+            logger.info(f"Waiting for all invoices...")
+            await self._payment_manager.wait_for_invoices()
+            logger.info(f"Waiting for all invoices done")
 
         await self._golem.aclose()
         self._golem = None
@@ -103,7 +102,14 @@ class GolemService:
             logger.info("Cluster was created already.")
             return
 
+        self._allocation = await self._golem.create_allocation(
+            amount=provider_config.budget,
+            network=provider_config.network,
+        )
+        self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
+
         payload = await self._create_payload(provider_config.node_config)
+
         self._demand = await self._golem.create_demand(
             payload,
             allocations=[self._allocation],
@@ -194,7 +200,12 @@ class GolemService:
         return f"{self._websocat_path} asyncstdio: {connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
 
     async def create_activities(
-        self, node_config: Dict[str, Any], count: int, ssh_public_key_path: Path
+        self,
+        node_config: Dict[str, Any],
+        count: int,
+        ssh_user: str,
+        ssh_private_key_path: Path,
+        ssh_public_key_path: Path,
     ) -> List[Tuple[Activity, str, str]]:
         demand = self._demand  # FIXME: Use demand for proper node_config
 
@@ -217,7 +228,9 @@ class GolemService:
                     async for activity, ip in chain:
                         connection_uri = self._get_connection_uri(ip)
                         ssh_proxy_command = self.get_ssh_proxy_command(connection_uri)
-                        self._print_ssh_command(ip, ssh_proxy_command, ssh_public_key_path)
+                        self._print_ssh_command(
+                            ip, ssh_proxy_command, ssh_user, ssh_private_key_path
+                        )
 
                         await self._add_public_ssh_key(activity, ssh_public_key_path)
 
@@ -283,16 +296,16 @@ class GolemService:
         return network_url.with_scheme("ws") / "net" / self._network.id / "tcp" / ip
 
     def _print_ssh_command(
-        self, ip: str, ssh_proxy_command: str, ssh_public_key_path: Path
+        self, ip: str, ssh_proxy_command: str, ssh_user: str, ssh_private_key_path: Path
     ) -> None:
         print(
             f"Connect to {ip} with:\n"
             "ssh "
             "-o StrictHostKeyChecking=no "
             "-o UserKnownHostsFile=/dev/null "
-            f"-o ProxyCommand='{ssh_proxy_command}' "
-            f"-i {ssh_public_key_path} "
-            f"root@{ip}"
+            f'-o "ProxyCommand={ssh_proxy_command}" '
+            f"-i {ssh_private_key_path} "
+            f"{ssh_user}@{ip}"
         )
 
     async def _add_public_ssh_key(self, activity: Activity, ssh_public_key_path: Path):

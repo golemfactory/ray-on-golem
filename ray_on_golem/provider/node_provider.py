@@ -42,7 +42,8 @@ class GolemNodeProvider(NodeProvider):
             network=provider_parameters["network"],
             budget=provider_parameters["budget"],
             node_config=NodeConfigData(**provider_parameters["node_config"]),
-            ssh_private_key=provider_parameters["ssh_private_key"],
+            ssh_private_key=provider_parameters["_ssh_private_key"],
+            ssh_user=provider_parameters["_ssh_user"],
         )
 
     @classmethod
@@ -65,7 +66,7 @@ class GolemNodeProvider(NodeProvider):
 
         if "ssh_private_key" not in auth:
             ssh_key_path = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
-            auth["ssh_private_key"] = provider_parameters["ssh_private_key"] = str(ssh_key_path)
+            auth["ssh_private_key"] = str(ssh_key_path)
 
             if not ssh_key_path.exists():
                 ssh_key_base64 = ray_on_golem_client.get_or_create_default_ssh_key(
@@ -77,9 +78,13 @@ class GolemNodeProvider(NodeProvider):
                 with ssh_key_path.open("w") as f:
                     f.write(ssh_key_base64)
 
+        # copy ssh details to provider namespace for cluster creation in __init__
+        provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
+        provider_parameters["_ssh_user"] = auth["ssh_user"]
+
         global_event_system.execute_callback(
             CreateClusterEvent.ssh_keypair_downloaded,
-            {"ssh_key_path": config["auth"]["ssh_private_key"]},
+            {"ssh_key_path": auth["ssh_private_key"]},
         )
 
         return config
