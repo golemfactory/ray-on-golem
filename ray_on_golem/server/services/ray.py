@@ -14,7 +14,7 @@ from ray_on_golem.utils import (
     are_dicts_equal,
     get_default_ssh_key_name,
     run_subprocess,
-    start_ssh_reverse_tunel_process,
+    run_subprocess_output,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,8 @@ class RayService:
         self._nodes_lock = asyncio.Lock()
         self._nodes_id_counter = 0
 
-        self._head_node_to_webserver_tunel_process: Optional[Process] = None
+        self._head_node_to_webserver_tunnel_process: Optional[Process] = None
+        self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
 
         self._ssh_private_key_path: Optional[Path] = None
         self._ssh_public_key_path: Optional[Path] = None
@@ -37,31 +38,32 @@ class RayService:
     async def shutdown(self) -> None:
         logger.info("Stopping RayService...")
 
-        await self._stop_head_node_to_webserver_tunel()
-
-        async with self._nodes_lock:
-            if not self._nodes:
-                logger.info(
-                    "Stopping RayService done, no need to destroy activities, as no activities are running"
-                )
-                return
-
-            logger.info(f"Destroying {len(self._nodes)} activities...")
-
-            for node in self._nodes.values():
-                await node.activity.destroy()
-
-            logger.info(f"Destroying {len(self._nodes)} activities done")
-
-            self._nodes.clear()
+        await self._stop_head_node_to_webserver_tunnel()
+        await self._destroy_nodes()
 
         logger.info("Stopping RayService done")
 
     async def create_cluster_on_golem(self, provider_config: CreateClusterRequestData) -> None:
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
+        self._ssh_user = provider_config.ssh_user
 
         await self._golem_service.create_cluster(provider_config=provider_config)
+
+    async def _destroy_nodes(self) -> None:
+        async with self._nodes_lock:
+            if not self._nodes:
+                logger.info("No need to destroy nodes, as no nodes are running")
+                return
+
+            logger.info(f"Destroying {len(self._nodes)} nodes...")
+
+            for node in self._nodes.values():
+                await node.activity.destroy()
+
+            logger.info(f"Destroying {len(self._nodes)} nodes done")
+
+            self._nodes.clear()
 
     async def create_nodes(
         self, node_config: Dict[str, Any], count: int, tags: Tags
@@ -70,6 +72,8 @@ class RayService:
         created_activities = await self._golem_service.create_activities(
             node_config=node_config,
             count=count,
+            ssh_user=self._ssh_user,
+            ssh_private_key_path=self._ssh_private_key_path,
             ssh_public_key_path=self._ssh_public_key_path,
         )
 
@@ -89,9 +93,9 @@ class RayService:
         async with self._nodes_lock:
             self._nodes.update(created_nodes)
 
-        # TODO: Consider running tunel on every head node
-        if not self._is_head_node_to_webserver_tunel_running():
-            await self._start_head_node_to_webserver_tunel()
+        # TODO: Consider running tunnel on every head node
+        if not self._is_head_node_to_webserver_tunnel_running():
+            await self._start_head_node_to_webserver_tunnel()
 
         return {
             node_id: node.dict(
@@ -161,7 +165,7 @@ class RayService:
         if not ssh_key_path.exists():
             ssh_key_path.parent.mkdir(parents=True, exist_ok=True)
 
-            await run_subprocess(
+            await run_subprocess_output(
                 "ssh-keygen", "-t", "rsa", "-b", "4096", "-N", "", "-f", str(ssh_key_path)
             )
 
@@ -187,34 +191,59 @@ class RayService:
                 if node.tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD:
                     return node
 
-    def _is_head_node_to_webserver_tunel_running(self) -> bool:
-        return self._head_node_to_webserver_tunel_process is not None
+    def _is_head_node_to_webserver_tunnel_running(self) -> bool:
+        return self._head_node_to_webserver_tunnel_process is not None
 
-    async def _start_head_node_to_webserver_tunel(self) -> None:
+    async def _start_head_node_to_webserver_tunnel(self) -> None:
+        logger.info("Starting head node to webserver tunnel...")
+
         head_node = await self._get_head_node()
+        port = self._golem_service._ray_on_golem_port
 
-        self._head_node_to_webserver_tunel_process = await start_ssh_reverse_tunel_process(
-            str(head_node.internal_ip),
-            self._golem_service._ray_on_golem_port,
-            private_key_path=self._ssh_private_key_path,
-            proxy_command=head_node.ssh_proxy_command,
+        self._head_node_to_webserver_tunnel_process = await run_subprocess(
+            "ssh",
+            "-N",
+            "-R",
+            f"*:{port}:127.0.0.1:{port}",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            f"ProxyCommand={head_node.ssh_proxy_command}",
+            "-i",
+            str(self._ssh_private_key_path),
+            f"{self._ssh_user}@{str(head_node.internal_ip)}",
+        )
+        self._head_node_to_webserver_tunnel_early_exit_task = asyncio.create_task(
+            self._on_head_node_to_webserver_tunnel_early_exit()
         )
 
-        # TODO: Add log when process dies early
+        logger.info("Starting head node to webserver tunnel done")
 
-        logger.info("Reverse tunel from remote head node to local webserver started")
+    async def _on_head_node_to_webserver_tunnel_early_exit(self) -> None:
+        await self._head_node_to_webserver_tunnel_process.communicate()
 
-    async def _stop_head_node_to_webserver_tunel(self) -> None:
-        process = self._head_node_to_webserver_tunel_process
+        logger.warning(f"Head node to webserver tunnel exited prematurely!")
 
-        if process is None:
+    async def _stop_head_node_to_webserver_tunnel(self) -> None:
+        process = self._head_node_to_webserver_tunnel_process
+
+        if process is None or process.returncode is not None:
+            logger.info("No need to stop head node to webserver tunnel, as it's not running")
             return
 
-        if process.returncode is None:
-            process.terminate()
+        logger.info("Stopping head node to webserver tunnel...")
 
+        self._head_node_to_webserver_tunnel_early_exit_task.cancel()
+        try:
+            await self._head_node_to_webserver_tunnel_early_exit_task
+        except asyncio.CancelledError:
+            pass
+
+        process.terminate()
         await process.wait()
 
-        logger.info("Reverse tunel from remote head node to local webserver stopped")
+        self._head_node_to_webserver_tunnel_process = None
 
-        self._head_node_to_webserver_tunel_process = None
+        logger.info("Stopping head node to webserver tunnel done")

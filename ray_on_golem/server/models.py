@@ -50,6 +50,7 @@ class CreateClusterRequestData(BaseModel):
     budget: int
     node_config: NodeConfigData
     ssh_private_key: str
+    ssh_user: str
 
 
 class NonTerminatedNodesRequestData(BaseModel):

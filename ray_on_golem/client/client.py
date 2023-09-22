@@ -23,6 +23,7 @@ class RayOnGolemClient:
         budget: int,
         node_config: NodeConfigData,
         ssh_private_key: str,
+        ssh_user: str,
     ) -> None:
         self._make_request(
             url=settings.URL_CREATE_CLUSTER,
@@ -31,6 +32,7 @@ class RayOnGolemClient:
                 budget=budget,
                 node_config=node_config,
                 ssh_private_key=ssh_private_key,
+                ssh_user=ssh_user,
             ),
             response_model=models.EmptyResponseData,
             error_message="Couldn't create cluster",
