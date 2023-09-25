@@ -10,7 +10,7 @@ to get it out of the building - to start verifying the potential to decide on fu
 
 This article contains a set of tasks that you can complete to broaden your knowledge and help improve the Golem Network.
 
-We have rewards for 10 people (600 GLM each) - we will communicate via the Upwork platform.
+We have rewards for 10 people (600 GLM each) - we will communicate via Discord.
 We want to test Ray on Golem on **Linux**.
 
 If you have any questions, we encourage you to contact the Ray on Golem team directly - join our community on [Discord](https://chat.golem.network) and find the `#Ray on Golem` channel in the Golem projects section.
