@@ -10,7 +10,7 @@ to run the preview program to get it out of the building - to start verifying th
 and decide if further investment in Ray on Golem is justified.
 
 **We want to test Ray on Golem on Linux**.
-The set of tasks described below will help you toet broaden your knowledge while contributing to improve the Golem Network. 
+The set of tasks described below will help you to broaden your knowledge while contributing to improve the Golem Network. 
 
 We have rewards for 10 people (100 USD each) - that you will be able to claim via Upwork after completing the task. 
 Note that only those who filled the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
