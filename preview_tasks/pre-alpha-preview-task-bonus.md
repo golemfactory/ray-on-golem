@@ -53,5 +53,5 @@ We would like to stop the computation when we find the match.
 
 ## Fill out the submission form
 
-At the end we would like a code that finds the `golem` word for `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` hash in XXX minutes.
+At the end we would like a code that finds the `golem` word for `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` hash in 10 minutes.
 
