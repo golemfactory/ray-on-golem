@@ -46,7 +46,7 @@ Your task is to parallelize the code and execute it on Ray on Golem cluster.
 The goal is to benefit from distributed execution on Ray on Golem cluster so that it takes less time than executed locally.
 
 Our original hash cracker code was a bit more straightforward, but it was tougher to parallelize as the obvious candidate for Ray task was too small.
-So now the code is a bit more comlex, but it should be easier to parallelize.
+So now the code is a bit more complex, but it should be easier to parallelize as it now allows more control over the sizes of the tasks.
 
 One additional challenge (and a learning opportunity) here is that we would like to avoid waiting for Ray on Golem to scan the whole of the word space.
 We would like to stop the computation when we find the match.
