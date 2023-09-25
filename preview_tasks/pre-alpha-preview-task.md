@@ -48,7 +48,7 @@ There are three tasks. You need to complete them all to apply for the reward.
  
 ### #3 Fill out the feedback form  
 
-Please fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
+Please fill out the [submission form](https://bit.ly/461V1ET)
 We are looking for **meaningful and thought-out feedback** that will help us drive the solution.
 
 The form will ask you to upload console logs from the first two tasks.
