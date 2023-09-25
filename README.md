@@ -53,8 +53,8 @@ We have tested Ray on Golem on Ubuntu and on WSL. It should work on MacOS and sh
 
 # QuickStart
 
-This [quickstart](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
-It limits the explanation to the bare minimum - if you are looking for more details jump to [setup tutorial](/docs/creators/ray/setup-tutorial)
+This [quickstart](https://docs.golem.network/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
+It limits the explanation to the bare minimum - if you are looking for more details jump to [setup tutorial](https://docs.golem.network/docs/creators/ray/setup-tutorial)
 
 
 ## Install software
@@ -138,4 +138,4 @@ By completing the above quickstart you have successfully:
 Congratulations!
 
 ## Next steps
-- [Ray on Golem docs](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app//docs/creators/ray)
+- [Ray on Golem docs](https://docs.golem.network/docs/creators/ray)
