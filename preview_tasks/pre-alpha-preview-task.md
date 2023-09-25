@@ -10,8 +10,8 @@ to get it out of the building - to start verifying the potential to decide on fu
 
 This article contains a set of tasks that you can complete to broaden your knowledge and help improve the Golem Network.
 
-We have rewards for 10 people (USD 120 each) - we will communicate via the Upwork platform.
-We want to test Ray on Golem on Linux.
+We have rewards for 10 people (600 GLM each) - we will communicate via the Upwork platform.
+We want to test Ray on Golem on **Linux**.
 
 If you have any questions, we encourage you to contact the Ray on Golem team directly - join our community on [Discord](https://chat.golem.network) and find the `#Ray on Golem` channel in the Golem projects section.
 
@@ -19,50 +19,37 @@ We also encourage you to visit https://www.golem.network/, where you can find mo
 
 ## Preview tasks
 
-There are four tasks. You need to complete them all to apply for the reward.
+There are three tasks. You need to complete them all to apply for the reward.
 
 ### #1 Setup tutorial
 
-Go through the [setup tutorial](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/setup-tutorial) and send us your console outputs (copy the content of all the terminals you used and paste them to a text file)
+Goal: We want to test how our solution behaves in different environments and how helpful our tutorial is.
 
-We want to test how our solution behaves in different environments and how helpful our tutorial is.
+Task: Send us the console logs from going through the setup tutorial. Be mindful, as We also need constructive feedback on the tutorial.
+
+Steps:
+- Go through the [concept article](https://docs.golem.network/docs/creators/ray/concept) to get you started.
+- Go through the [setup tutorial](https://docs.golem.network/docs/creators/ray/setup-tutorial) and check if it works out.
+- Send us your console outputs (copy the content of all the terminals you used and paste them to a text file)
+
 
 ### #2 Converting a real-life use case to Ray on Golem
 
-Go through the [converting a real-life use case to Ray on Golem tutorial](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/conversion-to-ray-on-golem-tutorial) and send us your console outputs (just copy the content of all the terminals you used and paste them to a text file)
+Goal: We want to test how our solution behaves in different environments and how helpful our tutorial is.
 
-We want to test how our solution behaves in different environments and how helpful our tutorial is.
+Task: Send us the console logs from going through the conversion a real-life use case to Ray on Golem tutorial. Be mindful, We also need constructive feedback on the tutorial.
+
+Steps:
+- Go through the [converting a real-life use case to Ray on Golem tutorial](https://docs.golem.network/docs/creators/ray/conversion-to-ray-on-golem-tutorial)
+- Send us your console outputs (copy the content of all the terminals you used and paste them to a text file)
+
  
-### #3 Parallelize the hash cracker script with Ray and execute it on Ray on Golem
-
-Take a look at this [piece of code](https://github.com/golemfactory/ray-on-golem/raw/main/examples/hash_cracker_ray_ready.py)
-
-It takes a sha256 hash of some unknown word as an input and looks for a word that results in a match.
-The code doesn't know anything about Golem nor Ray.
-
-```bash
-python hash_cracker_ray_ready.py -l 4 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
-```
-```
-finished in 0:00:40.953827, match found: test
-```
-
-You can find a couple of other hashes to crack in the code's comments.
-
-
-Your task is to parallelize the code and execute it on Ray on Golem cluster.
-The goal is to benefit from distributed execution on Ray on Golem cluster so that it takes less time than executed locally.
-
-Please send us your code and console output from running the code on Ray on Golem.
-
-As a result of this task, we'd like to learn whether, and how, our documentation helped you run such an arbitrary piece of python code on a Ray on Golem cluster.
-
-### #4 Fill out the feedback form  
+### #3 Fill out the feedback form  
 
 Please fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/GtaCVz0b)
 We are looking for meaningful and thought-out feedback that will help us drive the solution.
 
-The form will ask you to upload console logs from the first three tasks.
+The form will ask you to upload console logs from the first two tasks.
 
 ### Useful links
 
