@@ -42,13 +42,13 @@ There are three tasks. You need to complete them all to apply for the reward.
 **Task**: Send us the console logs from going through the conversion a real-life use case to Ray on Golem tutorial. Be mindful, we also need constructive feedback on the tutorial.
 
 **Steps**:
-- Go through the [converting a real-life use case to Ray on Golem tutorial](https://docs.golem.network/docs/creators/ray/conversion-to-ray-on-golem-tutorial)
+- Go through the [conversion of a real-life use case to Ray on Golem tutorial](https://docs.golem.network/docs/creators/ray/conversion-to-ray-on-golem-tutorial)
 - Send us your console outputs (copy the content of all the terminals you used and paste them to a text file)
 
  
 ### #3 Fill out the feedback form  
 
-Please fill out the [submission form](https://bit.ly/461V1ET)
+Please fill out the [submission form](https://bit.ly/461V1ET).
 We are looking for **meaningful and thought-out feedback** that will help us drive the solution.
 
 The form will ask you to upload console logs from the first two tasks.
