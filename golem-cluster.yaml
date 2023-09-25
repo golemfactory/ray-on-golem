@@ -28,7 +28,8 @@ provider:
     node_config:
       # if not provided, image_tag will be autodetected based on currently used python and ray versions
       # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-      image_tag: "golem/ray-on-golem:0.1.1-py3.10.13-ray2.3.1"
+      image_tag: "golem/ray-on-golem:0.1.0-py3.10.13-ray2.3.1"
+
       capabilities: ["vpn", "inet", "manifest-support"]
       min_mem_gib: 0
       min_cpu_threads: 0
