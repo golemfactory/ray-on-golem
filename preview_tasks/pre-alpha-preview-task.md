@@ -25,7 +25,7 @@ There are three tasks. You need to complete them all to apply for the reward.
 
 Goal: We want to test how our solution behaves in different environments and how helpful our tutorial is.
 
-Task: Send us the console logs from going through the setup tutorial. Be mindful, as We also need constructive feedback on the tutorial.
+Task: Send us the console logs from going through the setup tutorial. Be mindful, as we also need constructive feedback on the tutorial.
 
 Steps:
 - Go through the [concept article](https://docs.golem.network/docs/creators/ray/concept) to get you started.
@@ -37,7 +37,7 @@ Steps:
 
 Goal: We want to test how our solution behaves in different environments and how helpful our tutorial is.
 
-Task: Send us the console logs from going through the conversion a real-life use case to Ray on Golem tutorial. Be mindful, We also need constructive feedback on the tutorial.
+Task: Send us the console logs from going through the conversion a real-life use case to Ray on Golem tutorial. Be mindful, we also need constructive feedback on the tutorial.
 
 Steps:
 - Go through the [converting a real-life use case to Ray on Golem tutorial](https://docs.golem.network/docs/creators/ray/conversion-to-ray-on-golem-tutorial)
