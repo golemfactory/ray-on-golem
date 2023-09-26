@@ -14,7 +14,7 @@ import ray
 from golem.event_bus import Event
 from golem.node import SUBNET, GolemNode
 from golem.payload import ManifestVmPayload, constraint, prop
-from golem.pipeline import Buffer, Chain, DefaultPaymentHandler, Limit, Map
+from golem.pipeline import Buffer, Chain, DefaultPaymentHandler, Limit, Map, Sort
 from golem.resources import (
     Activity,
     Allocation,
@@ -37,6 +37,7 @@ from ray_on_golem.server.exceptions import (
 )
 from ray_on_golem.server.models import CreateClusterRequestData, NodeConfigData
 from ray_on_golem.server.services.golem.manifest import get_manifest
+from ray_on_golem.server.services.golem.repository import PROVIDERS_BLACKLIST, PROVIDERS_WHITELIST
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class GolemService:
         self._payment_manager: Optional[DefaultPaymentHandler] = None
         self._yagna_appkey: Optional[str] = None
         self._lock = asyncio.Lock()
+        self._provider_config_network: str = ""
 
     async def init(self, yagna_appkey: str) -> None:
         logger.info("Starting GolemService...")
@@ -106,6 +108,8 @@ class GolemService:
             logger.info("Cluster was created already.")
             return
 
+        # TODO remove this attribute and get this information from `self._allocation`
+        self._provider_config_network = provider_config.network
         self._allocation = await self._golem.create_allocation(
             amount=provider_config.budget,
             network=provider_config.network,
@@ -218,7 +222,12 @@ class GolemService:
                 async with async_timeout.timeout(int(150)):
                     chain = Chain(
                         demand.initial_proposals(),
-                        # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
+                        Sort(
+                            self._score_proposal_by_blacklist_whitelist,
+                            min_elements=2,
+                            min_wait=timedelta(seconds=8),
+                            max_wait=timedelta(minutes=1),
+                        ),
                         Map(self._negotiate),
                         Map(default_create_agreement),
                         Map(default_create_activity),
@@ -250,6 +259,26 @@ class GolemService:
     @staticmethod
     async def _negotiate(proposal):
         return await asyncio.wait_for(default_negotiate(proposal), timeout=10)
+
+    async def _score_proposal_by_blacklist_whitelist(self, proposal: "Proposal") -> Optional[float]:
+        data = await proposal.get_data()
+        if data.issuer_id is None:
+            return None
+
+        network = self._provider_config_network.lower()
+        if data.issuer_id in PROVIDERS_BLACKLIST.get(network, []):
+            logger.info("Discarding proposal from blacklisted provider")
+            return None
+
+        if data.issuer_id in PROVIDERS_WHITELIST.get(network, []):
+            max_score = len(PROVIDERS_WHITELIST.get(network, []))
+            provider_seeding = PROVIDERS_WHITELIST.get(network, []).index(data.issuer_id)
+            score = float(max_score - provider_seeding)
+            logger.info(f"Applying {score} score for proposal from whitelisted provider")
+            return score
+
+        logger.info(f"Applying neutral score for proposal from unknown provider")
+        return 0.0
 
     async def _deploy_with_vpn_and_start(self, activity: Activity) -> Tuple[Activity, str]:
         provider_id = activity.parent.parent.data.issuer_id
