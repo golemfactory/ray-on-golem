@@ -131,13 +131,15 @@ async def create_nodes(request: web.Request) -> web.Response:
 
 @routes.post(settings.URL_TERMINATE_NODE)
 async def terminate_node(request: web.Request) -> web.Response:
-    ray_service: RayService = request.app["ray_service"]
+    # ray_service: RayService = request.app["ray_service"]
+    #
+    # request_data = models.SingleNodeRequestData.parse_raw(await request.text())
+    #
+    # terminated_nodes = await ray_service.terminate_node(request_data.node_id)
 
-    request_data = models.SingleNodeRequestData.parse_raw(await request.text())
+    logger.info("-------------------- DUPA")
 
-    terminated_nodes = await ray_service.terminate_node(request_data.node_id)
-
-    response_data = models.TerminateNodeResponseData(terminated_nodes=terminated_nodes)
+    response_data = models.TerminateNodeResponseData(terminated_nodes={})
 
     return web.Response(text=response_data.json())
 
