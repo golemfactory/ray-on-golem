@@ -219,7 +219,7 @@ class GolemService:
 
         async with self._lock:
             try:
-                async with async_timeout.timeout(int(150)):
+                async with async_timeout.timeout(int(600)):
                     chain = Chain(
                         demand.initial_proposals(),
                         Sort(

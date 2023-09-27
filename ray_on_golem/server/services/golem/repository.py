@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 PROVIDERS_BLACKLIST: Dict[str, List[str]] = {
-    "goerli": [
+    "polygon": [
         "0x4c64c1ef437a432e9900bbbdceddba2683bd9b5f",
         "0xf2b37e0fe7cab28860c7f520818115e6517039a9",
         "0x875a64d5de187b62123c2ea6dba8985332715b58",
@@ -933,7 +933,7 @@ PROVIDERS_BLACKLIST: Dict[str, List[str]] = {
 }
 
 PROVIDERS_WHITELIST: Dict[str, List[str]] = {
-    "goerli": [
+    "polygon": [
         "0x7275a62bb03271bf0c303704ad1da5618d971ad2",
         "0xfc0b640a72c150ca133b82558d885f9237ff4e6f",
         "0xf460871f1741dd2eebfa115c3ddd8a1aaa7fa914",
