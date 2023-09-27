@@ -4,15 +4,9 @@ import logging.config
 
 from aiohttp import web
 
-from ray_on_golem.server.middlewares import error_middleware
+from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
-from ray_on_golem.server.settings import (
-    LOGGING_CONFIG,
-    RAY_ON_GOLEM_PORT,
-    TMP_PATH,
-    WEBSOCAT_PATH,
-    YAGNA_PATH,
-)
+from ray_on_golem.server.settings import LOGGING_CONFIG, TMP_PATH, WEBSOCAT_PATH, YAGNA_PATH
 from ray_on_golem.server.views import routes
 
 logger = logging.getLogger(__name__)
@@ -62,7 +56,12 @@ def prepare_tmp_dir():
 
 
 def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> web.Application:
-    app = web.Application(middlewares=[error_middleware])
+    app = web.Application(
+        middlewares=[
+            trace_id_middleware,
+            error_middleware,
+        ]
+    )
 
     app["port"] = port
     app["self_shutdown"] = self_shutdown
@@ -73,12 +72,12 @@ def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> 
     )
 
     app["golem_service"] = GolemService(
-        ray_on_golem_port=RAY_ON_GOLEM_PORT,
         websocat_path=WEBSOCAT_PATH,
         registry_stats=app["registry_stats"],
     )
 
     app["ray_service"] = RayService(
+        ray_on_golem_port=port,
         golem_service=app["golem_service"],
         tmp_path=TMP_PATH,
     )

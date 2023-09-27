@@ -42,7 +42,6 @@ check_license = {sequence = ["_check_license_export", "_check_license_verify"], 
 _check_license_export = "poetry export -f requirements.txt -o .requirements.txt"
 _check_license_verify = "liccheck -r .requirements.txt"
 
-
 [tool.isort]
 profile = "black"
 py_version = 38

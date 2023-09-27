@@ -94,9 +94,9 @@ worker_start_ray_commands: [
 ]
 
 # Authentication credentials that Ray will use to launch nodes
-auth:
-  # TODO: try to remove explicit ssh_user field
-  ssh_user: 'root'
+# auth:
+  # Custom username for ssh
+  # ssh_user: "root"
 
   # If ssh_private_key will be not provided, temporary key will be created and used
   # ssh_private_key: '~/.ssh/id_rsa'

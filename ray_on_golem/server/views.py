@@ -26,7 +26,7 @@ async def create_cluster(request: web.Request) -> web.Response:
 
     request_data = models.CreateClusterRequestData.parse_raw(await request.text())
 
-    await ray_service.create_cluster_on_golem(provider_config=request_data)
+    await ray_service.create_cluster(provider_config=request_data)
 
     response_data = models.EmptyResponseData()
 

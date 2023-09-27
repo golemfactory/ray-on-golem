@@ -3,7 +3,6 @@ import subprocess
 from copy import deepcopy
 from datetime import datetime
 from functools import lru_cache
-from time import sleep
 from types import ModuleType
 from typing import Any, Dict, List, Optional
 
@@ -19,7 +18,6 @@ from ray_on_golem.server.run import prepare_tmp_dir
 from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_CHECK_DEADLINE,
     RAY_ON_GOLEM_PATH,
-    RAY_ON_GOLEM_PORT,
     RAY_ON_GOLEM_START_DEADLINE,
     TMP_PATH,
 )
@@ -56,7 +54,7 @@ class GolemNodeProvider(NodeProvider):
         config = deepcopy(cluster_config)
 
         provider_parameters: Dict = config["provider"]["parameters"]
-        provider_parameters.setdefault("webserver_port", RAY_ON_GOLEM_PORT)
+        provider_parameters.setdefault("webserver_port", 4578)
         provider_parameters.setdefault("enable_registry_stats", True)
         provider_parameters.setdefault("log_level", "info"),
         provider_parameters.setdefault("network", "goerli")
