@@ -66,8 +66,6 @@ class YagnaService:
     async def _run_yagna(self) -> None:
         logger.info("Starting Yagna...")
 
-        # TODO: Add explicit logs when subprocess fails instantly (for e.g. when yagna_path
-        #  is incorrect)
         self._yagna_process = await run_subprocess(self._yagna_path, "service", "run")
         self._yagna_early_exit_task = asyncio.create_task(self._on_yagna_early_exit())
 

@@ -12,35 +12,73 @@ TMP_PATH = Path("/tmp/ray_on_golem")
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "add_trace_id": {
+            "()": "golem.utils.logging.AddTraceIdFilter",
+        },
+    },
+    "formatters": {
+        "standard": {
+            "format": "[%(asctime)s] [%(levelname)-7s] [%(traceid)s] "
+            "[%(name)s:%(lineno)d] %(message)s",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "level": "DEBUG",
             "formatter": "standard",
+            "filters": ["add_trace_id"],
         },
         "file": {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "DEBUG",
             "formatter": "standard",
+            "filters": ["add_trace_id"],
             "filename": TMP_PATH / "webserver.log",
             "maxBytes": 1024 * 1024,  # 1MB
             "backupCount": 3,
         },
     },
-    "formatters": {
-        "standard": {
-            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        },
-    },
     "root": {
         "level": "INFO",
-        "handlers": ["console", "file"],
+        "handlers": [
+            "console",
+            "file",
+        ],
     },
     "loggers": {
         "aiohttp": {
-            "level": "DEBUG",
+            "level": "WARNING",
         },
         "ray_on_golem": {
+            "level": "INFO",
+        },
+        "golem": {
+            "level": "INFO",
+        },
+        "golem.managers.payment": {
+            "level": "INFO",
+        },
+        "golem.managers.network": {
+            "level": "INFO",
+        },
+        "golem.managers.demand": {
+            "level": "INFO",
+        },
+        "golem.managers.negotiation": {
+            "level": "INFO",
+        },
+        "golem.managers.proposal": {
+            "level": "INFO",
+        },
+        "golem.managers.agreement": {
+            "level": "INFO",
+        },
+        "golem.managers.activity": {
+            "level": "INFO",
+        },
+        "golem.managers.work": {
             "level": "INFO",
         },
     },
@@ -50,7 +88,6 @@ YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
 YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
 YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
 
-RAY_ON_GOLEM_PORT = int(os.getenv("RAY_ON_GOLEM_PORT", 4578))
 RAY_ON_GOLEM_START_DEADLINE = timedelta(seconds=30)
 RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
 RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=10)

@@ -41,7 +41,12 @@ file_mounts:
   # remote_path: local_path
   {
     "/app/ray_on_golem": "./ray_on_golem",
+    "/app/golem": "../golem-core-python/golem",
   }
+
+rsync_exclude: [
+  "**/__pycache__",
+]
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -63,10 +68,9 @@ available_node_types:
     node_config: {}
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
-#initialization_commands: [
-#  "pip install endplay",
-#]
-initialization_commands: []
+initialization_commands: [
+  "cp -fR /app/golem/* $(python -c 'import site; print(site.getsitepackages()[0])')/golem"
+]
 
 # List of shell commands to run to set up nodes
 setup_commands: []
