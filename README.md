@@ -66,7 +66,7 @@ The first step is installing Ray on Golem (recommended within a clean venv). It 
 pip3 install -U ray-on-golem
 ```
 
-Additonally, a tool named [websocat](https://lib.rs/crates/websocat) is needed to wrap connections between your machine and Ray on Golem cluster.
+Additionally, a tool named [websocat](https://lib.rs/crates/websocat) is needed to wrap connections between your machine and Ray on Golem cluster.
 You can install websocat using [these instructions](https://lindevs.com/install-websocat-on-ubuntu/).
 
 Verify websocat is present:
