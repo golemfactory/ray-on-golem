@@ -1,5 +1,6 @@
 import socket
 import time
+import argparse
 from collections import Counter
 
 import ray
@@ -24,7 +25,15 @@ def f():
     return socket.gethostbyname(socket.gethostname())
 
 
-object_ids = [f.remote() for _ in range(100)]
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-c", "--count", type=int, default=100, help="number of tasks to perform, default: %(default)s"
+)
+args = parser.parse_args()
+
+
+object_ids = [f.remote() for _ in range(args.count)]
 ip_addresses = ray.get(object_ids)
 
 print("Tasks executed")
