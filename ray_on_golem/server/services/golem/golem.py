@@ -213,6 +213,9 @@ class GolemService:
     ) -> List[Tuple[Activity, str, str]]:
         demand = self._demand  # FIXME: Use demand for proper node_config
 
+        await demand.get_data()
+        logger.debug("Creating activities with demand: %s", demand.data)
+
         async with self._lock:
             try:
                 async with async_timeout.timeout(int(150)):
