@@ -93,11 +93,15 @@ class GolemNodeProvider(NodeProvider):
 
     @classmethod
     @lru_cache()
-    def _get_ray_on_golem_client_instance(cls, webserver_port: int, enable_registry_stats: bool, log_level: str = "info"):
+    def _get_ray_on_golem_client_instance(
+        cls, webserver_port: int, enable_registry_stats: bool, log_level: str = "info"
+    ):
         ray_on_golem_client = RayOnGolemClient(webserver_port)
 
         if not is_running_on_golem_network():
-            cls._start_webserver(ray_on_golem_client, webserver_port, enable_registry_stats, log_level)
+            cls._start_webserver(
+                ray_on_golem_client, webserver_port, enable_registry_stats, log_level
+            )
 
         return ray_on_golem_client
 
@@ -170,7 +174,10 @@ class GolemNodeProvider(NodeProvider):
 
     @staticmethod
     def _start_webserver(
-        ray_on_golem_client: RayOnGolemClient, port: int, registry_stats: bool, log_level: str,
+        ray_on_golem_client: RayOnGolemClient,
+        port: int,
+        registry_stats: bool,
+        log_level: str,
     ) -> None:
         with cli_logger.group(WEBSERVER_LOG_GROUP):
             if ray_on_golem_client.is_webserver_running():
