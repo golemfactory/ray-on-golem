@@ -43,6 +43,12 @@ def parse_sys_args() -> argparse.Namespace:
         action="store_false",
         dest="registry_stats",
     )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug"],
+    )
     parser.set_defaults(self_shutdown=False, registry_stats=True)
     return parser.parse_args()
 
@@ -125,9 +131,10 @@ async def ray_service_ctx(app: web.Application) -> None:
 
 def main():
     prepare_tmp_dir()
-    logging.config.dictConfig(LOGGING_CONFIG)
-
     args = parse_sys_args()
+
+    LOGGING_CONFIG["loggers"]["ray_on_golem"]["level"] = args.log_level.upper()
+    logging.config.dictConfig(LOGGING_CONFIG)
 
     app = create_application(args.port, args.self_shutdown, args.registry_stats)
 
