@@ -37,7 +37,7 @@ class GolemNodeProvider(NodeProvider):
         self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
-            provider_parameters.get("log_level", "info"),
+            provider_parameters["log_level"],
         )
         self._ray_on_golem_client.get_running_or_create_cluster(
             network=provider_parameters["network"],
@@ -54,13 +54,14 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters: Dict = config["provider"]["parameters"]
         provider_parameters.setdefault("webserver_port", RAY_ON_GOLEM_PORT)
         provider_parameters.setdefault("enable_registry_stats", True)
+        provider_parameters.setdefault("log_level", "info"),
         provider_parameters.setdefault("network", "goerli")
         provider_parameters.setdefault("budget", 1)
 
         ray_on_golem_client = cls._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
-            provider_parameters.get("log_level", "info"),
+            provider_parameters["log_level"],
         )
 
         auth: Dict = config["auth"]
@@ -94,7 +95,7 @@ class GolemNodeProvider(NodeProvider):
     @classmethod
     @lru_cache()
     def _get_ray_on_golem_client_instance(
-        cls, webserver_port: int, enable_registry_stats: bool, log_level: str = "info"
+        cls, webserver_port: int, enable_registry_stats: bool, log_level="info"
     ):
         ray_on_golem_client = RayOnGolemClient(webserver_port)
 

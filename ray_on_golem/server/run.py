@@ -48,6 +48,7 @@ def parse_sys_args() -> argparse.Namespace:
         type=str,
         default="info",
         choices=["critical", "error", "warning", "info", "debug"],
+        help="the logging level to enable, default: %(default)s",
     )
     parser.set_defaults(self_shutdown=False, registry_stats=True)
     return parser.parse_args()
