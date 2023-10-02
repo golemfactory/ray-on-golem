@@ -37,6 +37,7 @@ class GolemNodeProvider(NodeProvider):
         self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
+            provider_parameters["log_level"],
         )
         self._ray_on_golem_client.get_running_or_create_cluster(
             network=provider_parameters["network"],
@@ -53,12 +54,14 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters: Dict = config["provider"]["parameters"]
         provider_parameters.setdefault("webserver_port", RAY_ON_GOLEM_PORT)
         provider_parameters.setdefault("enable_registry_stats", True)
+        provider_parameters.setdefault("log_level", "info"),
         provider_parameters.setdefault("network", "goerli")
         provider_parameters.setdefault("budget", 1)
 
         ray_on_golem_client = cls._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
+            provider_parameters["log_level"],
         )
 
         auth: Dict = config["auth"]
@@ -91,11 +94,15 @@ class GolemNodeProvider(NodeProvider):
 
     @classmethod
     @lru_cache()
-    def _get_ray_on_golem_client_instance(cls, webserver_port: int, enable_registry_stats: bool):
+    def _get_ray_on_golem_client_instance(
+        cls, webserver_port: int, enable_registry_stats: bool, log_level="info"
+    ):
         ray_on_golem_client = RayOnGolemClient(webserver_port)
 
         if not is_running_on_golem_network():
-            cls._start_webserver(ray_on_golem_client, webserver_port, enable_registry_stats)
+            cls._start_webserver(
+                ray_on_golem_client, webserver_port, enable_registry_stats, log_level
+            )
 
         return ray_on_golem_client
 
@@ -168,7 +175,10 @@ class GolemNodeProvider(NodeProvider):
 
     @staticmethod
     def _start_webserver(
-        ray_on_golem_client: RayOnGolemClient, port: int, registry_stats: bool
+        ray_on_golem_client: RayOnGolemClient,
+        port: int,
+        registry_stats: bool,
+        log_level: str,
     ) -> None:
         with cli_logger.group(WEBSERVER_LOG_GROUP):
             if ray_on_golem_client.is_webserver_running():
@@ -176,24 +186,37 @@ class GolemNodeProvider(NodeProvider):
                 return
 
             cli_logger.print("Starting webserver...")
+            args = [
+                RAY_ON_GOLEM_PATH,
+                "-p",
+                str(port),
+                "--registry-stats" if registry_stats else "--no-registry-stats",
+                "--self-shutdown",
+                "--log-level",
+                log_level,
+            ]
 
-            subprocess.Popen(
-                [
-                    RAY_ON_GOLEM_PATH,
-                    "-p",
-                    str(port),
-                    "--registry-stats" if registry_stats else "--no-registry-stats",
-                    "--self-shutdown",
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+            cli_logger.verbose(f"Webserver command: `{' '.join([str(a) for a in args])}`")
+
+            proc = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 start_new_session=True,
             )
 
             start_deadline = datetime.now() + RAY_ON_GOLEM_START_DEADLINE
             check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
             while datetime.now() < start_deadline:
-                sleep(check_seconds)
+                try:
+                    out, err = proc.communicate(timeout=check_seconds)
+                    cli_logger.abort(
+                        "Starting webserver failed!\n"
+                        f"{out.decode('ascii')}\n"
+                        f"{err.decode('ascii')}"
+                    )
+                except subprocess.TimeoutExpired:
+                    pass
 
                 if ray_on_golem_client.is_webserver_running():
                     cli_logger.print("Starting webserver done")
