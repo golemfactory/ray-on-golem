@@ -30,7 +30,10 @@ provider:
     node_config:
       # if not provided, image_tag will be autodetected based on currently used python and ray versions
       # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-      image_tag: "golem/ray-on-golem:0.1.1-py3.10.13-ray2.3.1"
+
+      image_tag: "golem/ray-on-golem:0.1.2-py3.10.13-ray2.3.1"
+#      image_tag: "blueshade/raytest:ray-zmq231004a"
+#      image_tag: "golem/ray-on-golem:0.1.1-py3.10.13-ray2.7"
       capabilities: ["vpn", "inet", "manifest-support"]
       min_mem_gib: 0
       min_cpu_threads: 0
@@ -66,7 +69,9 @@ available_node_types:
 #initialization_commands: [
 #  "pip install endplay",
 #]
-initialization_commands: []
+initialization_commands: [
+    "pip install pillow",
+]
 
 # List of shell commands to run to set up nodes
 setup_commands: []

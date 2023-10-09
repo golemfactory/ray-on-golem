@@ -18,6 +18,8 @@ provider:
 
     enable_registry_stats: false
 
+    log_level: "debug"
+
     # Blockchain used for payments.
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
@@ -30,7 +32,7 @@ provider:
     node_config:
       # if not provided, image_tag will be autodetected based on currently used python and ray versions
       # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-      image_tag: "golem/ray-on-golem:0.1.1-py3.10.13-ray2.7"
+      image_tag: "blueshade/raytest:2.3.1"
 
       capabilities: ["vpn", "inet", "manifest-support"]
       min_mem_gib: 0
@@ -80,13 +82,13 @@ worker_setup_commands: []
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands: [
-  "ray start --head --node-ip-address 192.168.0.3 --include-dashboard=True --dashboard-host 0.0.0.0 --disable-usage-stats --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "ray start -v --head --node-ip-address 192.168.0.3 --include-dashboard=True --dashboard-host 0.0.0.0 --disable-usage-stats --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
 
 # Command to start ray on worker nodes. You don't need to change this.
 worker_start_ray_commands: [
   "screen -dm tcpdump -A dst host 192.168.0.3 and port 6379 -w /root/dump",
-  "ray start --address 192.168.0.3:6379",
+  "ray start -v --address 192.168.0.3:6379",
 ]
 
 # Authentication credentials that Ray will use to launch nodes
