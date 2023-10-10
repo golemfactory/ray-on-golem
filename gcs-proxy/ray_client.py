@@ -14,7 +14,7 @@ def run():
     print("Will try to greet world ...")
     with grpc.insecure_channel("localhost:6379") as channel:
         stub = gcs_service_pb2_grpc.NodeInfoGcsServiceStub(channel)
-        response:gcs_service_pb2.GetClusterIdReply = stub.GetClusterId(gcs_service_pb2.GetClusterIdRequest())
+        response: gcs_service_pb2.GetClusterIdReply = stub.GetClusterId(gcs_service_pb2.GetClusterIdRequest())
     print("Greeter client received: " + str(response.cluster_id))
 
 

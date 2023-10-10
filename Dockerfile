@@ -45,3 +45,4 @@ RUN pip install poetry && \
 RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
 COPY ray_on_golem /app/ray_on_golem/
+COPY gcs-proxy /gcs-proxy

@@ -80,7 +80,6 @@ class GCS(gcs_service_pb2_grpc.NodeInfoGcsServiceServicer):
         )
 
 
-
 def serve():
     port = "6379"
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -95,3 +94,4 @@ def serve():
 if __name__ == "__main__":
     logging.basicConfig()
     serve()
+

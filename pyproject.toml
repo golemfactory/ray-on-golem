@@ -9,7 +9,7 @@ packages = [{include = "ray_on_golem"}]
 [tool.poetry.dependencies]
 python = "^3.8"
 
-ray = {extras = ["default"], version = "^2.7"}
+ray = {extras = ["default"], version = "^2.7.1"}
 golem-api-python = "^0.1.1"
 aiohttp = "^3"
 requests = "^2"
