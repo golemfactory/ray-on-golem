@@ -98,6 +98,7 @@ async def startup_print(app: web.Application) -> None:
 
 async def shutdown_print(app: web.Application) -> None:
     logger.info("Stopping server...")
+    # TODO: Force cancel running requests on shutdown
 
 
 async def yagna_service_ctx(app: web.Application) -> None:

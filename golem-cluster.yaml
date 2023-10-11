@@ -5,7 +5,7 @@ cluster_name: golem-cluster
 max_workers: 10
 
 # The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
-idle_timeout_minutes: 5
+idle_timeout_minutes: 2
 
 # The cloud provider-specific configuration properties.
 provider:
@@ -22,7 +22,7 @@ provider:
     network: "goerli"
 
     # Maximum amount of GML that's going to be spent (not supported yet)
-    budget: 1
+    budget: 2
 
     # Params for creating golem demands (same for head and workers)
     node_config:

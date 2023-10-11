@@ -41,7 +41,7 @@ class GolemNodeProvider(NodeProvider):
             provider_parameters["enable_registry_stats"],
             provider_parameters["log_level"],
         )
-        self._ray_on_golem_client.get_running_or_create_cluster(
+        self._ray_on_golem_client.create_cluster(
             network=provider_parameters["network"],
             budget=provider_parameters["budget"],
             node_config=NodeConfigData(**provider_parameters["node_config"]),
