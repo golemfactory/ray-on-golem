@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from golem.resources import Activity
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 
 NodeId = str
 Tags = Dict[str, str]
@@ -36,7 +36,7 @@ class SingleNodeRequestData(BaseModel):
     node_id: NodeId
 
 
-class NodeConfigData(BaseModel):
+class DemandConfigData(BaseModel):
     image_hash: Optional[str] = None
     image_tag: Optional[str] = None
     capabilities: List[str]
@@ -45,12 +45,55 @@ class NodeConfigData(BaseModel):
     min_storage_gib: float
 
 
-class CreateClusterRequestData(BaseModel):
+class CostManagementData(BaseModel):
+    average_cpu_load: Optional[float] = None
+    average_duration_minutes: Optional[float] = None
+
+    max_average_usage_cost: Optional[float] = None
+    max_initial_price: Optional[float] = None
+    max_cpu_sec_price: Optional[float] = None
+    max_duration_sec_price: Optional[float] = None
+
+    @root_validator
+    def check_average_fields(cls, values):
+        average_cpu_load = values.get("average_cpu_load")
+        average_duration_minutes = values.get("average_duration_minutes")
+        max_average_usage_cost = values.get("max_average_usage_cost")
+
+        if average_cpu_load is None != average_duration_minutes is None:
+            raise ValueError(
+                "Both `average_cpu_load` and `average_duration_minutes` parameter should be defined together!"
+            )
+
+        if max_average_usage_cost is not None and (
+            average_cpu_load is None or average_duration_minutes is None
+        ):
+            raise ValueError(
+                "Parameter `max_average_usage_cost` requires `average_cpu_load` and `average_duration_minutes`"
+                " parameters to be defined!"
+            )
+
+        return values
+
+    def is_average_usage_cost_enabled(self):
+        return self.average_cpu_load is not None and self.average_duration_minutes is not None
+
+
+class NodeConfigData(BaseModel):
+    demand: DemandConfigData
+    cost_management: Optional[CostManagementData] = None
+
+
+class ProviderConfigData(BaseModel):
     network: str
     budget: int
     node_config: NodeConfigData
     ssh_private_key: str
     ssh_user: str
+
+
+class CreateClusterRequestData(ProviderConfigData):
+    pass
 
 
 class NonTerminatedNodesRequestData(BaseModel):

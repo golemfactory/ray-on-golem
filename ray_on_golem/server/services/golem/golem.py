@@ -6,8 +6,10 @@ import logging
 import platform
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import timedelta
+from functools import partial
 from pathlib import Path
-from typing import AsyncIterator, Dict, Optional, Tuple
+from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 import aiohttp
 import ray
@@ -15,42 +17,49 @@ from golem.managers import (
     ActivityManager,
     AddChosenPaymentPlatform,
     AgreementManager,
+    BlacklistProviderIdPlugin,
     DefaultAgreementManager,
     DefaultProposalManager,
     DemandManager,
+    LinearAverageCostPricing,
+    MapScore,
     NegotiatingPlugin,
     PayAllPaymentManager,
     PaymentManager,
     ProposalManager,
+    ProposalManagerPlugin,
+    ProposalScorer,
     RefreshingDemandManager,
+    RejectIfCostsExceeds,
+    ScoringBuffer,
     WorkContext,
 )
+from golem.managers.proposal.plugins.linear_coeffs import LinearCoeffsCost
 from golem.node import SUBNET, GolemNode
 from golem.payload import ManifestVmPayload, Payload, constraint, prop
-from golem.resources import Activity, Network
+from golem.resources import Activity, Network, ProposalData
+from pydantic import BaseModel, Field
 from yarl import URL
 
 from ray_on_golem.server.exceptions import RayOnGolemServerError, RegistryRequestError
-from ray_on_golem.server.models import NodeConfigData
+from ray_on_golem.server.models import DemandConfigData, NodeConfigData
 from ray_on_golem.server.services.golem.manifest import get_manifest
+from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST, PROVIDERS_SCORED
 
 logger = logging.getLogger(__name__)
 
 
-class ManagerStack:
-    def __init__(
-        self,
-        payment_manager=None,
-        demand_manager=None,
-        proposal_manager=None,
-        agreement_manager=None,
-        activity_manager=None,
-    ) -> None:
-        self.payment_manager: Optional[PaymentManager] = payment_manager
-        self.demand_manager: Optional[DemandManager] = demand_manager
-        self.proposal_manager: Optional[ProposalManager] = proposal_manager
-        self.agreement_manager: Optional[AgreementManager] = agreement_manager
-        self.activity_manager: Optional[ActivityManager] = activity_manager
+class ManagerStack(BaseModel):
+    payment_manager: Optional[PaymentManager]
+    demand_manager: Optional[DemandManager]
+    proposal_manager: Optional[ProposalManager]
+    agreement_manager: Optional[AgreementManager]
+    activity_manager: Optional[ActivityManager]
+    extra_proposal_plugins: List[ProposalManagerPlugin] = Field(default_factory=list)
+    extra_proposal_scorers: List[ProposalScorer] = Field(default_factory=list)
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @property
     def _managers(self):
@@ -131,7 +140,7 @@ class GolemService:
             del self._stacks_locks[stack_hash]
 
     async def _get_or_create_stack_from_node_config(
-        self, node_config: NodeConfigData
+        self, node_config: NodeConfigData, budget: float, network: str
     ) -> ManagerStack:
         stack_hash = self._get_hash_from_node_config(node_config)
 
@@ -140,7 +149,9 @@ class GolemService:
             if stack is None:
                 logger.info(f"Creating new stack `{stack_hash}`...")
 
-                self._stacks[stack_hash] = stack = await self._create_stack(node_config)
+                self._stacks[stack_hash] = stack = await self._create_stack(
+                    node_config, budget, network
+                )
                 await stack.start()
 
                 logger.info(f"Creating new stack `{stack_hash}` done")
@@ -151,25 +162,43 @@ class GolemService:
     def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
         return hashlib.md5(node_config.json().encode()).hexdigest()
 
-    async def _create_stack(self, node_config: NodeConfigData) -> ManagerStack:
+    async def _create_stack(
+        self, node_config: NodeConfigData, budget: float, network: str
+    ) -> ManagerStack:
         stack = ManagerStack()
 
-        payload = await self._get_payload_from_node_config(node_config)
+        payload = await self._get_payload_from_demand_config(node_config.demand)
 
-        stack.payment_manager = PayAllPaymentManager(self._golem, budget=1)
+        self._apply_cost_management_avg_usage(stack, node_config)
+        self._apply_cost_management_hard_limits(stack, node_config)
+
+        stack.payment_manager = PayAllPaymentManager(self._golem, budget=budget, network=network)
         stack.demand_manager = RefreshingDemandManager(
-            self._golem, stack.payment_manager.get_allocation, payload
+            self._golem,
+            stack.payment_manager.get_allocation,
+            payload,
+            demand_expiration_timeout=timedelta(hours=8),
         )
         stack.proposal_manager = DefaultProposalManager(
             self._golem,
             stack.demand_manager.get_initial_proposal,
-            plugins=[
-                NegotiatingPlugin(
-                    proposal_negotiators=[
-                        AddChosenPaymentPlatform(),
-                    ]
+            plugins=(
+                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(network, set())),
+                *stack.extra_proposal_plugins,
+                ScoringBuffer(
+                    min_size=5,
+                    max_size=50,
+                    fill_at_start=True,
+                    proposal_scorers=(
+                        *stack.extra_proposal_scorers,
+                        MapScore(partial(self._score_with_provider_data, network=network)),
+                    ),
+                    update_interval=timedelta(seconds=40),
                 ),
-            ],
+                NegotiatingPlugin(
+                    proposal_negotiators=(AddChosenPaymentPlatform(),),
+                ),
+            ),
         )
         stack.agreement_manager = DefaultAgreementManager(
             self._golem, stack.proposal_manager.get_draft_proposal
@@ -177,7 +206,7 @@ class GolemService:
 
         return stack
 
-    async def _get_payload_from_node_config(self, node_config: NodeConfigData) -> Payload:
+    async def _get_payload_from_demand_config(self, demand_config: DemandConfigData) -> Payload:
         @dataclass
         class CustomManifestVmPayload(ManifestVmPayload):
             subnet_constraint: str = constraint("golem.node.debug.subnet", "=", default=SUBNET)
@@ -185,21 +214,21 @@ class GolemService:
                 "golem.com.payment.debit-notes.accept-timeout?", default=240
             )
 
-        image_url, image_hash = await self._get_image_url_and_hash(node_config)
+        image_url, image_hash = await self._get_image_url_and_hash(demand_config)
 
         manifest = get_manifest(image_url, image_hash)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
-        params = node_config.dict(exclude={"image_hash", "image_tag"})
+        params = demand_config.dict(exclude={"image_hash", "image_tag"})
         params["manifest"] = manifest
 
         payload = CustomManifestVmPayload(**params)
 
         return payload
 
-    async def _get_image_url_and_hash(self, node_config: NodeConfigData) -> Tuple[URL, str]:
-        image_tag = node_config.image_tag
-        image_hash = node_config.image_hash
+    async def _get_image_url_and_hash(self, demand_config: DemandConfigData) -> Tuple[URL, str]:
+        image_tag = demand_config.image_tag
+        image_hash = demand_config.image_hash
 
         if image_tag is not None and image_hash is not None:
             raise RayOnGolemServerError(
@@ -247,6 +276,73 @@ class GolemService:
                 else:
                     raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
+    def _apply_cost_management_avg_usage(
+        self, stack: ManagerStack, node_config: NodeConfigData
+    ) -> None:
+        cost_management = node_config.cost_management
+
+        if cost_management is None or not cost_management.is_average_usage_cost_enabled():
+            logger.debug("Cost management based on average usage is not enabled")
+            return
+
+        linear_average_cost = LinearAverageCostPricing(
+            average_cpu_load=node_config.cost_management.average_cpu_load,
+            average_duration=timedelta(
+                minutes=node_config.cost_management.average_duration_minutes
+            ),
+        )
+
+        stack.extra_proposal_scorers.append(
+            MapScore(linear_average_cost, normalize=True, normalize_flip=True),
+        )
+
+        max_average_usage_cost = node_config.cost_management.max_average_usage_cost
+        if max_average_usage_cost is not None:
+            stack.extra_proposal_plugins.append(
+                RejectIfCostsExceeds(max_average_usage_cost, linear_average_cost),
+            )
+            logger.debug("Cost management based on average usage applied with max limits")
+        else:
+            logger.debug("Cost management based on average usage applied without max limits")
+
+    def _apply_cost_management_hard_limits(
+        self, stack: ManagerStack, node_config: NodeConfigData
+    ) -> None:
+        # TODO: Consider creating RejectIfCostsExceeds variant for multiple values
+        proposal_plugins = []
+        field_names = {
+            "max_initial_price": "price_initial",
+            "max_cpu_sec_price": "price_cpu_sec",
+            "max_duration_sec_price": "price_duration_sec",
+        }
+
+        for cost_field_name, coef_field_name in field_names.items():
+            cost_max_value = getattr(node_config.cost_management, cost_field_name)
+            if cost_max_value is not None:
+                stack.extra_proposal_plugins.append(
+                    RejectIfCostsExceeds(cost_max_value, LinearCoeffsCost(coef_field_name)),
+                )
+
+        if proposal_plugins:
+            logger.debug("Cost management based on max limits applied")
+            stack.extra_proposal_plugins.extend(proposal_plugins)
+        else:
+            logger.debug("Cost management based on max limits is not enabled")
+
+    def _score_with_provider_data(
+        self, proposal_data: ProposalData, network: str
+    ) -> Optional[float]:
+        provider_id = proposal_data.issuer_id
+
+        try:
+            prescored_providers = PROVIDERS_SCORED[network]
+            provider_pos = prescored_providers.index(provider_id)
+        except (KeyError, ValueError):
+            return 0
+
+        # Gives pre-scored providers from 0.5 to 1.0 score
+        return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
+
     async def _on_activity_start(self, context: WorkContext, ip: str, ssh_public_key_data: str):
         deploy_args = {"net": [self._network.deploy_args(ip)]}
         hostname = ip.replace(".", "-")
@@ -267,8 +363,10 @@ class GolemService:
         node_config: NodeConfigData,
         count: int,
         ssh_public_key: str,
+        budget: float,
+        network: str,
     ) -> AsyncIterator[Tuple[Activity, str, str]]:
-        stack = await self._get_or_create_stack_from_node_config(node_config)
+        stack = await self._get_or_create_stack_from_node_config(node_config, budget, network)
 
         coros = [self._create_activity(stack, ssh_public_key) for _ in range(count)]
 

@@ -8,14 +8,7 @@ from typing import Any, Dict, Iterator, List, Optional
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
 
 from ray_on_golem.server.exceptions import NodeNotFound
-from ray_on_golem.server.models import (
-    CreateClusterRequestData,
-    Node,
-    NodeConfigData,
-    NodeId,
-    NodeState,
-    Tags,
-)
+from ray_on_golem.server.models import Node, NodeId, NodeState, ProviderConfigData, Tags
 from ray_on_golem.server.services.golem import GolemService
 from ray_on_golem.utils import (
     are_dicts_equal,
@@ -33,6 +26,8 @@ class RayService:
         self._golem_service = golem_service
         self._tmp_path = tmp_path
 
+        self._provider_config: Optional[ProviderConfigData] = None
+
         self._nodes: Dict[NodeId, Node] = {}
         self._nodes_lock = asyncio.Lock()
         self._nodes_id_counter = 0
@@ -40,7 +35,6 @@ class RayService:
         self._head_node_to_webserver_tunnel_process: Optional[Process] = None
         self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
 
-        self._node_config: Optional[NodeConfigData] = None
         self._ssh_private_key_path: Optional[Path] = None
         self._ssh_public_key_path: Optional[Path] = None
         self._ssh_public_key: Optional[str] = None
@@ -54,8 +48,8 @@ class RayService:
 
         logger.info("Stopping RayService done")
 
-    async def create_cluster(self, provider_config: CreateClusterRequestData) -> None:
-        self._node_config = provider_config.node_config
+    async def create_cluster(self, provider_config: ProviderConfigData) -> None:
+        self._provider_config = provider_config
 
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
@@ -88,9 +82,11 @@ class RayService:
 
         created_nodes = {}
         async for activity, ip, ssh_proxy_command in self._golem_service.create_activities(
-            node_config=self._node_config,
+            node_config=self._provider_config.node_config,
             count=count,
             ssh_public_key=self._ssh_public_key,
+            budget=self._provider_config.budget,
+            network=self._provider_config.network,
         ):
             self._print_ssh_command(
                 ip, ssh_proxy_command, self._ssh_user, self._ssh_private_key_path
@@ -188,6 +184,7 @@ class RayService:
 
             ssh_key_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # FIXME: Use cryptography module instead of subprocess
             await run_subprocess_output(
                 "ssh-keygen", "-t", "rsa", "-b", "4096", "-N", "", "-f", str(ssh_key_path)
             )

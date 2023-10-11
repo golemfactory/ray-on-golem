@@ -17,7 +17,7 @@ class RayOnGolemClient:
 
         self._session = requests.Session()
 
-    def get_running_or_create_cluster(
+    def create_cluster(
         self,
         network: str,
         budget: int,
