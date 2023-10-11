@@ -15,6 +15,7 @@ from ray.autoscaler.node_provider import NodeProvider
 from ray_on_golem.client.client import RayOnGolemClient
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeConfigData, NodeId, ShutdownState
+from ray_on_golem.server.run import prepare_tmp_dir
 from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_CHECK_DEADLINE,
     RAY_ON_GOLEM_PATH,
@@ -26,6 +27,9 @@ from ray_on_golem.utils import get_default_ssh_key_name, is_running_on_golem_net
 
 logger = logging.getLogger(__name__)
 WEBSERVER_LOG_GROUP = "Ray On Golem webserver"
+
+WEBSERVER_OUTFILE = TMP_PATH / "webserver.out"
+WEBSERVER_ERRFILE = TMP_PATH / "webserver.err"
 
 
 class GolemNodeProvider(NodeProvider):
@@ -198,10 +202,11 @@ class GolemNodeProvider(NodeProvider):
 
             cli_logger.verbose(f"Webserver command: `{' '.join([str(a) for a in args])}`")
 
+            prepare_tmp_dir()
             proc = subprocess.Popen(
                 args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=open(WEBSERVER_OUTFILE, "w"),
+                stderr=open(WEBSERVER_ERRFILE, "w"),
                 start_new_session=True,
             )
 
@@ -209,11 +214,11 @@ class GolemNodeProvider(NodeProvider):
             check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
             while datetime.now() < start_deadline:
                 try:
-                    out, err = proc.communicate(timeout=check_seconds)
+                    proc.communicate(timeout=check_seconds)
                     cli_logger.abort(
                         "Starting webserver failed!\n"
-                        f"{out.decode('ascii')}\n"
-                        f"{err.decode('ascii')}"
+                        f"{open(WEBSERVER_OUTFILE, 'r').read()}\n"
+                        f"{open(WEBSERVER_ERRFILE, 'r').read()}"
                     )
                 except subprocess.TimeoutExpired:
                     pass
