@@ -11,19 +11,23 @@ from typing import Any, Dict, List, Optional, Tuple
 import aiohttp
 import async_timeout
 import ray
-from golem_core.core.activity_api import Activity, BatchError, commands
-from golem_core.core.golem_node import SUBNET, GolemNode
-from golem_core.core.market_api import Demand, ManifestVmPayload
-from golem_core.core.market_api.pipeline import (
+from golem.event_bus import Event
+from golem.node import SUBNET, GolemNode
+from golem.payload import ManifestVmPayload, constraint, prop
+from golem.pipeline import Buffer, Chain, DefaultPaymentHandler, Limit, Map
+from golem.resources import (
+    Activity,
+    Allocation,
+    BatchError,
+    Demand,
+    Deploy,
+    Network,
+    Run,
+    Start,
     default_create_activity,
     default_create_agreement,
     default_negotiate,
 )
-from golem_core.core.market_api.resources.demand.demand_offer_base.model import constraint, prop
-from golem_core.core.network_api import Network
-from golem_core.core.payment_api import Allocation
-from golem_core.managers.payment.default import DefaultPaymentManager
-from golem_core.pipeline import Buffer, Chain, Limit, Map
 from yarl import URL
 
 from ray_on_golem.server.exceptions import (
@@ -47,7 +51,7 @@ class GolemService:
         self._demand: Optional[Demand] = None
         self._allocation: Optional[Allocation] = None
         self._network: Optional[Network] = None
-        self._payment_manager: Optional[DefaultPaymentManager] = None
+        self._payment_manager: Optional[DefaultPaymentHandler] = None
         self._yagna_appkey: Optional[str] = None
         self._lock = asyncio.Lock()
 
@@ -61,7 +65,7 @@ class GolemService:
         async def on_event(event) -> None:
             logger.debug(f"----- EVENT: {event}")
 
-        self._golem.event_bus.listen(on_event)
+        await self._golem.event_bus.on(Event, on_event)
         self._network = await self._golem.create_network(
             "192.168.0.1/24"
         )  # will be retrieved from provider_config
@@ -106,7 +110,7 @@ class GolemService:
             amount=provider_config.budget,
             network=provider_config.network,
         )
-        self._payment_manager = DefaultPaymentManager(self._golem, self._allocation)
+        self._payment_manager = DefaultPaymentHandler(self._golem, self._allocation)
 
         payload = await self._create_payload(provider_config.node_config)
 
@@ -258,8 +262,8 @@ class GolemService:
         deploy_args = {"net": [self._network.deploy_args(ip)]}
 
         batch = await activity.execute_commands(
-            commands.Deploy(deploy_args),
-            commands.Start(),
+            Deploy(deploy_args),
+            Start(),
         )
 
         try:
@@ -284,11 +288,11 @@ class GolemService:
         hostname = ip.replace(".", "-")
 
         batch = await activity.execute_commands(
-            commands.Run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment"),
-            commands.Run(f"hostname '{hostname}'"),
-            commands.Run(f"echo '{hostname}' > /etc/hostname"),
-            commands.Run(f"echo '{ip} {hostname}' >> /etc/hosts"),
-            commands.Run("service ssh start"),
+            Run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment"),
+            Run(f"hostname '{hostname}'"),
+            Run(f"echo '{hostname}' > /etc/hostname"),
+            Run(f"echo '{ip} {hostname}' >> /etc/hosts"),
+            Run("service ssh start"),
         )
         await batch.wait(15)
 
@@ -333,8 +337,8 @@ class GolemService:
         :param key: Key you want to add to authorized_keys on provider machine
         """
         batch = await activity.execute_commands(
-            commands.Run("mkdir -p /root/.ssh"),
-            commands.Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
+            Run("mkdir -p /root/.ssh"),
+            Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
         )
         try:
             await batch.wait(15)
