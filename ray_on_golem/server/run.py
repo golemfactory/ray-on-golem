@@ -6,7 +6,13 @@ from aiohttp import web
 
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
-from ray_on_golem.server.settings import LOGGING_CONFIG, TMP_PATH, WEBSOCAT_PATH, YAGNA_PATH
+from ray_on_golem.server.settings import (
+    LOGGING_CONFIG,
+    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
+    TMP_PATH,
+    WEBSOCAT_PATH,
+    YAGNA_PATH,
+)
 from ray_on_golem.server.views import routes
 
 logger = logging.getLogger(__name__)
@@ -36,13 +42,6 @@ def parse_sys_args() -> argparse.Namespace:
         "--no-registry-stats",
         action="store_false",
         dest="registry_stats",
-    )
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default="info",
-        choices=["critical", "error", "warning", "info", "debug"],
-        help="the logging level to enable, default: %(default)s",
     )
     parser.set_defaults(self_shutdown=False, registry_stats=True)
     return parser.parse_args()
@@ -97,8 +96,7 @@ async def startup_print(app: web.Application) -> None:
 
 
 async def shutdown_print(app: web.Application) -> None:
-    logger.info("Stopping server...")
-    # TODO: Force cancel running requests on shutdown
+    logger.info("Stopping server gracefully, forcing after `%s`...", RAY_ON_GOLEM_SHUTDOWN_DEADLINE)
 
 
 async def yagna_service_ctx(app: web.Application) -> None:
@@ -134,7 +132,6 @@ def main():
     prepare_tmp_dir()
     args = parse_sys_args()
 
-    LOGGING_CONFIG["loggers"]["ray_on_golem"]["level"] = args.log_level.upper()
     logging.config.dictConfig(LOGGING_CONFIG)
 
     app = create_application(args.port, args.self_shutdown, args.registry_stats)
@@ -143,9 +140,17 @@ def main():
         "Starting server... {}".format(", ".join(f"{k}={v}" for k, v in args.__dict__.items()))
     )
 
-    web.run_app(app, port=app["port"], print=None)
-
-    logger.info("Stopping server done, bye!")
+    try:
+        web.run_app(
+            app,
+            port=app["port"],
+            print=None,
+            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
+        )
+    except Exception:
+        logger.info("Server unexpectedly died, bye!")
+    else:
+        logger.info("Stopping server done, bye!")
 
 
 if __name__ == "__main__":

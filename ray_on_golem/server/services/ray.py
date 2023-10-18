@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterator, List, Optional
 
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
 
+from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.exceptions import NodeNotFound
 from ray_on_golem.server.models import Node, NodeId, NodeState, ProviderConfigData, Tags
 from ray_on_golem.server.services.golem import GolemService
@@ -18,6 +19,10 @@ from ray_on_golem.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class RayServiceError(RayOnGolemError):
+    pass
 
 
 class RayService:
@@ -61,7 +66,7 @@ class RayService:
     async def _destroy_nodes(self) -> None:
         async with self._nodes_lock:
             if not self._nodes:
-                logger.info("No need to destroy nodes, as no nodes are running")
+                logger.info("Not destroying nodes, as no nodes are running")
                 return
 
             logger.info(f"Destroying {len(self._nodes)} nodes...")
@@ -78,6 +83,10 @@ class RayService:
     ) -> Dict[NodeId, Dict]:
         # TODO: handle pending state
         # TODO: Use node_config from yaml.available_node_types not, from yaml.provider
+
+        if not self._provider_config:
+            raise RayServiceError("Node creation is available only after cluster bootstrap!")
+
         logger.info(f"Creating {count} nodes...")
 
         created_nodes = {}
@@ -265,7 +274,7 @@ class RayService:
         process = self._head_node_to_webserver_tunnel_process
 
         if process is None or process.returncode is not None:
-            logger.info("No need to stop head node to webserver tunnel, as it's not running")
+            logger.info("Not stopping head node to webserver tunnel, as it's not running")
             return
 
         logger.info("Stopping head node to webserver tunnel...")

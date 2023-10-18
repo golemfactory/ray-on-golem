@@ -1,7 +1,9 @@
 import asyncio
 import hashlib
+import logging
 import os
 from asyncio.subprocess import Process
+from logging.handlers import RotatingFileHandler
 from typing import Dict
 
 from aiohttp.web_runner import GracefulExit
@@ -9,11 +11,13 @@ from aiohttp.web_runner import GracefulExit
 from ray_on_golem.exceptions import RayOnGolemError
 
 
-async def run_subprocess(*args) -> Process:
+async def run_subprocess(
+    *args, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL
+) -> Process:
     process = await asyncio.create_subprocess_exec(
         *args,
-        stderr=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.DEVNULL,
+        stderr=stderr,
+        stdout=stdout,
         # As this process lifetime will be fully managed, we need to disable signal propagation
         # from parent to child process https://stackoverflow.com/a/5446982/1993670
         preexec_fn=os.setpgrp,
@@ -56,3 +60,11 @@ def get_default_ssh_key_name(cluster_name: str) -> str:
 
 def raise_graceful_exit() -> None:
     raise GracefulExit()
+
+
+def rolloverLogFiles():
+    root_logger = logging.getLogger()
+
+    for handler in root_logger.handlers:
+        if isinstance(handler, RotatingFileHandler):
+            handler.doRollover()

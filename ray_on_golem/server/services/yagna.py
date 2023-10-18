@@ -2,13 +2,22 @@ import asyncio
 import json
 import logging
 from asyncio.subprocess import Process
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import aiohttp
 
 from ray_on_golem.exceptions import RayOnGolemError
-from ray_on_golem.server.settings import YAGNA_API_URL, YAGNA_APPKEY, YAGNA_APPNAME
+from ray_on_golem.server.settings import (
+    LOGGING_YAGNA_PATH,
+    RAY_ON_GOLEM_CHECK_DEADLINE,
+    YAGNA_API_URL,
+    YAGNA_APPKEY,
+    YAGNA_APPNAME,
+    YAGNA_CHECK_DEADLINE,
+    YAGNA_START_DEADLINE,
+)
 from ray_on_golem.utils import run_subprocess, run_subprocess_output
 
 logger = logging.getLogger(__name__)
@@ -30,7 +39,7 @@ class YagnaService:
         logger.info("Starting YagnaService...")
 
         if await self._check_if_yagna_is_running():
-            logger.info("No need to start Yagna, as it was started externally")
+            logger.info("Not starting Yagna, as it was started externally")
         else:
             await self._run_yagna()
             await self._run_yagna_payment_fund()
@@ -47,11 +56,20 @@ class YagnaService:
         logger.info("Stopping YagnaService done")
 
     async def _wait_for_yagna_api(self) -> bool:
+        logger.debug("Waiting for Yagna Api...")
+
+        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
         for _ in range(25):
             if await self._check_if_yagna_is_running():
+                logger.debug("Waiting for Yagna Api done")
                 return True
 
-            await asyncio.sleep(1)
+            logger.debug(
+                "Yagna Api not yet ready, waiting additional `%s` seconds...", check_seconds
+            )
+            await asyncio.sleep(check_seconds)
+
+        logger.debug("Waiting for Yagna Api failed with timeout!")
 
         return False
 
@@ -66,15 +84,41 @@ class YagnaService:
     async def _run_yagna(self) -> None:
         logger.info("Starting Yagna...")
 
-        self._yagna_process = await run_subprocess(self._yagna_path, "service", "run")
-        self._yagna_early_exit_task = asyncio.create_task(self._on_yagna_early_exit())
+        log_file = LOGGING_YAGNA_PATH.open("w")
+        self._yagna_process = await run_subprocess(
+            self._yagna_path, "service", "run", stderr=log_file, stdout=log_file
+        )
 
-        is_running = await self._wait_for_yagna_api()
+        start_deadline = datetime.now() + YAGNA_START_DEADLINE
+        check_seconds = int(YAGNA_CHECK_DEADLINE.total_seconds())
+        while datetime.now() < start_deadline:
+            try:
+                await asyncio.wait_for(self._yagna_process.communicate(), timeout=check_seconds)
+            except asyncio.TimeoutError:
+                if await self._check_if_yagna_is_running():
+                    self._yagna_early_exit_task = asyncio.create_task(self._on_yagna_early_exit())
+                    logger.info("Starting Yagna done")
+                    return
+            else:
+                logger.error(
+                    "Starting Yagna failed!\nShowing last 50 lines from `%s`:\n%s",
+                    LOGGING_YAGNA_PATH,
+                    "".join(LOGGING_YAGNA_PATH.open("r").readlines()[-50:]),
+                )
+                raise YagnaServiceError("Starting Yagna failed!")
 
-        if is_running:
-            logger.info("Starting Yagna done")
-        else:
-            logger.error("Starting Yagna failed!")
+            logger.info(
+                "Yagna is not yet running, waiting additional `%s` seconds...",
+                check_seconds,
+            )
+
+        logger.error(
+            "Starting Yagna failed! Deadline of `%s` reached.\nShowing last 50 lines from `%s`:\n%s",
+            YAGNA_START_DEADLINE,
+            LOGGING_YAGNA_PATH,
+            "".join(LOGGING_YAGNA_PATH.open("r").readlines()[-50:]),
+        )
+        raise YagnaServiceError("Starting Yagna failed!")
 
     async def _on_yagna_early_exit(self) -> None:
         await self._yagna_process.communicate()
@@ -83,11 +127,11 @@ class YagnaService:
 
     async def _stop_yagna_service(self) -> None:
         if self._yagna_process is None:
-            logger.info("No need to stop Yagna, as it was started externally")
+            logger.info("Not stopping Yagna, as it was started externally")
             return
 
         if self._yagna_process.returncode is not None:
-            logger.info("No need to stop Yagna, as it's not running")
+            logger.info("Not stopping Yagna, as it's not running")
             return
 
         logger.info("Stopping Yagna...")

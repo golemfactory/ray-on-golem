@@ -8,6 +8,9 @@ RAY_ON_GOLEM_PATH = Path(os.getenv("RAY_ON_GOLEM_PATH", "ray-on-golem"))
 YAGNA_PATH = Path(os.getenv("YAGNA_PATH", "yagna"))
 WEBSOCAT_PATH = Path(os.getenv("WEBSOCAT_PATH", "websocat"))
 TMP_PATH = Path("/tmp/ray_on_golem")
+LOGGING_INFO_PATH = TMP_PATH / "webserver.log"
+LOGGING_DEBUG_PATH = TMP_PATH / "webserver_debug.log"
+LOGGING_YAGNA_PATH = TMP_PATH / "yagna.log"
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -18,7 +21,10 @@ LOGGING_CONFIG = {
         },
     },
     "formatters": {
-        "standard": {
+        "compact": {
+            "format": "[%(asctime)s] [%(levelname)-7s] [%(name)s] %(message)s",
+        },
+        "verbose": {
             "format": "[%(asctime)s] [%(levelname)-7s] [%(traceid)s] "
             "[%(name)s:%(lineno)d] %(message)s",
         },
@@ -27,17 +33,15 @@ LOGGING_CONFIG = {
         "console": {
             "class": "logging.StreamHandler",
             "level": "DEBUG",
-            "formatter": "standard",
+            "formatter": "verbose",
             "filters": ["add_trace_id"],
         },
         "file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "level": "DEBUG",
-            "formatter": "standard",
-            "filters": ["add_trace_id"],
-            "filename": TMP_PATH / "webserver.log",
-            "maxBytes": 1024 * 1024,  # 1MB
-            "backupCount": 3,
+            "class": "logging.FileHandler",
+            "level": "INFO",
+            "formatter": "compact",
+            "filename": LOGGING_INFO_PATH,
+            "mode": "w",
         },
     },
     "root": {
@@ -49,34 +53,39 @@ LOGGING_CONFIG = {
     },
     "loggers": {
         "aiohttp": {
-            "level": "WARNING",
+            "level": "DEBUG",
+            "handlers": ["console"],
+            "propagate": False,
         },
         "ray_on_golem": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
         "golem": {
             "level": "INFO",
         },
+        "golem.utils.asyncio": {
+            "level": "DEBUG",
+        },
         "golem.managers.payment": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
         "golem.managers.network": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
         "golem.managers.demand": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
         "golem.managers.proposal": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
         "golem.managers.agreement": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
         "golem.managers.activity": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
         "golem.managers.work": {
-            "level": "INFO",
+            "level": "DEBUG",
         },
     },
 }
@@ -84,10 +93,13 @@ LOGGING_CONFIG = {
 YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
 YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
 YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
+YAGNA_START_DEADLINE = timedelta(minutes=2)
+YAGNA_CHECK_DEADLINE = timedelta(seconds=2)
 
-RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=2)
+RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=2, seconds=30)
 RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
 RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=10)
+RAY_ON_GOLEM_SHUTDOWN_DEADLINE = timedelta(seconds=30)
 
 URL_HEALTH_CHECK = "/health_check"
 URL_CREATE_CLUSTER = "/create_cluster"

@@ -317,15 +317,15 @@ class GolemService:
         }
 
         for cost_field_name, coef_field_name in field_names.items():
-            cost_max_value = getattr(node_config.cost_management, cost_field_name)
+            cost_max_value = getattr(node_config.cost_management, cost_field_name, None)
             if cost_max_value is not None:
-                stack.extra_proposal_plugins.append(
+                proposal_plugins.append(
                     RejectIfCostsExceeds(cost_max_value, LinearCoeffsCost(coef_field_name)),
                 )
 
         if proposal_plugins:
-            logger.debug("Cost management based on max limits applied")
             stack.extra_proposal_plugins.extend(proposal_plugins)
+            logger.debug("Cost management based on max limits applied")
         else:
             logger.debug("Cost management based on max limits is not enabled")
 
