@@ -31,7 +31,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-# start arg.count remote calls
+# start args.count remote calls
 object_ids = [f.remote() for _ in range(args.count)]
 
 # wait for the results
