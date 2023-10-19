@@ -5,7 +5,7 @@ cluster_name: golem-cluster
 max_workers: 10
 
 # The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
-idle_timeout_minutes: 5
+idle_timeout_minutes: 2
 
 # The cloud provider-specific configuration properties.
 provider:
@@ -23,25 +23,51 @@ provider:
     # Polygon is for mainnet operations.
     network: "goerli"
 
-    # Maximum amount of GML that's going to be spent (not supported yet)
-    budget: 1
+    # Maximum amount of GLMs that's going to be spent for the whole cluster
+    budget: 2
 
     # Params for creating golem demands (same for head and workers)
     node_config:
-      # if not provided, image_tag will be autodetected based on currently used python and ray versions
-      # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-      image_tag: "lucjandudek/ray-on-golem:py3.10.12-ray2.3.1-coremain"
-      capabilities: ["vpn", "inet", "manifest-support"]
-      min_mem_gib: 0
-      min_cpu_threads: 0
-      min_storage_gib: 0
+      demand:
+        # if not provided, image_tag will be autodetected based on currently used python and ray versions
+        # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
+        image_tag: "approxit/ray-on-golem:managers"
+        capabilities: ["vpn", "inet", "manifest-support"]
+        min_mem_gib: 0
+        min_cpu_threads: 0
+        min_storage_gib: 0
+
+      cost_management:  # TODO: Consider more suitable parameter name
+        # Estimated average load and duration for worker that tells cost management to pick the least expensive Golem provider offers first.
+        # If not provided, offers will be picked at random.
+        # Both values need to be defined or undefined together.
+        average_cpu_load: 0.8
+        average_duration_minutes: 20
+
+        # Amount of GLMs for average usage which Golem provider offer will be rejected if exceeded.
+        # Requires "average_cpu_load" and "average_duration_minutes" parameters to take effect.
+        max_average_usage_cost: 0.5
+
+        # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
+        max_initial_price: 0.01
+
+        # Amount of GLMs for CPU utilisation per second which Golem provider offer will be rejected if exceeded.
+        max_cpu_sec_price: 0.0002
+
+        # Amount of GLMs for each second that worker runs which Golem provider offer will be rejected if exceeded.
+        max_duration_sec_price: 0.0002
 
 # The files or directories to copy to the head and worker nodes
 file_mounts:
   # remote_path: local_path
   {
     "/app/ray_on_golem": "./ray_on_golem",
+    "/app/golem": "../golem-core-python/golem",
   }
+
+rsync_exclude: [
+  "**/__pycache__",
+]
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -63,10 +89,9 @@ available_node_types:
     node_config: {}
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
-#initialization_commands: [
-#  "pip install endplay",
-#]
-initialization_commands: []
+initialization_commands: [
+  "cp -fR /app/golem/* $(python -c 'import site; print(site.getsitepackages()[0])')/golem"
+]
 
 # List of shell commands to run to set up nodes
 setup_commands: []

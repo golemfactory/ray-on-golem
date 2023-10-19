@@ -1,59 +1,108 @@
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 import platform
+from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
+from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 import aiohttp
-import async_timeout
 import ray
-from golem.event_bus import Event
-from golem.node import SUBNET, GolemNode
-from golem.payload import ManifestVmPayload, constraint, prop
-from golem.pipeline import Buffer, Chain, DefaultPaymentHandler, Limit, Map
-from golem.resources import (
-    Activity,
-    Allocation,
-    BatchError,
-    Demand,
-    Deploy,
-    Network,
-    Run,
-    Start,
-    default_create_activity,
-    default_create_agreement,
-    default_negotiate,
+from golem.managers import (
+    ActivityManager,
+    AddChosenPaymentPlatform,
+    AgreementManager,
+    BlacklistProviderIdPlugin,
+    DefaultAgreementManager,
+    DefaultProposalManager,
+    DemandManager,
+    LinearAverageCostPricing,
+    MapScore,
+    NegotiatingPlugin,
+    PayAllPaymentManager,
+    PaymentManager,
+    ProposalManager,
+    ProposalManagerPlugin,
+    ProposalScorer,
+    RefreshingDemandManager,
+    RejectIfCostsExceeds,
+    ScoringBuffer,
+    WorkContext,
 )
+from golem.managers.proposal.plugins.linear_coeffs import LinearCoeffsCost
+from golem.node import SUBNET, GolemNode
+from golem.payload import ManifestVmPayload, Payload, constraint, prop
+from golem.resources import Activity, Network, ProposalData
+from pydantic import BaseModel, Field
 from yarl import URL
 
-from ray_on_golem.server.exceptions import (
-    CreateActivitiesTimeout,
-    RayOnGolemServerError,
-    RegistryRequestError,
-)
-from ray_on_golem.server.models import CreateClusterRequestData, NodeConfigData
+from ray_on_golem.server.exceptions import RayOnGolemServerError, RegistryRequestError
+from ray_on_golem.server.models import DemandConfigData, NodeConfigData
 from ray_on_golem.server.services.golem.manifest import get_manifest
+from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST, PROVIDERS_SCORED
 
 logger = logging.getLogger(__name__)
 
 
+class ManagerStack(BaseModel):
+    payment_manager: Optional[PaymentManager]
+    demand_manager: Optional[DemandManager]
+    proposal_manager: Optional[ProposalManager]
+    agreement_manager: Optional[AgreementManager]
+    activity_manager: Optional[ActivityManager]
+    extra_proposal_plugins: List[ProposalManagerPlugin] = Field(default_factory=list)
+    extra_proposal_scorers: List[ProposalScorer] = Field(default_factory=list)
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    @property
+    def _managers(self):
+        return [
+            self.payment_manager,
+            self.demand_manager,
+            self.proposal_manager,
+            self.agreement_manager,
+            self.activity_manager,
+        ]
+
+    async def start(self) -> None:
+        logger.info("Starting stack managers...")
+
+        for manager in self._managers:
+            if manager is not None:
+                await manager.start()
+
+        logger.info("Starting stack managers done")
+
+    async def stop(self) -> None:
+        logger.info("Stopping stack managers...")
+
+        for manager in reversed(self._managers):
+            if manager is not None:
+                try:
+                    await manager.stop()
+                except Exception:
+                    logger.exception(f"{manager} stop failed!")
+
+        logger.info("Stopping stack managers done")
+
+
 class GolemService:
-    def __init__(self, ray_on_golem_port: int, websocat_path: Path, registry_stats: bool):
-        self._ray_on_golem_port = ray_on_golem_port
+    def __init__(self, websocat_path: Path, registry_stats: bool):
         self._websocat_path = websocat_path
         self._registry_stats = registry_stats
 
         self._golem: Optional[GolemNode] = None
-        self._demand: Optional[Demand] = None
-        self._allocation: Optional[Allocation] = None
         self._network: Optional[Network] = None
-        self._payment_manager: Optional[DefaultPaymentHandler] = None
         self._yagna_appkey: Optional[str] = None
-        self._lock = asyncio.Lock()
+        self._stacks: Dict[str, ManagerStack] = {}
+        self._stacks_locks = defaultdict(asyncio.Lock)
 
     async def init(self, yagna_appkey: str) -> None:
         logger.info("Starting GolemService...")
@@ -62,10 +111,6 @@ class GolemService:
         self._yagna_appkey = yagna_appkey
         await self._golem.start()
 
-        async def on_event(event) -> None:
-            logger.debug(f"----- EVENT: {event}")
-
-        await self._golem.event_bus.on(Event, on_event)
         self._network = await self._golem.create_network(
             "192.168.0.1/24"
         )  # will be retrieved from provider_config
@@ -74,88 +119,120 @@ class GolemService:
         logger.info("Starting GolemService done")
 
     async def shutdown(self) -> None:
-        """
-        Terminates all activities and ray on head node.
-        Additionally, closes reverse ssh connection from local to proxy.
-
-        :return:
-        """
         logger.info("Stopping GolemService...")
 
-        if self._payment_manager is None:
-            logger.info(f"No need to wait for invoices, as cluster was not started")
-        else:
-            await self._payment_manager.terminate_agreements()
-
-            logger.info(f"Waiting for all invoices...")
-            await self._payment_manager.wait_for_invoices()
-            logger.info(f"Waiting for all invoices done")
+        await asyncio.gather(
+            *[self._remove_stack(stack_hash) for stack_hash in self._stacks.keys()]
+        )
 
         await self._golem.aclose()
         self._golem = None
 
         logger.info("Stopping GolemService done")
 
-    async def create_cluster(self, provider_config: CreateClusterRequestData):
-        """
-        Manages creating cluster, creates payload from given data and creates demand basing on payload
-        Local node is being created without ray instance.
-        :param provider_config: dictionary containing 'num_workers', and 'image_hash' keys
-        """
-        if self._demand:
-            logger.info("Cluster was created already.")
-            return
+    # TODO: Remove stack when last activity was terminated instead of relying on self shutdown
+    async def _remove_stack(self, stack_hash: str) -> None:
+        async with self._stacks_locks[stack_hash]:
+            # FIXME make sure to terminate running activities
+            await self._stacks[stack_hash].stop()
 
-        self._allocation = await self._golem.create_allocation(
-            amount=provider_config.budget,
-            network=provider_config.network,
-        )
-        self._payment_manager = DefaultPaymentHandler(self._golem, self._allocation)
+            del self._stacks[stack_hash]
+            del self._stacks_locks[stack_hash]
 
-        payload = await self._create_payload(provider_config.node_config)
+    async def _get_or_create_stack_from_node_config(
+        self, node_config: NodeConfigData, budget: float, network: str
+    ) -> ManagerStack:
+        stack_hash = self._get_hash_from_node_config(node_config)
 
-        self._demand = await self._golem.create_demand(
+        async with self._stacks_locks[stack_hash]:
+            stack = self._stacks.get(stack_hash)
+            if stack is None:
+                logger.info(f"Creating new stack `{stack_hash}`...")
+
+                self._stacks[stack_hash] = stack = await self._create_stack(
+                    node_config, budget, network
+                )
+                await stack.start()
+
+                logger.info(f"Creating new stack `{stack_hash}` done")
+
+            return stack
+
+    @staticmethod
+    def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
+        return hashlib.md5(node_config.json().encode()).hexdigest()
+
+    async def _create_stack(
+        self, node_config: NodeConfigData, budget: float, network: str
+    ) -> ManagerStack:
+        stack = ManagerStack()
+
+        payload = await self._get_payload_from_demand_config(node_config.demand)
+
+        self._apply_cost_management_avg_usage(stack, node_config)
+        self._apply_cost_management_hard_limits(stack, node_config)
+
+        stack.payment_manager = PayAllPaymentManager(self._golem, budget=budget, network=network)
+        stack.demand_manager = RefreshingDemandManager(
+            self._golem,
+            stack.payment_manager.get_allocation,
             payload,
-            allocations=[self._allocation],
-            autostart=True,
-            expiration=datetime.now(timezone.utc) + timedelta(hours=8),
+            demand_expiration_timeout=timedelta(hours=8),
+        )
+        stack.proposal_manager = DefaultProposalManager(
+            self._golem,
+            stack.demand_manager.get_initial_proposal,
+            plugins=(
+                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(network, set())),
+                *stack.extra_proposal_plugins,
+                ScoringBuffer(
+                    min_size=5,
+                    max_size=50,
+                    fill_at_start=True,
+                    proposal_scorers=(
+                        *stack.extra_proposal_scorers,
+                        MapScore(partial(self._score_with_provider_data, network=network)),
+                    ),
+                    update_interval=timedelta(seconds=40),
+                ),
+                NegotiatingPlugin(
+                    proposal_negotiators=(AddChosenPaymentPlatform(),),
+                ),
+            ),
+        )
+        stack.agreement_manager = DefaultAgreementManager(
+            self._golem, stack.proposal_manager.get_draft_proposal
         )
 
-    async def _create_payload(self, node_config: NodeConfigData) -> ManifestVmPayload:
-        """
-        Creates payload from given image_hash and parses manifest.json file
-        which is then used to create demand in golem network
-        :param node_config: dictionary containing image_hash and num_workers
-        :return:
-        """
+        return stack
 
-        # fix for golem-core-python missing subnet_tag constraint and `debit-notes.accept-timeout?` property
+    async def _get_payload_from_demand_config(self, demand_config: DemandConfigData) -> Payload:
         @dataclass
-        class Payload(ManifestVmPayload):
+        class CustomManifestVmPayload(ManifestVmPayload):
             subnet_constraint: str = constraint("golem.node.debug.subnet", "=", default=SUBNET)
             debit_notes_accept_timeout: int = prop(
                 "golem.com.payment.debit-notes.accept-timeout?", default=240
             )
 
-        image_url, image_hash = await self._get_image_url_and_hash(node_config)
+        image_url, image_hash = await self._get_image_url_and_hash(demand_config)
 
         manifest = get_manifest(image_url, image_hash)
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
-        params = node_config.dict(exclude={"image_hash", "image_tag"})
+        params = demand_config.dict(exclude={"image_hash", "image_tag"})
         params["manifest"] = manifest
 
-        payload = Payload(**params)
+        payload = CustomManifestVmPayload(**params)
 
         return payload
 
-    async def _get_image_url_and_hash(self, node_config: NodeConfigData) -> Tuple[URL, str]:
-        image_tag = node_config.image_tag
-        image_hash = node_config.image_hash
+    async def _get_image_url_and_hash(self, demand_config: DemandConfigData) -> Tuple[URL, str]:
+        image_tag = demand_config.image_tag
+        image_hash = demand_config.image_hash
 
         if image_tag is not None and image_hash is not None:
             raise RayOnGolemServerError(
-                "Only one of 'image_tag' and 'image_hash' parameter should be defined!"
+                "Only one of `image_tag` and `image_hash` parameter should be defined!"
             )
 
         if image_hash is not None:
@@ -180,7 +257,7 @@ class GolemService:
                 if response.status == 200:
                     return URL(response_data["http"])
                 elif response.status == 404:
-                    raise RegistryRequestError(f"Image hash {image_hash} does not exist")
+                    raise RegistryRequestError(f"Image hash `{image_hash}` does not exist")
                 else:
                     raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
@@ -195,151 +272,131 @@ class GolemService:
                 if response.status == 200:
                     return response_data["http"], response_data["sha3"]
                 elif response.status == 404:
-                    raise RegistryRequestError(f"Image tag '{image_tag}' does not exist")
+                    raise RegistryRequestError(f"Image tag `{image_tag}` does not exist")
                 else:
                     raise RegistryRequestError("Can't access Golem Registry for image lookup!")
 
-    def get_ssh_proxy_command(self, connection_uri: URL) -> str:
-        # Using single quotes for JWT token as double quotes are causing problems with CLI character escaping in ray
-        return f"{self._websocat_path} asyncstdio: {connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
+    def _apply_cost_management_avg_usage(
+        self, stack: ManagerStack, node_config: NodeConfigData
+    ) -> None:
+        cost_management = node_config.cost_management
+
+        if cost_management is None or not cost_management.is_average_usage_cost_enabled():
+            logger.debug("Cost management based on average usage is not enabled")
+            return
+
+        linear_average_cost = LinearAverageCostPricing(
+            average_cpu_load=node_config.cost_management.average_cpu_load,
+            average_duration=timedelta(
+                minutes=node_config.cost_management.average_duration_minutes
+            ),
+        )
+
+        stack.extra_proposal_scorers.append(
+            MapScore(linear_average_cost, normalize=True, normalize_flip=True),
+        )
+
+        max_average_usage_cost = node_config.cost_management.max_average_usage_cost
+        if max_average_usage_cost is not None:
+            stack.extra_proposal_plugins.append(
+                RejectIfCostsExceeds(max_average_usage_cost, linear_average_cost),
+            )
+            logger.debug("Cost management based on average usage applied with max limits")
+        else:
+            logger.debug("Cost management based on average usage applied without max limits")
+
+    def _apply_cost_management_hard_limits(
+        self, stack: ManagerStack, node_config: NodeConfigData
+    ) -> None:
+        # TODO: Consider creating RejectIfCostsExceeds variant for multiple values
+        proposal_plugins = []
+        field_names = {
+            "max_initial_price": "price_initial",
+            "max_cpu_sec_price": "price_cpu_sec",
+            "max_duration_sec_price": "price_duration_sec",
+        }
+
+        for cost_field_name, coef_field_name in field_names.items():
+            cost_max_value = getattr(node_config.cost_management, cost_field_name)
+            if cost_max_value is not None:
+                stack.extra_proposal_plugins.append(
+                    RejectIfCostsExceeds(cost_max_value, LinearCoeffsCost(coef_field_name)),
+                )
+
+        if proposal_plugins:
+            logger.debug("Cost management based on max limits applied")
+            stack.extra_proposal_plugins.extend(proposal_plugins)
+        else:
+            logger.debug("Cost management based on max limits is not enabled")
+
+    def _score_with_provider_data(
+        self, proposal_data: ProposalData, network: str
+    ) -> Optional[float]:
+        provider_id = proposal_data.issuer_id
+
+        try:
+            prescored_providers = PROVIDERS_SCORED[network]
+            provider_pos = prescored_providers.index(provider_id)
+        except (KeyError, ValueError):
+            return 0
+
+        # Gives pre-scored providers from 0.5 to 1.0 score
+        return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
+
+    async def _on_activity_start(self, context: WorkContext, ip: str, ssh_public_key_data: str):
+        deploy_args = {"net": [self._network.deploy_args(ip)]}
+        hostname = ip.replace(".", "-")
+        batch = await context.create_batch()
+        batch.deploy(deploy_args)
+        batch.start()
+        batch.run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
+        batch.run(f"hostname '{hostname}'")
+        batch.run(f"echo '{hostname}' > /etc/hostname")
+        batch.run(f"echo '{ip} {hostname}' >> /etc/hosts")
+        batch.run("mkdir -p /root/.ssh")
+        batch.run(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
+        batch.run("service ssh start")
+        await batch()
 
     async def create_activities(
         self,
-        node_config: Dict[str, Any],
+        node_config: NodeConfigData,
         count: int,
-        ssh_user: str,
-        ssh_private_key_path: Path,
-        ssh_public_key_path: Path,
-    ) -> List[Tuple[Activity, str, str]]:
-        demand = self._demand  # FIXME: Use demand for proper node_config
+        ssh_public_key: str,
+        budget: float,
+        network: str,
+    ) -> AsyncIterator[Tuple[Activity, str, str]]:
+        stack = await self._get_or_create_stack_from_node_config(node_config, budget, network)
 
-        async with self._lock:
-            try:
-                async with async_timeout.timeout(int(150)):
-                    chain = Chain(
-                        demand.initial_proposals(),
-                        # SimpleScorer(score_proposal, min_proposals=200, max_wait=timedelta(seconds=5)),
-                        Map(self._negotiate),
-                        Map(default_create_agreement),
-                        Map(default_create_activity),
-                        Map(self._deploy_with_vpn_and_start),
-                        Map(self._bootstrap_host),
-                        Buffer(1),
-                        Limit(count),
-                    )
+        coros = [self._create_activity(stack, ssh_public_key) for _ in range(count)]
 
-                    results = []
-                    async for activity, ip in chain:
-                        connection_uri = self._get_connection_uri(ip)
-                        ssh_proxy_command = self.get_ssh_proxy_command(connection_uri)
-                        self._print_ssh_command(
-                            ip, ssh_proxy_command, ssh_user, ssh_private_key_path
-                        )
+        for coro in asyncio.as_completed(coros):
+            result = await coro
+            await self._network.refresh_nodes()
 
-                        await self._add_public_ssh_key(activity, ssh_public_key_path)
+            yield result
 
-                        results.append((activity, ip, ssh_proxy_command))
+    async def _create_activity(
+        self, stack: ManagerStack, public_ssh_key: str
+    ) -> Tuple[Activity, str, str]:
+        logger.info(f"Creating new activity...")
 
-                    await self._network.refresh_nodes()
+        agreement = await stack.agreement_manager.get_agreement()
+        activity = await agreement.create_activity()
+        ip = await self._network.create_node(activity.parent.parent.data.issuer_id)
+        connection_uri = self._get_connection_uri(ip)
+        ssh_proxy_command = self._get_ssh_proxy_command(connection_uri)
 
-                    return results
+        await self._on_activity_start(WorkContext(activity), ip, public_ssh_key)
 
-            except asyncio.TimeoutError:
-                raise CreateActivitiesTimeout
+        logger.info(f"Creating new activity done with `{activity}` on ip `{ip}`")
 
-    @staticmethod
-    async def _negotiate(proposal):
-        return await asyncio.wait_for(default_negotiate(proposal), timeout=10)
-
-    async def _deploy_with_vpn_and_start(self, activity: Activity) -> Tuple[Activity, str]:
-        provider_id = activity.parent.parent.data.issuer_id
-        assert provider_id is not None  # mypy
-        ip = await self._network.create_node(provider_id)
-
-        deploy_args = {"net": [self._network.deploy_args(ip)]}
-
-        batch = await activity.execute_commands(
-            Deploy(deploy_args),
-            Start(),
-        )
-
-        try:
-            await batch.wait(600)
-        except BatchError:
-            # FIXME: image_url should be freely available instead of decoding manifest
-            provider_name = activity.parent.parent.data.properties["golem.node.id.name"]
-            manifest = json.loads(
-                base64.b64decode(
-                    activity.parent.parent.demand.data.properties["golem.srv.comp.payload"]
-                )
-            )
-            image_url = manifest["payload"][0]["urls"][0]
-            print(
-                f"Provider '{provider_name}' deploy failed on image '{image_url}' with batch id: '{batch.id}'"
-            )
-            raise
-
-        return activity, ip
-
-    async def _bootstrap_host(self, activity: Activity, ip: str) -> Tuple[Activity, str]:
-        hostname = ip.replace(".", "-")
-
-        batch = await activity.execute_commands(
-            Run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment"),
-            Run(f"hostname '{hostname}'"),
-            Run(f"echo '{hostname}' > /etc/hostname"),
-            Run(f"echo '{ip} {hostname}' >> /etc/hosts"),
-            Run("service ssh start"),
-        )
-        await batch.wait(15)
-
-        return activity, ip
+        return activity, ip, ssh_proxy_command
 
     def _get_connection_uri(self, ip: str) -> URL:
         network_url = URL(self._network.node._api_config.net_url)
         return network_url.with_scheme("ws") / "net" / self._network.id / "tcp" / ip
 
-    def _print_ssh_command(
-        self, ip: str, ssh_proxy_command: str, ssh_user: str, ssh_private_key_path: Path
-    ) -> None:
-        print(
-            f"Connect to {ip} with:\n"
-            "ssh "
-            "-o StrictHostKeyChecking=no "
-            "-o UserKnownHostsFile=/dev/null "
-            f'-o "ProxyCommand={ssh_proxy_command}" '
-            f"-i {ssh_private_key_path} "
-            f"{ssh_user}@{ip}"
-        )
-
-    async def _add_public_ssh_key(self, activity: Activity, ssh_public_key_path: Path):
-        """
-        Add local ssh key to all providers
-        """
-        if not ssh_public_key_path.exists():
-            logger.error(f"{ssh_public_key_path} not exists. SSH connection may fail.")
-            return
-
-        # TODO: Use async file handling
-        with ssh_public_key_path.open() as f:
-            public_ssh_key = f.readline().strip()
-
-        await self._add_authorized_key(activity, public_ssh_key)
-
-    @staticmethod
-    async def _add_authorized_key(activity: Activity, key: str) -> None:
-        """
-        Adds local machine ssh key to providers machine
-        :param activity: Activity object from golem
-        :param key: Key you want to add to authorized_keys on provider machine
-        """
-        batch = await activity.execute_commands(
-            Run("mkdir -p /root/.ssh"),
-            Run(f'echo "{key}" >> /root/.ssh/authorized_keys'),
-        )
-        try:
-            await batch.wait(15)
-            logger.info("Added local ssh key to provider with id: {}".format(activity.id))
-        except Exception:
-            print(batch.events)
-            raise
+    def _get_ssh_proxy_command(self, connection_uri: URL) -> str:
+        # Using single quotes for JWT token as double quotes are causing problems with CLI character escaping in ray
+        return f"{self._websocat_path} asyncstdio: {connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"

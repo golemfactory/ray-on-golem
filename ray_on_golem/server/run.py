@@ -4,15 +4,9 @@ import logging.config
 
 from aiohttp import web
 
-from ray_on_golem.server.middlewares import error_middleware
+from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
-from ray_on_golem.server.settings import (
-    LOGGING_CONFIG,
-    RAY_ON_GOLEM_PORT,
-    TMP_PATH,
-    WEBSOCAT_PATH,
-    YAGNA_PATH,
-)
+from ray_on_golem.server.settings import LOGGING_CONFIG, TMP_PATH, WEBSOCAT_PATH, YAGNA_PATH
 from ray_on_golem.server.views import routes
 
 logger = logging.getLogger(__name__)
@@ -43,6 +37,13 @@ def parse_sys_args() -> argparse.Namespace:
         action="store_false",
         dest="registry_stats",
     )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug"],
+        help="the logging level to enable, default: %(default)s",
+    )
     parser.set_defaults(self_shutdown=False, registry_stats=True)
     return parser.parse_args()
 
@@ -55,7 +56,12 @@ def prepare_tmp_dir():
 
 
 def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> web.Application:
-    app = web.Application(middlewares=[error_middleware])
+    app = web.Application(
+        middlewares=[
+            trace_id_middleware,
+            error_middleware,
+        ]
+    )
 
     app["port"] = port
     app["self_shutdown"] = self_shutdown
@@ -66,12 +72,12 @@ def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> 
     )
 
     app["golem_service"] = GolemService(
-        ray_on_golem_port=RAY_ON_GOLEM_PORT,
         websocat_path=WEBSOCAT_PATH,
         registry_stats=app["registry_stats"],
     )
 
     app["ray_service"] = RayService(
+        ray_on_golem_port=port,
         golem_service=app["golem_service"],
         tmp_path=TMP_PATH,
     )
@@ -92,6 +98,7 @@ async def startup_print(app: web.Application) -> None:
 
 async def shutdown_print(app: web.Application) -> None:
     logger.info("Stopping server...")
+    # TODO: Force cancel running requests on shutdown
 
 
 async def yagna_service_ctx(app: web.Application) -> None:
@@ -125,9 +132,10 @@ async def ray_service_ctx(app: web.Application) -> None:
 
 def main():
     prepare_tmp_dir()
-    logging.config.dictConfig(LOGGING_CONFIG)
-
     args = parse_sys_args()
+
+    LOGGING_CONFIG["loggers"]["ray_on_golem"]["level"] = args.log_level.upper()
+    logging.config.dictConfig(LOGGING_CONFIG)
 
     app = create_application(args.port, args.self_shutdown, args.registry_stats)
 
