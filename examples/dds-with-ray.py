@@ -7,7 +7,7 @@ DEAL_COUNT = 50
 runtime_env = {
     "pip": [
         "Pillow",  # explicit uppercased "Pillow", as pip complains about mismatched metadata in endplay dependency tree
-        "endplay",
+        "endplay==0.4.11b0",
     ]
 }
 
