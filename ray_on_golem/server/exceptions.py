@@ -28,7 +28,7 @@ class DestroyActivityError(RayOnGolemServerError):
 
 
 class CheckYagnaStatusError(RayOnGolemServerError):
-    message = "Can't check yagna status"
+    message = "Can't check Yagna status"
 
 
 class ManifestNotFound(RayOnGolemServerError):

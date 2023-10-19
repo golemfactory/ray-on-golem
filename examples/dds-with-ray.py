@@ -4,7 +4,12 @@ import ray
 
 DEAL_COUNT = 50
 # endplay library dependency
-runtime_env = {"pip": ["endplay==0.4.11b0"]}
+runtime_env = {
+    "pip": [
+        "Pillow",  # explicit uppercased "Pillow", as pip complains about mismatched metadata in endplay dependency tree
+        "endplay==0.4.11b0",
+    ]
+}
 
 # Use default ray cluster or start a local one
 # Make sure endplay lib is installed
