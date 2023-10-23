@@ -94,6 +94,8 @@ class RayService:
             node_config=self._provider_config.node_config,
             count=count,
             ssh_public_key=self._ssh_public_key,
+            ssh_user=self._ssh_user,
+            ssh_private_key_path=self._ssh_private_key_path,
             budget=self._provider_config.budget,
             network=self._provider_config.network,
         ):

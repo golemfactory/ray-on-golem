@@ -46,16 +46,16 @@ provider:
 
         # Amount of GLMs for average usage which Golem provider offer will be rejected if exceeded.
         # Requires "average_cpu_load" and "average_duration_minutes" parameters to take effect.
-        max_average_usage_cost: 0.5
+        max_average_usage_cost: 1.5
 
         # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
-        max_initial_price: 0.01
+        max_initial_price: 0.5
 
         # Amount of GLMs for CPU utilisation per second which Golem provider offer will be rejected if exceeded.
-        max_cpu_sec_price: 0.0002
+        max_cpu_sec_price: 0.0005
 
         # Amount of GLMs for each second that worker runs which Golem provider offer will be rejected if exceeded.
-        max_duration_sec_price: 0.0002
+        max_duration_sec_price: 0.0005
 
 # The files or directories to copy to the head and worker nodes
 file_mounts:
