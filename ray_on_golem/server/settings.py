@@ -96,7 +96,7 @@ YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
 YAGNA_START_DEADLINE = timedelta(minutes=2)
 YAGNA_CHECK_DEADLINE = timedelta(seconds=2)
 
-RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=2, seconds=30)
+RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=5)
 RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
 RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=10)
 RAY_ON_GOLEM_SHUTDOWN_DEADLINE = timedelta(seconds=30)

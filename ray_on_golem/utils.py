@@ -36,7 +36,7 @@ async def run_subprocess_output(*args) -> bytes:
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
-        raise RayOnGolemError(stderr)
+        raise RayOnGolemError(f'Process exited with code `{process.returncode}`!\nstdout:\n{stdout}\nstderr:\n{stderr}')
 
     return stdout
 

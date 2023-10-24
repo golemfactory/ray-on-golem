@@ -212,20 +212,25 @@ class GolemNodeProvider(NodeProvider):
                         cli_logger.print("Starting webserver done")
                         return
                 else:
-                    cli_logger.abort(
-                        "Starting webserver failed!\nShowing last 50 lines from `{}`:\n{}",
-                        LOGGING_DEBUG_PATH,
-                        "".join(LOGGING_DEBUG_PATH.open("r").readlines()[-50:]),
-                    )
+                    with LOGGING_DEBUG_PATH.open("r") as file:
+                        cli_logger.abort(
+                            "Starting webserver failed!\nShowing last 50 lines from `{}`:\n{}",
+                            LOGGING_DEBUG_PATH,
+                            "".join(file.readlines()[-50:]),
+                        )
 
                 cli_logger.print(
                     "Webserver is not yet running, waiting additional `{}` seconds...",
                     check_seconds,
                 )
 
-            cli_logger.abort(
-                "Starting webserver failed! Deadline of `{}` reached.", RAY_ON_GOLEM_START_DEADLINE
-            )
+            with LOGGING_DEBUG_PATH.open("r") as file:
+                cli_logger.abort(
+                    "Starting webserver failed! Deadline of `{}` reached.\nShowing last 50 lines from `{}`:\n{}",
+                    RAY_ON_GOLEM_START_DEADLINE,
+                    LOGGING_DEBUG_PATH,
+                    "".join(file.readlines()[-50:]),
+                )
 
     @staticmethod
     def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:

@@ -100,11 +100,12 @@ class YagnaService:
                     logger.info("Starting Yagna done")
                     return
             else:
-                logger.error(
-                    "Starting Yagna failed!\nShowing last 50 lines from `%s`:\n%s",
-                    LOGGING_YAGNA_PATH,
-                    "".join(LOGGING_YAGNA_PATH.open("r").readlines()[-50:]),
-                )
+                with LOGGING_YAGNA_PATH.open("r") as file:
+                    logger.error(
+                        "Starting Yagna failed!\nShowing last 50 lines from `%s`:\n%s",
+                        LOGGING_YAGNA_PATH,
+                        "".join(file.readlines()[-50:]),
+                    )
                 raise YagnaServiceError("Starting Yagna failed!")
 
             logger.info(
@@ -112,12 +113,13 @@ class YagnaService:
                 check_seconds,
             )
 
-        logger.error(
-            "Starting Yagna failed! Deadline of `%s` reached.\nShowing last 50 lines from `%s`:\n%s",
-            YAGNA_START_DEADLINE,
-            LOGGING_YAGNA_PATH,
-            "".join(LOGGING_YAGNA_PATH.open("r").readlines()[-50:]),
-        )
+        with LOGGING_YAGNA_PATH.open("r") as file:
+            logger.error(
+                "Starting Yagna failed! Deadline of `%s` reached.\nShowing last 50 lines from `%s`:\n%s",
+                YAGNA_START_DEADLINE,
+                LOGGING_YAGNA_PATH,
+                "".join(file.readlines()[-50:]),
+            )
         raise YagnaServiceError("Starting Yagna failed!")
 
     async def _on_yagna_early_exit(self) -> None:
