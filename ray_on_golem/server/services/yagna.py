@@ -18,7 +18,7 @@ from ray_on_golem.server.settings import (
     YAGNA_CHECK_DEADLINE,
     YAGNA_START_DEADLINE,
 )
-from ray_on_golem.utils import run_subprocess, run_subprocess_output
+from ray_on_golem.utils import get_last_lines_from_file, run_subprocess, run_subprocess_output
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class YagnaService:
                 logger.error(
                     "Starting Yagna failed!\nShowing last 50 lines from `%s`:\n%s",
                     LOGGING_YAGNA_PATH,
-                    "".join(LOGGING_YAGNA_PATH.open("r").readlines()[-50:]),
+                    get_last_lines_from_file(LOGGING_YAGNA_PATH, 50),
                 )
                 raise YagnaServiceError("Starting Yagna failed!")
 
@@ -116,7 +116,7 @@ class YagnaService:
             "Starting Yagna failed! Deadline of `%s` reached.\nShowing last 50 lines from `%s`:\n%s",
             YAGNA_START_DEADLINE,
             LOGGING_YAGNA_PATH,
-            "".join(LOGGING_YAGNA_PATH.open("r").readlines()[-50:]),
+            get_last_lines_from_file(LOGGING_YAGNA_PATH, 50),
         )
         raise YagnaServiceError("Starting Yagna failed!")
 

@@ -22,7 +22,11 @@ from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_START_DEADLINE,
     TMP_PATH,
 )
-from ray_on_golem.utils import get_default_ssh_key_name, is_running_on_golem_network
+from ray_on_golem.utils import (
+    get_default_ssh_key_name,
+    get_last_lines_from_file,
+    is_running_on_golem_network,
+)
 
 logger = logging.getLogger(__name__)
 WEBSERVER_LOG_GROUP = "Ray On Golem webserver"
@@ -215,7 +219,7 @@ class GolemNodeProvider(NodeProvider):
                     cli_logger.abort(
                         "Starting webserver failed!\nShowing last 50 lines from `{}`:\n{}",
                         LOGGING_DEBUG_PATH,
-                        "".join(LOGGING_DEBUG_PATH.open("r").readlines()[-50:]),
+                        get_last_lines_from_file(LOGGING_DEBUG_PATH, 50),
                     )
 
                 cli_logger.print(
@@ -224,7 +228,10 @@ class GolemNodeProvider(NodeProvider):
                 )
 
             cli_logger.abort(
-                "Starting webserver failed! Deadline of `{}` reached.", RAY_ON_GOLEM_START_DEADLINE
+                "Starting webserver failed! Deadline of `{}` reached.\nShowing last 50 lines from `{}`:\n{}",
+                RAY_ON_GOLEM_START_DEADLINE,
+                LOGGING_DEBUG_PATH,
+                get_last_lines_from_file(LOGGING_DEBUG_PATH, 50),
             )
 
     @staticmethod

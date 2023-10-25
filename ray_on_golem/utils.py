@@ -3,7 +3,9 @@ import hashlib
 import logging
 import os
 from asyncio.subprocess import Process
+from collections import deque
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Dict
 
 from aiohttp.web_runner import GracefulExit
@@ -36,7 +38,9 @@ async def run_subprocess_output(*args) -> bytes:
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
-        raise RayOnGolemError(stderr)
+        raise RayOnGolemError(
+            f"Process exited with code `{process.returncode}`!\nstdout:\n{stdout}\nstderr:\n{stderr}"
+        )
 
     return stdout
 
@@ -68,3 +72,8 @@ def rolloverLogFiles():
     for handler in root_logger.handlers:
         if isinstance(handler, RotatingFileHandler):
             handler.doRollover()
+
+
+def get_last_lines_from_file(file_path: Path, max_lines: int) -> str:
+    with file_path.open() as file:
+        return "".join(deque(file, max_lines))
