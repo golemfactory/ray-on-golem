@@ -56,14 +56,23 @@ We have tested Ray on Golem on Ubuntu and on WSL. It should work on MacOS and sh
 This [quickstart](https://docs.golem.network/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
 It limits the explanation to the bare minimum - if you are looking for more details jump to [setup tutorial](https://docs.golem.network/docs/creators/ray/setup-tutorial)
 
+It is recommended to create a new directory and a clean virtual environment to play with the following.
+It will let you avoid cluttering your system's Python installation with unnecessary packages.
 
 ## Install software
 
-The first step is installing Ray on Golem (recommended within a clean venv). It will install Ray as a dependency.
+The first step is installing Ray on Golem. It will install Ray as a dependency.
 
 ```bash
 # install ray-on-golem and ray (recommended within a clean venv)
 pip3 install -U ray-on-golem
+```
+
+For now, you also need to download and install Golem node software representing you in the Golem network.
+
+```bash
+# install yagna - golem network daemon
+curl -sSf https://join.golem.network/as-requestor | bash -
 ```
 
 Additionally, a tool named [websocat](https://lib.rs/crates/websocat) is needed to wrap connections between your machine and Ray on Golem cluster.
@@ -76,13 +85,6 @@ websocat -V
 It should print something like:
 ```
 websocat 1.11.0
-```
-
-For now, you also need to download and install Golem node software representing you in the Golem network.
-
-```bash
-# install yagna - golem network daemon
-curl -sSf https://join.golem.network/as-requestor | bash -
 ```
 
 ## Set the cluster up
@@ -115,20 +117,33 @@ wget https://github.com/golemfactory/ray-on-golem/raw/main/examples/simple-task.
 python3 simple-task.py
 ```
 
-Feed the app to the cluster. Observe how Ray on Golem cluster expands during the computation
+This particular script shows information about the cluster it is being run on 
+and also visualizes the number of tasks run on different nodes (by default it executes 100 tasks).
+
+Once you ensure the app works, you can feed it to your Ray on the Golem cluster
 
 ```bash
-# Run some ray-based code (that knows *nothing** about Golem) - this will either:
-# A) Run only on one node (the head node), if the autoscaler decides there is no need for a worker node
-# B) Or create worker node(s) on the Golem Network. Worker nodes will be later auto-terminated by the autoscaler)
-
 # Submit the app to be executed on your cluster
-ray submit golem-cluster.yaml simple-task.py 
+ray submit golem-cluster.yaml simple-task.py
 ```
+
+You can see the information about the cluster both before and after running the computations.
+
+Submit the code again, requesting more tasks to see how the autoscaler expands the cluster, as the work progresses (give it up to 5 mins).
+
+```bash
+# Submit the app with 400 tasks
+ray submit golem-cluster.yaml simple-task.py -- --count 400 
+```
+
+The above shows the usual workflow with Ray apps.
+- You develop them, while at the same time testing them, on your local machine.
+- When you are ready to get more power - you send them to a Ray cluster **without changing a single line** of your application's code.
+
 
 ## Stop the cluster
 
-In the end, stop your cluster to free the Golem network providers and to avoid too much spending (the testnet is free, but good practice is a good practice)
+Finally, stop your cluster to free the Golem network providers and to avoid spending more than needed (the testnet is free, but good practice is a good practice).
 
 ```bash
 # Tear down the cluster.
