@@ -56,8 +56,7 @@ We have tested Ray on Golem on Ubuntu and on WSL. It should work on MacOS and sh
 This [quickstart](https://docs.golem.network/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
 It limits the explanation to the bare minimum - if you are looking for more details jump to [setup tutorial](https://docs.golem.network/docs/creators/ray/setup-tutorial)
 
-It is recommended to create a new directory and a clean virtual environment to play with the following.
-It will let you avoid cluttering your system's Python installation with unnecessary packages.
+We recommend creating a new directory and a clean Python virtual environment before you proceed. This avoids cluttering your system installation with unnecessary packages.
 
 ## Install software
 
@@ -68,30 +67,12 @@ The first step is installing Ray on Golem. It will install Ray as a dependency.
 pip3 install -U ray-on-golem
 ```
 
-For now, you also need to download and install Golem node software representing you in the Golem network.
-
-```bash
-# install yagna - golem network daemon
-curl -sSf https://join.golem.network/as-requestor | bash -
-```
-
-Additionally, a tool named [websocat](https://lib.rs/crates/websocat) is needed to wrap connections between your machine and Ray on Golem cluster.
-You can install websocat using [these instructions](https://lindevs.com/install-websocat-on-ubuntu/).
-
-Verify websocat is present:
-```bash
-websocat -V
-```
-It should print something like:
-```
-websocat 1.11.0
-```
+As a prerequisite, it also installs yagna - Golem daemon used to schedule work on the Golem Network.
 
 ## Set the cluster up
 
 With the packages in place, you can download our sample golem cluster configuration yaml, and feed it to `ray up` to start up the cluster.
 It will give you a cluster of one node (which will expand when you feed it with work) on the Golem test network (free, but not very powerful)
-
 
 ```bash
 # Download the golem-cluster.yaml
