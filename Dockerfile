@@ -19,7 +19,6 @@ RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
 	echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 
 RUN pip install -U pip
-RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
 WORKDIR /app
 
@@ -28,6 +27,8 @@ COPY ray_on_golem/__init__.py /app/ray_on_golem/__init__.py
 
 RUN pip install poetry && \
 	poetry config virtualenvs.create false && \
-	poetry install --no-interaction --no-ansi
+	poetry install --no-interaction --no-ansi --only ray
+
+RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
 COPY ray_on_golem /app/ray_on_golem/
