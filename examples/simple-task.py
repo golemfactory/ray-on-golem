@@ -1,9 +1,10 @@
+import argparse
 import socket
 import time
-import argparse
 from collections import Counter
 
 import ray
+
 ray.init()
 
 
@@ -17,12 +18,14 @@ print(
     )
 )
 
+
 # remote function returning ip of the worker (after 0.5 sec of sleep)
 @ray.remote
 def f():
     time.sleep(0.5)
 
     return socket.gethostbyname(socket.gethostname())
+
 
 # get the number of remote calls from the command line
 parser = argparse.ArgumentParser()

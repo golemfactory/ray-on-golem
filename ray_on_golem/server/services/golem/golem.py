@@ -46,6 +46,7 @@ from ray_on_golem.server.exceptions import RayOnGolemServerError, RegistryReques
 from ray_on_golem.server.models import DemandConfigData, NodeConfigData
 from ray_on_golem.server.services.golem.manifest import get_manifest
 from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST, PROVIDERS_SCORED
+from ray_on_golem.server.services.utils import get_ssh_command
 
 logger = logging.getLogger(__name__)
 
@@ -377,7 +378,7 @@ class GolemService:
         ssh_user: str,
         ssh_private_key_path: Path,
     ) -> None:
-        ssh_command = self._get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)
+        ssh_command = get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)
 
         logger.debug(f"Verifying ssh connection with:\n{ssh_command} uptime")
 
@@ -400,18 +401,6 @@ class GolemService:
             raise Exception(msg)
 
         logger.info(msg)
-
-    def _get_ssh_command(
-        self, ip: str, ssh_proxy_command: str, ssh_user: str, ssh_private_key_path: Path
-    ) -> str:
-        return (
-            "ssh "
-            "-o StrictHostKeyChecking=no "
-            "-o UserKnownHostsFile=/dev/null "
-            f'-o "ProxyCommand={ssh_proxy_command}" '
-            f"-i {ssh_private_key_path} "
-            f"{ssh_user}@{ip}"
-        )
 
     async def create_activities(
         self,
