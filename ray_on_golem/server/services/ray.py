@@ -11,6 +11,7 @@ from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.exceptions import NodeNotFound
 from ray_on_golem.server.models import Node, NodeId, NodeState, ProviderConfigData, Tags
 from ray_on_golem.server.services.golem import GolemService
+from ray_on_golem.server.services.utils import get_ssh_command
 from ray_on_golem.utils import (
     are_dicts_equal,
     get_default_ssh_key_name,
@@ -94,6 +95,8 @@ class RayService:
             node_config=self._provider_config.node_config,
             count=count,
             ssh_public_key=self._ssh_public_key,
+            ssh_user=self._ssh_user,
+            ssh_private_key_path=self._ssh_private_key_path,
             budget=self._provider_config.budget,
             network=self._provider_config.network,
         ):
@@ -227,12 +230,7 @@ class RayService:
     ) -> None:
         logger.debug(
             f"Connect to `{ip}` with:\n"
-            "ssh "
-            "-o StrictHostKeyChecking=no "
-            "-o UserKnownHostsFile=/dev/null "
-            f'-o "ProxyCommand={ssh_proxy_command}" '
-            f"-i {ssh_private_key_path} "
-            f"{ssh_user}@{ip}"
+            f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)}"
         )
 
     def _is_head_node_to_webserver_tunnel_running(self) -> bool:
