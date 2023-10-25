@@ -120,7 +120,7 @@ python3 simple-task.py
 This particular script shows information about the cluster it is being run on 
 and also visualizes the number of tasks run on different nodes (by default it executes 100 tasks).
 
-Once you ensure the app works, you can feed it to your Ray on the Golem cluster
+Once you ensure the app works, you can feed it to your Ray on Golem cluster
 
 ```bash
 # Submit the app to be executed on your cluster
@@ -153,11 +153,11 @@ ray down golem-cluster.yaml --yes
 ## Summary
 
 By completing the above quickstart you have successfully:
-- installed ray and ray-on-golem packages
-- downloaded the example golem cluster yaml and the example ray application
-- started up the Ray on Golem cluster
-- run the app on your local computer and then on the cluster
-- stopped the cluster
+- Installed ray and ray-on-golem packages
+- Downloaded the example golem cluster yaml and the example ray application
+- Started up the Ray on Golem cluster
+- Run the app on your local computer and then on the cluster
+- Stopped the cluster
 
 Congratulations!
 
