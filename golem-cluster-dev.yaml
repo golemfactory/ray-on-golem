@@ -104,7 +104,7 @@ worker_setup_commands: []
 
 # Command to start ray on the head node. You don't need to change this.
 head_start_ray_commands: [
-  "ray start --head --node-ip-address 192.168.0.3 --include-dashboard=True --dashboard-host 0.0.0.0 --disable-usage-stats --autoscaling-config=~/ray_bootstrap_config.yaml",
+  "ray start --head --node-ip-address $NODE_IP --include-dashboard=True --dashboard-host 0.0.0.0 --disable-usage-stats --autoscaling-config=~/ray_bootstrap_config.yaml",
 ]
 
 # Command to start ray on worker nodes. You don't need to change this.

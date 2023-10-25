@@ -360,6 +360,7 @@ class GolemService:
         logger.info(f"Running initial commands on `{context._activity}`")
         hostname = ip.replace(".", "-")
         await context.run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
+        await context.run(f"echo 'NODE_IP={ip}' >> /etc/environment")
         await context.run(f"hostname '{hostname}'")
         await context.run(f"echo '{hostname}' > /etc/hostname")
         await context.run(f"echo '{ip} {hostname}' >> /etc/hosts")
