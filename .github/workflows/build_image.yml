@@ -33,4 +33,4 @@ jobs:
       - name: Convert the image
         run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }}
       - name: Push the image
-        run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }} --push-to {{ vars.REGISTRY_TEST_REPOSITORY }}:${{ steps.image_version.outputs.version }} 
+        run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }} --push-to ${{ vars.REGISTRY_TEST_REPOSITORY }}:${{ steps.image_version.outputs.version }}
