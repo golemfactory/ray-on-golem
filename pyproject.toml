@@ -9,6 +9,7 @@ packages = [{include = "ray_on_golem"}]
 [tool.poetry.dependencies]
 python = "^3.8"
 ray = {version="^2.7.1", extras=["default"]}
+# golem-core = { path="../golem-core-python", develop=true }
 golem-core = "^0.2.0"
 aiohttp = "^3"
 requests = "^2"
@@ -22,6 +23,7 @@ setuptools = "*"
 [tool.poetry.group.ray.dependencies]
 python = "^3.8"
 ray = {version="^2.7.1", extras=["default"]}
+# golem-core = { path="../golem-core-python", develop=true }
 golem-core = "^0.2.0"
 aiohttp = "^3"
 requests = "^2"
