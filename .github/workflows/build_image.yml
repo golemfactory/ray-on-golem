@@ -1,6 +1,6 @@
 name: Build the GVMI image
 
-on: push
+on: workflow_dispatch
 
 jobs:
   image_test:
