@@ -1,6 +1,13 @@
 name: Build the GVMI image
 
-on: [workflow_dispatch, push]
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      is_test_build:
+        description: Whether this build is a test build.
+        required: true
+        type: boolean
 
 jobs:
   image_test:
@@ -32,5 +39,7 @@ jobs:
       - run: df -h
       - name: Convert the image
         run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }}
+      - name: Is test build?
+        run: echo "${{ inputs.is_test_build }}"
       - name: Push the image
         run: REGISTRY_USER=${{ secrets.REGISTRY_TEST_USER }} REGISTRY_TOKEN=${{ secrets.REGISTRY_TEST_TOKEN }} gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }} --push-to ${{ vars.REGISTRY_TEST_REPOSITORY }}:${{ steps.image_version.outputs.version }}
