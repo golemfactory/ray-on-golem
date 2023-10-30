@@ -98,7 +98,7 @@ YAGNA_CHECK_DEADLINE = timedelta(seconds=2)
 
 RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=5)
 RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
-RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=10)
+RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=30)
 RAY_ON_GOLEM_SHUTDOWN_DEADLINE = timedelta(seconds=30)
 
 URL_HEALTH_CHECK = "/health_check"

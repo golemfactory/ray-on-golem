@@ -148,7 +148,25 @@ class YagnaService:
         logger.info("Stopping Yagna done")
 
     async def _run_yagna_payment_fund(self) -> None:
-        await run_subprocess_output(self._yagna_path, "payment", "fund")
+        for _ in range(5):
+            logger.debug("Preparing testnet fund...")
+            try:
+                await run_subprocess_output(self._yagna_path, "payment", "fund")
+                # await asyncio.sleep(5)  # FIXME: Funds are sometime not available ASAP
+            except RayOnGolemError as e:
+                logger.error("Preparing testnet fund failed with error: %s", e)
+            else:
+                output = json.loads(
+                    await run_subprocess_output(self._yagna_path, "payment", "status", "--json")
+                )
+
+                logger.debug(
+                    "Preparing testnet fund done with balance of %.2f tGLMs",
+                    float(output["amount"]),
+                )
+                return
+
+        raise YagnaServiceError("Can't prepare testnet fund!")
 
     async def _get_or_create_yagna_appkey(self) -> str:
         if YAGNA_APPKEY:
