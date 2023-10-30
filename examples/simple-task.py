@@ -8,15 +8,18 @@ import ray
 ray.init()
 
 
-# output cluster information before the computation
-print(
-    """This cluster consists of
-    {} nodes in total
-    {} CPU resources in total
-""".format(
-        len(ray.nodes()), ray.cluster_resources()["CPU"]
+def output_cluster_info():
+    print(
+        """This cluster consists of
+        {} nodes in total
+        {} CPU resources in total
+    """.format(
+            len(ray.nodes()), ray.cluster_resources()["CPU"]
+        )
     )
-)
+
+# cluster information before the computation
+output_cluster_info()
 
 
 # remote function returning ip of the worker (after 0.5 sec of sleep)
@@ -45,12 +48,5 @@ for ip_address, num_tasks in Counter(ip_addresses).items():
     print("    {} tasks on {}".format(num_tasks, ip_address))
 
 
-# output cluster information after the computation
-print(
-    """This cluster consists of
-    {} nodes in total
-    {} CPU resources in total
-""".format(
-        len(ray.nodes()), ray.cluster_resources()["CPU"]
-    )
-)
+# cluster information after the computation
+output_cluster_info()
