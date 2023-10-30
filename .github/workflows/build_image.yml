@@ -1,0 +1,36 @@
+name: Build the GVMI image
+
+on: workflow_dispatch
+
+jobs:
+  image_test:
+    name: Build the image
+    runs-on: [goth2]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - uses: Gr1N/setup-poetry@v8
+      - name: Install requirements
+        run: poetry install --no-ansi
+      - name: Install gvmkit
+        run: pip install gvmkit-build
+      - name: Get Ray-On-Golem version
+        run: echo "::set-output name=version::$(poetry version | sed 's/ray-on-golem //')"
+        id: ray_on_golem_version
+      - name: Get Ray version
+        run: echo "::set-output name=version::$(poetry run pip freeze | grep 'ray==' | sed 's/ray==//')"
+        id: ray_version
+      - name: Set image version
+        run: echo "::set-output name=version::${{ steps.ray_on_golem_version.outputs.version }}-py${{ vars.PYTHON_VERSION }}-ray${{ steps.ray_version.outputs.version }}"
+        id: image_version
+      - name: Build the image
+        run: docker build -t ray-on-golem:${{ steps.image_version.outputs.version }} --build-arg="PYTHON_VERSION=${{ vars.PYTHON_VERSION }}" .
+      - run: ls -alh .
+      - run: df -h
+      - name: Convert the image
+        run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }}
+      - name: Push the image
+        run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }} --push
