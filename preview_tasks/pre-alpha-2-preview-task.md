@@ -19,22 +19,25 @@ If you have any questions, we encourage you to contact the `Ray on Golem` team d
 
 We also encourage you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
 
-# Preview tasks
-
-There are three tasks. You need to complete them all to apply for the reward.
-
-## (Bonus task) Parallelize the hash cracker script with Ray and execute it on Ray on Golem
+## Task: parallelize the hash cracker script with Ray and execute it on Ray on Golem
 
 **Goal**: Evaluate if Ray on Golem makes it easier to parallelize Python code
 
 **Task**: Parallelize the provided hash cracker code. Please show us the resulting code and logs from running it with Ray on Golem.
 
 **Steps**:
+- Go through Ray on Golem documentation
 - Consider the provided piece of code.
 - Parallelize it with Ray (i.e. make it run faster for bigger inputs)
 - Run it on Ray on Golem
-- Send us your code, the console logs of the code execution on Ray on Golem
+- Send us your code, the console logs of the code execution on Ray on Golem, and Ray on Golem debug log file.
 - Fill out the [submission form](todo) (code, logs and meaningful and thought-out feedback)
+
+### The documentation
+Take a look at this [documentation](https://docs.golem.network/docs/creators/ray).
+
+While doing that consider its clarity, purpose & completeness - we will be asking about this at the end.
+The direction we should take with the docs is an important aspect of the Preview Program for us.
 
 ### The code
 Take a look at this [piece of code](https://github.com/golemfactory/ray-on-golem/raw/main/examples/hash_cracker_ray_ready.py)
