@@ -421,7 +421,11 @@ class GolemService:
         ]
 
         for coro in asyncio.as_completed(coros):
-            result = await coro
+            try:
+                result = await coro
+            except Exception:
+                logger.warning("Unable to create activity, abandoning", exc_info=True)
+                pass
             await self._network.refresh_nodes()
 
             yield result
@@ -438,6 +442,8 @@ class GolemService:
                 return await self._create_activity(
                     stack, public_ssh_key, ssh_user, ssh_private_key_path
                 )
+            except RuntimeError:
+                raise
             except Exception:
                 logger.warning("Failed to create activity, retrying", exc_info=True)
 
