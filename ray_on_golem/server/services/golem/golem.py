@@ -425,7 +425,7 @@ class GolemService:
                 result = await coro
             except Exception:
                 logger.warning("Unable to create activity, abandoning", exc_info=True)
-                pass
+                continue
             await self._network.refresh_nodes()
 
             yield result
