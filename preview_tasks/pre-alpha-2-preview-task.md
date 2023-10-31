@@ -19,11 +19,11 @@ If you have any questions, we encourage you to contact the `Ray on Golem` team d
 
 We also encourage you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
 
-## Preview tasks
+# Preview tasks
 
 There are three tasks. You need to complete them all to apply for the reward.
 
-### (Bonus task) Parallelize the hash cracker script with Ray and execute it on Ray on Golem
+## (Bonus task) Parallelize the hash cracker script with Ray and execute it on Ray on Golem
 
 **Goal**: Evaluate if Ray on Golem makes it easier to parallelize Python code
 
@@ -36,7 +36,7 @@ There are three tasks. You need to complete them all to apply for the reward.
 - Send us your code, the console logs of the code execution on Ray on Golem
 - Fill out the [submission form](todo) (code, logs and meaningful and thought-out feedback)
 
-#### The code
+### The code
 Take a look at this [piece of code](https://github.com/golemfactory/ray-on-golem/raw/main/examples/hash_cracker_ray_ready.py)
 
 It takes a sha256 hash of some unknown word as input and looks for a word that results in a match.
@@ -62,7 +62,7 @@ finished in 0:01:45.139588, match found: 9Lm!
 
 You can find a couple of other hashes to crack in the code's comments.
 
-#### Parallelize to make the code run faster.
+### Parallelize to make the code run faster.
 
 You will notice that it runs very fast for hashes of 3-character words, ok-ish for 4-character words (30-120 seconds), and very slowly for longer words (over 20 mins for 5-character words).
 
@@ -75,7 +75,7 @@ So now the code is a bit more complex, but it should be easier to parallelize as
 One additional challenge (and a learning opportunity) here is that we would like to avoid waiting for Ray on Golem to scan the whole of the word space.
 We would like to stop the computation when we find the match.
 
-#### Fill out the submission form
+### Fill out the submission form
 
 At the end, we would like a code that finds the `golem` word for `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` hash in 10 minutes.
 
