@@ -1,105 +1,44 @@
 import asyncio
-import base64
 import hashlib
-import json
 import logging
-import platform
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import AsyncIterator, Dict, List, Optional, Tuple
+from typing import AsyncIterator, Dict, Optional, Tuple
 
-import aiohttp
-import ray
 from golem.managers import (
-    ActivityManager,
     AddChosenPaymentPlatform,
-    AgreementManager,
     BlacklistProviderIdPlugin,
     Buffer,
     DefaultAgreementManager,
     DefaultProposalManager,
-    DemandManager,
-    LinearAverageCostPricing,
     MapScore,
     NegotiatingPlugin,
     PayAllPaymentManager,
-    PaymentManager,
-    ProposalManager,
-    ProposalManagerPlugin,
-    ProposalScorer,
     RefreshingDemandManager,
-    RejectIfCostsExceeds,
     ScoringBuffer,
     WorkContext,
 )
-from golem.managers.proposal.plugins.linear_coeffs import LinearCoeffsCost
-from golem.node import SUBNET, GolemNode
-from golem.payload import ManifestVmPayload, Payload, constraint, prop
+from golem.node import GolemNode
 from golem.resources import Activity, Network, ProposalData
-from pydantic import BaseModel, Field
 from yarl import URL
 
-from ray_on_golem.server.exceptions import RayOnGolemServerError, RegistryRequestError
-from ray_on_golem.server.models import DemandConfigData, NodeConfigData
-from ray_on_golem.server.services.golem.manifest import get_manifest
+from ray_on_golem.server.models import NodeConfigData
+from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
+from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
+from ray_on_golem.server.services.golem.manager_stack import ManagerStack
 from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST, PROVIDERS_SCORED
 from ray_on_golem.server.services.utils import get_ssh_command
 
 logger = logging.getLogger(__name__)
 
 
-class ManagerStack(BaseModel):
-    payment_manager: Optional[PaymentManager]
-    demand_manager: Optional[DemandManager]
-    proposal_manager: Optional[ProposalManager]
-    agreement_manager: Optional[AgreementManager]
-    activity_manager: Optional[ActivityManager]
-    extra_proposal_plugins: List[ProposalManagerPlugin] = Field(default_factory=list)
-    extra_proposal_scorers: List[ProposalScorer] = Field(default_factory=list)
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    @property
-    def _managers(self):
-        return [
-            self.payment_manager,
-            self.demand_manager,
-            self.proposal_manager,
-            self.agreement_manager,
-            self.activity_manager,
-        ]
-
-    async def start(self) -> None:
-        logger.info("Starting stack managers...")
-
-        for manager in self._managers:
-            if manager is not None:
-                await manager.start()
-
-        logger.info("Starting stack managers done")
-
-    async def stop(self) -> None:
-        logger.info("Stopping stack managers...")
-
-        for manager in reversed(self._managers):
-            if manager is not None:
-                try:
-                    await manager.stop()
-                except Exception:
-                    logger.exception(f"{manager} stop failed!")
-
-        logger.info("Stopping stack managers done")
-
-
 class GolemService:
     def __init__(self, websocat_path: Path, registry_stats: bool):
         self._websocat_path = websocat_path
-        self._registry_stats = registry_stats
 
+        self._demand_config_helper: DemandConfigHelper = DemandConfigHelper(registry_stats)
         self._golem: Optional[GolemNode] = None
         self._network: Optional[Network] = None
         self._yagna_appkey: Optional[str] = None
@@ -169,10 +108,12 @@ class GolemService:
     ) -> ManagerStack:
         stack = ManagerStack()
 
-        payload = await self._get_payload_from_demand_config(node_config.demand)
+        payload = await self._demand_config_helper.get_payload_from_demand_config(
+            node_config.demand
+        )
 
-        self._apply_cost_management_avg_usage(stack, node_config)
-        self._apply_cost_management_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_cost_management_avg_usage(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_cost_management_hard_limits(stack, node_config)
 
         stack.payment_manager = PayAllPaymentManager(self._golem, budget=budget, network=network)
         stack.demand_manager = RefreshingDemandManager(
@@ -208,129 +149,6 @@ class GolemService:
         )
 
         return stack
-
-    async def _get_payload_from_demand_config(self, demand_config: DemandConfigData) -> Payload:
-        @dataclass
-        class CustomManifestVmPayload(ManifestVmPayload):
-            subnet_constraint: str = constraint("golem.node.debug.subnet", "=", default=SUBNET)
-            debit_notes_accept_timeout: int = prop(
-                "golem.com.payment.debit-notes.accept-timeout?", default=240
-            )
-
-        image_url, image_hash = await self._get_image_url_and_hash(demand_config)
-
-        manifest = get_manifest(image_url, image_hash)
-        manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
-
-        params = demand_config.dict(exclude={"image_hash", "image_tag"})
-        params["manifest"] = manifest
-
-        payload = CustomManifestVmPayload(**params)
-
-        return payload
-
-    async def _get_image_url_and_hash(self, demand_config: DemandConfigData) -> Tuple[URL, str]:
-        image_tag = demand_config.image_tag
-        image_hash = demand_config.image_hash
-
-        if image_tag is not None and image_hash is not None:
-            raise RayOnGolemServerError(
-                "Only one of `image_tag` and `image_hash` parameter should be defined!"
-            )
-
-        if image_hash is not None:
-            image_url = await self._get_image_url_from_hash(image_hash)
-            return image_url, image_hash
-
-        if image_tag is None:
-            python_version = platform.python_version()
-            ray_version = ray.__version__
-            image_tag = f"golem/ray-on-golem:py{python_version}-ray{ray_version}"
-
-        return await self._get_image_url_and_hash_from_tag(image_tag)
-
-    async def _get_image_url_from_hash(self, image_hash: str) -> URL:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"https://registry.golem.network/v1/image/info",
-                params={"hash": image_hash, "count": str(self._registry_stats).lower()},
-            ) as response:
-                response_data = await response.json()
-
-                if response.status == 200:
-                    return URL(response_data["http"])
-                elif response.status == 404:
-                    raise RegistryRequestError(f"Image hash `{image_hash}` does not exist")
-                else:
-                    raise RegistryRequestError("Can't access Golem Registry for image lookup!")
-
-    async def _get_image_url_and_hash_from_tag(self, image_tag: str) -> Tuple[URL, str]:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"https://registry.golem.network/v1/image/info",
-                params={"tag": image_tag, "count": str(self._registry_stats).lower()},
-            ) as response:
-                response_data = await response.json()
-
-                if response.status == 200:
-                    return response_data["http"], response_data["sha3"]
-                elif response.status == 404:
-                    raise RegistryRequestError(f"Image tag `{image_tag}` does not exist")
-                else:
-                    raise RegistryRequestError("Can't access Golem Registry for image lookup!")
-
-    def _apply_cost_management_avg_usage(
-        self, stack: ManagerStack, node_config: NodeConfigData
-    ) -> None:
-        cost_management = node_config.cost_management
-
-        if cost_management is None or not cost_management.is_average_usage_cost_enabled():
-            logger.debug("Cost management based on average usage is not enabled")
-            return
-
-        linear_average_cost = LinearAverageCostPricing(
-            average_cpu_load=node_config.cost_management.average_cpu_load,
-            average_duration=timedelta(
-                minutes=node_config.cost_management.average_duration_minutes
-            ),
-        )
-
-        stack.extra_proposal_scorers.append(
-            MapScore(linear_average_cost, normalize=True, normalize_flip=True),
-        )
-
-        max_average_usage_cost = node_config.cost_management.max_average_usage_cost
-        if max_average_usage_cost is not None:
-            stack.extra_proposal_plugins.append(
-                RejectIfCostsExceeds(max_average_usage_cost, linear_average_cost),
-            )
-            logger.debug("Cost management based on average usage applied with max limits")
-        else:
-            logger.debug("Cost management based on average usage applied without max limits")
-
-    def _apply_cost_management_hard_limits(
-        self, stack: ManagerStack, node_config: NodeConfigData
-    ) -> None:
-        # TODO: Consider creating RejectIfCostsExceeds variant for multiple values
-        proposal_plugins = []
-        field_names = {
-            "max_initial_price": "price_initial",
-            "max_cpu_sec_price": "price_cpu_sec",
-            "max_duration_sec_price": "price_duration_sec",
-        }
-
-        for cost_field_name, coef_field_name in field_names.items():
-            cost_max_value = getattr(node_config.cost_management, cost_field_name, None)
-            if cost_max_value is not None:
-                proposal_plugins.append(
-                    RejectIfCostsExceeds(cost_max_value, LinearCoeffsCost(coef_field_name)),
-                )
-
-        if proposal_plugins:
-            stack.extra_proposal_plugins.extend(proposal_plugins)
-            logger.debug("Cost management based on max limits applied")
-        else:
-            logger.debug("Cost management based on max limits is not enabled")
 
     def _score_with_provider_data(
         self, proposal_data: ProposalData, network: str
