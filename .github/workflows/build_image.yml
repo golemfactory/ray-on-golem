@@ -22,8 +22,6 @@ jobs:
       - uses: Gr1N/setup-poetry@v8
       - name: Install requirements
         run: poetry install --no-ansi
-      - name: Install gvmkit
-        run: pip install gvmkit-build
       - name: Get Ray-On-Golem version
         run: echo "::set-output name=version::$(poetry version | sed 's/ray-on-golem //')"
         id: ray_on_golem_version
@@ -41,5 +39,15 @@ jobs:
         run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }}
       - name: Is test build?
         run: echo "${{ inputs.is_test_build }}"
+      - name: Check YAML image tag
+        run: echo "::set-output name=tag::$(poetry run yaml-get -p provider.parameters.node_config.demand.image_tag golem-cluster-dev.yaml)
+        id: yaml_image_tag
+      - name: Set pushed image tag
+        run: echo "::set-output name=tag::${{ vars.REGISTRY_TEST_REPOSITORY }}:${{ steps.image_version.outputs.version }}"
+        id: pushed_image_tag
+      - name: Fail on YAML tag mismatch
+        run: exit 1
+        if:
+          ${{ steps.yaml_image_tag.outputs.tag != steps.pushed_image_tag.outputs.tag }}
       - name: Push the image
-        run: REGISTRY_USER=${{ secrets.REGISTRY_TEST_USER }} REGISTRY_TOKEN=${{ secrets.REGISTRY_TEST_TOKEN }} gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }} --push-to ${{ vars.REGISTRY_TEST_REPOSITORY }}:${{ steps.image_version.outputs.version }}
+        run: REGISTRY_USER=${{ secrets.REGISTRY_TEST_USER }} REGISTRY_TOKEN=${{ secrets.REGISTRY_TEST_TOKEN }} poetry run gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }} --push-to ${{ steps.pushed_image_tag.outputs.tag }}
