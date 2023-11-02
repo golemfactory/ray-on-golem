@@ -39,8 +39,8 @@ jobs:
         run: gvmkit-build ray-on-golem:${{ steps.image_version.outputs.version }}
       - name: Is test build?
         run: echo "${{ inputs.is_test_build }}"
-      - name: Check YAML image tag
-        run: echo "::set-output name=tag::$(poetry run yaml-get -p provider.parameters.node_config.demand.image_tag golem-cluster-dev.yaml)
+      - name: Get YAML image tag
+        run: echo "::set-output name=tag::$(poetry run yaml-get -p provider.parameters.node_config.demand.image_tag golem-cluster-dev.yaml)"
         id: yaml_image_tag
       - name: Set pushed image tag
         run: echo "::set-output name=tag::${{ vars.REGISTRY_TEST_REPOSITORY }}:${{ steps.image_version.outputs.version }}"
