@@ -1,0 +1,16 @@
+# The files or directories to copy to the head and worker nodes
+file_mounts:
+  # remote_path: local_path
+  {
+    "/app/ray_on_golem": "./ray_on_golem",
+    "/app/golem": "../golem-core-python/golem",
+  }
+
+rsync_exclude: [
+  "**/__pycache__",
+]
+
+# List of commands that will be run to initialize the nodes (before `setup_commands`)
+initialization_commands: [
+  "cp -fR /app/golem/* $(python -c 'import site; print(site.getsitepackages()[0])')/golem"
+]
