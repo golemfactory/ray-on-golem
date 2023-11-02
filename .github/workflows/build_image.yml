@@ -45,6 +45,8 @@ jobs:
       - name: Set pushed image tag
         run: echo "::set-output name=tag::${{ vars.REGISTRY_TEST_REPOSITORY }}:${{ steps.image_version.outputs.version }}"
         id: pushed_image_tag
+      - name: Test
+        run: echo ${{ steps.pushed_image_tag.outputs.tag }} VS ${{ steps.yaml_image_tag.outputs.tag }}
       - name: Fail on YAML tag mismatch
         run: exit 1
         if:
