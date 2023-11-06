@@ -1,9 +1,8 @@
 name: Build and publish the release
 
 on:
-  push:
-#  release:
-#    types: [prereleased, released]
+  release:
+    types: [prereleased, released]
 
 env:
   PYTHON_VERSION: "3.10"
@@ -21,21 +20,8 @@ jobs:
       - uses: Gr1N/setup-poetry@v8
       - run: poetry install
 
-  test_image:
-    needs: [release_test]
-    if: true #${{ env.EVENT == 'prereleased' }}
-    uses: ./.github/workflows/build_image.yml
-    with:
-      IS_TEST_BUILD: true
-      ENV_PYTHON_VERSION: "3.10"
-      IMAGE_PYTHON_VERSION: ${{ vars.PYTHON_VERSION }}
-      REGISTRY_REPOSITORY: ${{ vars.REGISTRY_TEST_REPOSITORY }}
-    secrets:
-      REGISTRY_USER: ${{ secrets.REGISTRY_TEST_USER }}
-      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TEST_TOKEN }}
-
   build:
-    needs: [test_image]
+    needs: [release_test]
     name: Build the release
     runs-on: ubuntu-latest
 
@@ -64,11 +50,37 @@ jobs:
           name: dist
           path: dist
 
-  test_publish:
+  build_test_image:
     needs: [build]
+    if: ${{ env.EVENT == 'prereleased' }}
+    uses: ./.github/workflows/build_image.yml
+    with:
+      IS_TEST_BUILD: true
+      ENV_PYTHON_VERSION: "3.10"
+      IMAGE_PYTHON_VERSION: ${{ vars.PYTHON_VERSION }}
+      REGISTRY_REPOSITORY: ${{ vars.REGISTRY_TEST_REPOSITORY }}
+    secrets:
+      REGISTRY_USER: ${{ secrets.REGISTRY_TEST_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TEST_TOKEN }}
+
+  build_image:
+    needs: [build]
+    if: ${{ env.EVENT == 'released' }}
+    uses: ./.github/workflows/build_image.yml
+    with:
+      IS_TEST_BUILD: false
+      ENV_PYTHON_VERSION: "3.10"
+      IMAGE_PYTHON_VERSION: ${{ vars.PYTHON_VERSION }}
+      REGISTRY_REPOSITORY: ${{ vars.REGISTRY_REPOSITORY }}
+    secrets:
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  test_publish:
+    needs: [build_test_image]
     name: Publish the release to test.pypi
     runs-on: ubuntu-latest
-    if: false #${{ env.EVENT == 'prereleased' }}
+    if: ${{ env.EVENT == 'prereleased' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -87,10 +99,10 @@ jobs:
           poetry publish -r testpypi -u __token__ -p ${{ secrets.TESTPYPI_TOKEN }}
 
   publish:
-    needs: [build]
+    needs: [build_image]
     name: Publish the release
     runs-on: ubuntu-latest
-    if: false #${{ env.EVENT == 'released' }}
+    if: ${{ env.EVENT == 'released' }}
 
     steps:
       - uses: actions/checkout@v4
