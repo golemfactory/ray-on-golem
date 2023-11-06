@@ -9,3 +9,5 @@ poetry.lock
 *.gvmi.descr.bin
 .requirements.txt
 .python-version
+golem-cluster.dev.yaml
+golem-cluster.local.yaml

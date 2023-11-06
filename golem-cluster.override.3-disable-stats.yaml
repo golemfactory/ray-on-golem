@@ -1,0 +1,2 @@
+provider:
+    enable_registry_stats: false
