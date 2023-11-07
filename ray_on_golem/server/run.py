@@ -1,11 +1,14 @@
 import argparse
+import asyncio
 import logging
 import logging.config
+from contextlib import asynccontextmanager
 
 from aiohttp import web
 
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
+from ray_on_golem.server.services.golem.network_stats import GolemNetworkStatsService
 from ray_on_golem.server.settings import (
     LOGGING_CONFIG,
     RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
@@ -21,19 +24,6 @@ logger = logging.getLogger(__name__)
 def parse_sys_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ray on Golem's webserver.")
     parser.add_argument(
-        "-p",
-        "--port",
-        type=int,
-        default=4578,
-        help="port for Ray on Golem's webserver to listen on, default: %(default)s",
-    )
-    parser.add_argument(
-        "--self-shutdown",
-        action="store_true",
-        help="flag to enable self-shutdown after last node termination, default: %(default)s",
-    )
-    parser.add_argument("--no-self-shutdown", action="store_false", dest="self_shutdown")
-    parser.add_argument(
         "--registry-stats",
         action="store_true",
         help="flag to enable collection of Golem Registry stats about resolved images, default: %(default)s",
@@ -43,7 +33,36 @@ def parse_sys_args() -> argparse.Namespace:
         action="store_false",
         dest="registry_stats",
     )
-    parser.set_defaults(self_shutdown=False, registry_stats=True)
+    subparsers = parser.add_subparsers(dest="command")
+
+    webserver_parser = subparsers.add_parser("webserver")
+    webserver_parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=4578,
+        help="port for Ray on Golem's webserver to listen on, default: %(default)s",
+    )
+    webserver_parser.add_argument(
+        "--self-shutdown",
+        action="store_true",
+        help="flag to enable self-shutdown after last node termination, default: %(default)s",
+    )
+    webserver_parser.add_argument("--no-self-shutdown", action="store_false", dest="self_shutdown")
+    webserver_parser.set_defaults(self_shutdown=False, registry_stats=True)
+
+    stats_parser = subparsers.add_parser("stats")
+    stats_parser.add_argument(
+        "--enable-logging",
+        action="store_true",
+        dest="enable_logging",
+        help="flag to enable logging, default: %(default)s",
+    )
+    # TODO add config arg
+    # stats_parser.add_argument(
+    #     "CLUSTER_CONFIG_FILE",
+    # )
+
     return parser.parse_args()
 
 
@@ -128,29 +147,55 @@ async def ray_service_ctx(app: web.Application) -> None:
     await ray_service.shutdown()
 
 
+@asynccontextmanager
+async def golem_network_stats_service(registry_stats: bool) -> GolemNetworkStatsService:
+    golem_network_stats_service: GolemNetworkStatsService = GolemNetworkStatsService(registry_stats)
+    yagna_service = YagnaService(
+        yagna_path=YAGNA_PATH,
+    )
+
+    await yagna_service.init()
+    await golem_network_stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
+
+    yield golem_network_stats_service
+
+    await golem_network_stats_service.shutdown()
+    await yagna_service.shutdown()
+
+
+async def stats_main(args: argparse.Namespace):
+    async with golem_network_stats_service(args.registry_stats) as stats_service:
+        await stats_service.run()
+
+
 def main():
     prepare_tmp_dir()
     args = parse_sys_args()
 
-    logging.config.dictConfig(LOGGING_CONFIG)
+    if args.command == "webserver":
+        logging.config.dictConfig(LOGGING_CONFIG)
+        app = create_application(args.port, args.self_shutdown, args.registry_stats)
 
-    app = create_application(args.port, args.self_shutdown, args.registry_stats)
-
-    logger.info(
-        "Starting server... {}".format(", ".join(f"{k}={v}" for k, v in args.__dict__.items()))
-    )
-
-    try:
-        web.run_app(
-            app,
-            port=app["port"],
-            print=None,
-            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
+        logger.info(
+            "Starting server... {}".format(", ".join(f"{k}={v}" for k, v in args.__dict__.items()))
         )
-    except Exception:
-        logger.info("Server unexpectedly died, bye!")
-    else:
-        logger.info("Stopping server done, bye!")
+
+        try:
+            web.run_app(
+                app,
+                port=app["port"],
+                print=None,
+                shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
+            )
+        except Exception:
+            logger.info("Server unexpectedly died, bye!")
+        else:
+            logger.info("Stopping server done, bye!")
+
+    elif args.command == "stats":
+        if args.enable_logging:
+            logging.config.dictConfig(LOGGING_CONFIG)
+        asyncio.run(stats_main(args))
 
 
 if __name__ == "__main__":
