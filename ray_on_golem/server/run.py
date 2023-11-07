@@ -4,6 +4,7 @@ import logging
 import logging.config
 from contextlib import asynccontextmanager
 
+import yaml
 from aiohttp import web
 
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
@@ -23,16 +24,6 @@ logger = logging.getLogger(__name__)
 
 def parse_sys_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ray on Golem's webserver.")
-    parser.add_argument(
-        "--registry-stats",
-        action="store_true",
-        help="flag to enable collection of Golem Registry stats about resolved images, default: %(default)s",
-    )
-    parser.add_argument(
-        "--no-registry-stats",
-        action="store_false",
-        dest="registry_stats",
-    )
     subparsers = parser.add_subparsers(dest="command")
 
     webserver_parser = subparsers.add_parser("webserver")
@@ -48,20 +39,39 @@ def parse_sys_args() -> argparse.Namespace:
         action="store_true",
         help="flag to enable self-shutdown after last node termination, default: %(default)s",
     )
+    webserver_parser.add_argument(
+        "--registry-stats",
+        action="store_true",
+        help="flag to enable collection of Golem Registry stats about resolved images, default: %(default)s",
+    )
+    webserver_parser.add_argument(
+        "--no-registry-stats",
+        action="store_false",
+        dest="registry_stats",
+    )
     webserver_parser.add_argument("--no-self-shutdown", action="store_false", dest="self_shutdown")
     webserver_parser.set_defaults(self_shutdown=False, registry_stats=True)
 
     stats_parser = subparsers.add_parser("stats")
+    stats_parser.add_argument(
+        "CLUSTER_CONFIG_FILE",
+        type=argparse.FileType("r"),
+        help="Cluster config yaml",
+    )
+    stats_parser.add_argument(
+        "-t",
+        "--run-time",
+        type=int,
+        dest="run_time",
+        default=5,
+        help="For how long in minutes to gather stats, default: %(default)s",
+    )
     stats_parser.add_argument(
         "--enable-logging",
         action="store_true",
         dest="enable_logging",
         help="flag to enable logging, default: %(default)s",
     )
-    # TODO add config arg
-    # stats_parser.add_argument(
-    #     "CLUSTER_CONFIG_FILE",
-    # )
 
     return parser.parse_args()
 
@@ -164,8 +174,13 @@ async def golem_network_stats_service(registry_stats: bool) -> GolemNetworkStats
 
 
 async def stats_main(args: argparse.Namespace):
-    async with golem_network_stats_service(args.registry_stats) as stats_service:
-        await stats_service.run()
+    with args.CLUSTER_CONFIG_FILE as file:
+        config = yaml.safe_load(file.read())
+    provider_config = config["provider"]
+    async with golem_network_stats_service(
+        provider_config["enable_registry_stats"]
+    ) as stats_service:
+        await stats_service.run(provider_config["parameters"], args.run_time)
 
 
 def main():
