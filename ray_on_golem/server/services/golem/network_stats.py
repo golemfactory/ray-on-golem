@@ -139,7 +139,7 @@ class GolemNetworkStatsService:
 
         logger.info("Stopping GolemNetworkStatsService done")
 
-    async def run(self, provider_parameters: Dict, run_time_minutes: int) -> None:
+    async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
         network: str = provider_parameters["network"]
         budget: int = provider_parameters["budget"]
         node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
@@ -152,7 +152,7 @@ class GolemNetworkStatsService:
         try:
             await asyncio.wait(
                 [consume_proposals_task],
-                timeout=timedelta(minutes=run_time_minutes).total_seconds(),
+                timeout=timedelta(minutes=duration_minutes).total_seconds(),
             )
         finally:
             consume_proposals_task.cancel()
@@ -203,13 +203,9 @@ class GolemNetworkStatsService:
             self._stats_plugin_factory.create_counter_plugin("Not blacklisted"),
         ]
 
-        for idx, plugin in enumerate(stack.extra_proposal_plugins):
+        for plugin_tag, plugin in stack.extra_proposal_plugins.items():
             plugins.append(plugin)
-            plugins.append(
-                self._stats_plugin_factory.create_counter_plugin(
-                    f"Passed {plugin.__class__.__name__} #{idx + 1}"
-                )
-            )
+            plugins.append(self._stats_plugin_factory.create_counter_plugin(f"Passed {plugin_tag}"))
 
         plugins.extend(
             [
@@ -217,7 +213,7 @@ class GolemNetworkStatsService:
                     min_size=50,
                     max_size=1000,
                     fill_at_start=True,
-                    proposal_scorers=(*stack.extra_proposal_scorers,),
+                    proposal_scorers=(*stack.extra_proposal_scorers.values(),),
                     update_interval=timedelta(seconds=10),
                 ),
                 self._stats_plugin_factory.create_counter_plugin("Scored"),

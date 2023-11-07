@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import Dict, Optional
 
 from golem.managers import (
     ActivityManager,
@@ -21,8 +21,8 @@ class ManagerStack(BaseModel):
     proposal_manager: Optional[ProposalManager]
     agreement_manager: Optional[AgreementManager]
     activity_manager: Optional[ActivityManager]
-    extra_proposal_plugins: List[ProposalManagerPlugin] = Field(default_factory=list)
-    extra_proposal_scorers: List[ProposalScorer] = Field(default_factory=list)
+    extra_proposal_plugins: Dict[str, ProposalManagerPlugin] = Field(default_factory=dict)
+    extra_proposal_scorers: Dict[str, ProposalScorer] = Field(default_factory=dict)
 
     class Config:
         arbitrary_types_allowed = True

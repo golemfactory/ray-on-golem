@@ -127,13 +127,13 @@ class GolemService:
             stack.demand_manager.get_initial_proposal,
             plugins=(
                 BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(network, set())),
-                *stack.extra_proposal_plugins,
+                *stack.extra_proposal_plugins.values(),
                 ScoringBuffer(
                     min_size=50,
                     max_size=1000,
                     fill_at_start=True,
                     proposal_scorers=(
-                        *stack.extra_proposal_scorers,
+                        *stack.extra_proposal_scorers.values(),
                         MapScore(partial(self._score_with_provider_data, network=network)),
                     ),
                     update_interval=timedelta(seconds=10),
