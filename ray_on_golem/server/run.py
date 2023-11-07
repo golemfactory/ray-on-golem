@@ -174,7 +174,30 @@ async def golem_network_stats_service(registry_stats: bool) -> GolemNetworkStats
     await yagna_service.shutdown()
 
 
+def webserver_main(args: argparse.Namespace):
+    logging.config.dictConfig(LOGGING_CONFIG)
+    app = create_application(args.port, args.self_shutdown, args.registry_stats)
+
+    logger.info(
+        "Starting server... {}".format(", ".join(f"{k}={v}" for k, v in args.__dict__.items()))
+    )
+
+    try:
+        web.run_app(
+            app,
+            port=app["port"],
+            print=None,
+            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
+        )
+    except Exception:
+        logger.info("Server unexpectedly died, bye!")
+    else:
+        logger.info("Stopping server done, bye!")
+
+
 async def network_stats_main(args: argparse.Namespace):
+    if args.enable_logging:
+        logging.config.dictConfig(LOGGING_CONFIG)
     with args.CLUSTER_CONFIG_FILE as file:
         config = yaml.safe_load(file.read())
     provider_config = config["provider"]
@@ -189,28 +212,9 @@ def main():
     args = parse_sys_args()
 
     if args.command == "webserver":
-        logging.config.dictConfig(LOGGING_CONFIG)
-        app = create_application(args.port, args.self_shutdown, args.registry_stats)
-
-        logger.info(
-            "Starting server... {}".format(", ".join(f"{k}={v}" for k, v in args.__dict__.items()))
-        )
-
-        try:
-            web.run_app(
-                app,
-                port=app["port"],
-                print=None,
-                shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
-            )
-        except Exception:
-            logger.info("Server unexpectedly died, bye!")
-        else:
-            logger.info("Stopping server done, bye!")
+        webserver_main(args)
 
     elif args.command == "network-stats":
-        if args.enable_logging:
-            logging.config.dictConfig(LOGGING_CONFIG)
         asyncio.run(network_stats_main(args))
 
 

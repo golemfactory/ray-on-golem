@@ -147,7 +147,7 @@ class GolemNetworkStatsService:
         stack = await self._create_stack(node_config, budget, network)
         await stack.start()
 
-        print("Gathering stats data...")
+        print(f"Gathering stats data for {duration_minutes} minutes...")
         consume_proposals_task = asyncio.create_task(self._consume_draft_proposals(stack))
         try:
             await asyncio.wait(
