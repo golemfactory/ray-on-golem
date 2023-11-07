@@ -52,21 +52,22 @@ def parse_sys_args() -> argparse.Namespace:
     webserver_parser.add_argument("--no-self-shutdown", action="store_false", dest="self_shutdown")
     webserver_parser.set_defaults(self_shutdown=False, registry_stats=True)
 
-    stats_parser = subparsers.add_parser("stats")
+    stats_parser = subparsers.add_parser("network-stats")
     stats_parser.add_argument(
         "CLUSTER_CONFIG_FILE",
         type=argparse.FileType("r"),
         help="Cluster config yaml",
     )
     stats_parser.add_argument(
-        "-t",
-        "--run-time",
+        "-d",
+        "--duration",
         type=int,
-        dest="run_time",
+        dest="duration",
         default=5,
         help="For how long in minutes to gather stats, default: %(default)s",
     )
     stats_parser.add_argument(
+        "-log",
         "--enable-logging",
         action="store_true",
         dest="enable_logging",
@@ -173,14 +174,14 @@ async def golem_network_stats_service(registry_stats: bool) -> GolemNetworkStats
     await yagna_service.shutdown()
 
 
-async def stats_main(args: argparse.Namespace):
+async def network_stats_main(args: argparse.Namespace):
     with args.CLUSTER_CONFIG_FILE as file:
         config = yaml.safe_load(file.read())
     provider_config = config["provider"]
     async with golem_network_stats_service(
         provider_config["enable_registry_stats"]
     ) as stats_service:
-        await stats_service.run(provider_config["parameters"], args.run_time)
+        await stats_service.run(provider_config["parameters"], args.duration)
 
 
 def main():
@@ -207,10 +208,10 @@ def main():
         else:
             logger.info("Stopping server done, bye!")
 
-    elif args.command == "stats":
+    elif args.command == "network-stats":
         if args.enable_logging:
             logging.config.dictConfig(LOGGING_CONFIG)
-        asyncio.run(stats_main(args))
+        asyncio.run(network_stats_main(args))
 
 
 if __name__ == "__main__":

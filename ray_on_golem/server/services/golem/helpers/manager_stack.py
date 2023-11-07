@@ -26,15 +26,15 @@ class ManagerStackNodeConfigHelper:
             ),
         )
 
-        stack.extra_proposal_scorers.append(
-            MapScore(linear_average_cost, normalize=True, normalize_flip=True),
+        stack.extra_proposal_scorers["Sort by linear average cost"] = MapScore(
+            linear_average_cost, normalize=True, normalize_flip=True
         )
 
         max_average_usage_cost = node_config.cost_management.max_average_usage_cost
         if max_average_usage_cost is not None:
-            stack.extra_proposal_plugins.append(
-                RejectIfCostsExceeds(max_average_usage_cost, linear_average_cost),
-            )
+            stack.extra_proposal_plugins[
+                f"Reject if max_average_usage_cost exceeds {node_config.cost_management.max_average_usage_cost}"
+            ] = RejectIfCostsExceeds(max_average_usage_cost, linear_average_cost)
             logger.debug("Cost management based on average usage applied with max limits")
         else:
             logger.debug("Cost management based on average usage applied without max limits")
@@ -42,7 +42,7 @@ class ManagerStackNodeConfigHelper:
     @staticmethod
     def apply_cost_management_hard_limits(stack: ManagerStack, node_config: NodeConfigData) -> None:
         # TODO: Consider creating RejectIfCostsExceeds variant for multiple values
-        proposal_plugins = []
+        proposal_plugins = {}
         field_names = {
             "max_initial_price": "price_initial",
             "max_cpu_sec_price": "price_cpu_sec",
@@ -52,12 +52,12 @@ class ManagerStackNodeConfigHelper:
         for cost_field_name, coef_field_name in field_names.items():
             cost_max_value = getattr(node_config.cost_management, cost_field_name, None)
             if cost_max_value is not None:
-                proposal_plugins.append(
-                    RejectIfCostsExceeds(cost_max_value, LinearCoeffsCost(coef_field_name)),
-                )
+                proposal_plugins[
+                    f"Reject if {coef_field_name} exceeds {cost_max_value}"
+                ] = RejectIfCostsExceeds(cost_max_value, LinearCoeffsCost(coef_field_name))
 
         if proposal_plugins:
-            stack.extra_proposal_plugins.extend(proposal_plugins)
+            stack.extra_proposal_plugins.update(proposal_plugins)
             logger.debug("Cost management based on max limits applied")
         else:
             logger.debug("Cost management based on max limits is not enabled")
