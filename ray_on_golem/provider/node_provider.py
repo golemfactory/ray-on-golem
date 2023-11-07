@@ -189,6 +189,7 @@ class GolemNodeProvider(NodeProvider):
             )
             args = [
                 RAY_ON_GOLEM_PATH,
+                "webserver",
                 "-p",
                 str(port),
                 "--registry-stats" if registry_stats else "--no-registry-stats",
