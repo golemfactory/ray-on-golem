@@ -3,7 +3,7 @@ import logging
 import re
 from collections import defaultdict
 from datetime import timedelta
-from typing import Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 from golem.managers import (
     AddChosenPaymentPlatform,
@@ -23,7 +23,7 @@ from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
 
-from ray_on_golem.server.models import CostManagementData, DemandConfigData, NodeConfigData
+from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
@@ -112,9 +112,8 @@ class StatsPluginFactory:
 
 
 class GolemNetworkStatsService:
-    def __init__(self, registry_stats: bool, run_time_minutes=5) -> None:
+    def __init__(self, registry_stats: bool) -> None:
         self._registry_stats = registry_stats
-        self._run_time = timedelta(minutes=run_time_minutes)
 
         self._demand_config_helper: DemandConfigHelper = DemandConfigHelper(registry_stats)
 
@@ -140,40 +139,28 @@ class GolemNetworkStatsService:
 
         logger.info("Stopping GolemNetworkStatsService done")
 
-    async def run(self) -> None:
-        # FIXME pass args from yaml
-        network: str = "goerli"
-        # network: str = "polygon"
-        budget: int = 1.0
-        node_config: NodeConfigData = NodeConfigData(
-            demand=DemandConfigData(
-                image_tag="blueshade/ray-on-golem:0.2.0-py3.10.13-ray2.7.1",
-                capabilities=["vpn", "inet", "manifest-support"],
-                min_mem_gib=0.0,
-                min_cpu_threads=0,
-                min_storage_gib=0.0,
-            ),
-            cost_management=CostManagementData(
-                average_cpu_load=0.8,
-                average_duration_minutes=20,
-                max_average_usage_cost=1.5,
-                max_initial_price=0.5,
-                max_cpu_sec_price=0.0005,
-                max_duration_sec_price=0.0005,
-            ),
-        )
+    async def run(self, provider_parameters: Dict, run_time_minutes: int) -> None:
+        network: str = provider_parameters["network"]
+        budget: int = provider_parameters["budget"]
+        node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
 
         stack = await self._create_stack(node_config, budget, network)
         await stack.start()
 
+        print("Gathering stats data...")
         consume_proposals_task = asyncio.create_task(self._consume_draft_proposals(stack))
-        await asyncio.wait([consume_proposals_task], timeout=self._run_time.total_seconds())
+        try:
+            await asyncio.wait(
+                [consume_proposals_task],
+                timeout=timedelta(minutes=run_time_minutes).total_seconds(),
+            )
+        finally:
+            consume_proposals_task.cancel()
+            await consume_proposals_task
 
-        consume_proposals_task.cancel()
-        await consume_proposals_task
-
-        await stack.stop()
-        self._stats_plugin_factory.print_gathered_stats()
+            await stack.stop()
+            print("Gathering stats data done")
+            self._stats_plugin_factory.print_gathered_stats()
 
     async def _consume_draft_proposals(self, stack: ManagerStack) -> None:
         drafts = []
@@ -220,7 +207,7 @@ class GolemNetworkStatsService:
             plugins.append(plugin)
             plugins.append(
                 self._stats_plugin_factory.create_counter_plugin(
-                    f"Passed {plugin.__class__.__name__} {idx + 1}"
+                    f"Passed {plugin.__class__.__name__} #{idx + 1}"
                 )
             )
 
