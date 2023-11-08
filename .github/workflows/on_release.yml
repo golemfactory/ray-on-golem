@@ -61,6 +61,7 @@ jobs:
           path: dist
 
   build_test_image:
+    name: Build Test VM Image
     needs: [build]
     if: ${{ env.EVENT == 'prereleased' }}
     uses: ./.github/workflows/build_image.yml
@@ -74,11 +75,13 @@ jobs:
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TEST_TOKEN }}
 
   smoke_tests:
+    name: Run Smoke Tests
     needs: [build_test_image]
     if: ${{ env.EVENT == 'prereleased' }}
     uses: ./.github/workflows/smoke_tests.yml
 
   build_image:
+    name: Build VM Image
     needs: [build]
     if: ${{ env.EVENT == 'released' }}
     uses: ./.github/workflows/build_image.yml
