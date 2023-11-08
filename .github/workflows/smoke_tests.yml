@@ -40,7 +40,7 @@ jobs:
         run: poetry run ray down golem-cluster.tests.yaml -y
 
       - name: Check node creation in logs
-        run: poetry run python .github/workflows/smoke_tests.py /tmp/ray_on_golem/webserver_debug.log
+        run: poetry run python tests/smoke.py /tmp/ray_on_golem/webserver_debug.log
 
       - name: Collects logs
         if: always()
