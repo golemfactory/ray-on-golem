@@ -85,7 +85,7 @@ We suggest you check out the `ray.wait()` function, which allows you to retrieve
 
 ### Acceptance criteria 
 
-At the end, we would like a code that finds the word: `golem`, represented by the hash: `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` in 10 minutes, using Ray on Golem.
+In the end, we would like a code that finds the word: `golem`, represented by the hash: `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` in 10 minutes, using Ray on Golem.
 The 10-minute criterion is not critical - the main point is for you to think of ways to optimize the time it takes the Ray on Golem cluster to find the solution.
 
 Please don't hesitate to talk to us on `#Ray on Golem` - we would love to see what you struggle with.
@@ -96,6 +96,6 @@ At the same time, we don't want to waste your time on powering through the rough
 The final step is to submit your solution, the logs, and your feedback via the [submission form](todo).
 
 Remember that your insights have the power to refine and propel Ray on Golem forward.
-Apart from the solution to above task, the most attractive feedback for us would be your ideas for real-life Ray on Golem applications.
+Apart from the solution to the above task, the most attractive feedback for us would be your ideas for real-life Ray on Golem applications.
 Ideally, the ones that you would like to implement yourself.
 We need reference usages and are willing to actively support their potential creators.
