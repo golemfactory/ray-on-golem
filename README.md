@@ -9,7 +9,7 @@
 
 ## What is Golem, Ray and Ray on Golem
 
-[Golem](https://golem.network) on is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
+[Golem](https://golem.network) is a decentralized marketplace for computing power, where providers let requestors use their machines for a small fee.
 
 Ray on Golem makes it super easy to set up and use Golem Network to run your Ray applications.
 
