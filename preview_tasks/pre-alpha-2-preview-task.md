@@ -75,7 +75,8 @@ Our original hash cracker code was a bit more straightforward, but it was more c
 So now the code is a bit more complex, but it should be easier to parallelize as it now allows more control over the sizes of the tasks.
 
 One additional challenge (and a learning opportunity) here is that we would like to avoid waiting for Ray on Golem to scan the whole of the word space.
-We would like the code to stop the computation when it finds the match.
+We would like the code to stop the computation when it finds the match. 
+You might want to use Ray mechanisms which is not described in Ray on Golem docs (we suggest you check out `ray.wait()`).
 
 ### Acceptance criteria 
 
