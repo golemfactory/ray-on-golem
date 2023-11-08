@@ -1,22 +1,26 @@
-# Ray on Golem Pre-Alpha Preview #2 Program
+# Ray on Golem Pre-Alpha Preview Program #2
 
-Welcome to the Ray on Golem Pre-Alpha Preview #2 Program description!
+Welcome to the Ray on Golem Pre-Alpha Preview Program #2!
 
-Thank you for your interest in the Preview Program. 
-Its purpose is to test the new Ray on Golem solution with its documentation: https://docs.golem.network/docs/creators/ray.
+If you've ever tried scaling your Python code to process large data sets or solve complex computational tasks, you'll know that it may be challenging in various ways.
+With Ray on Golem, we're aiming to make this as straightforward as possible, and we invite you to help us make it happen.
 
-The pre-alpha releases line is a sneak-peak, with a happy path working on our test network. We publish the releases and run the preview programs to get out of the building - to start verifying the potential 
-and decide if further investment in Ray on Golem is justified.
+Therefore, we'd like to thank you for your interest in the Preview Program.
+Its purpose is to field test the new Ray on Golem along with its documentation: https://docs.golem.network/docs/creators/ray.
 
-We want to test Ray on Golem on **Linux**.
-The task described below will help you broaden your knowledge while contributing to the improvement of the Golem Network. 
+Our current line of releases is a sneak-peek, with a happy path working on our test network.
+We publish these releases and run subsequent editions of our preview program with the aim of verifying the potential
+of our product against real users' needs.
 
-We have rewards for 10 people (100 USD each) - that you will be able to claim via Upwork after completing the task. 
+At the time, we're limiting our tests to Ray on Golem on **Linux**, since we want to focus on the core experience and not on idiosyncrasies of particular platforms on which Golem or Ray in general can run.
+The task described below will help you broaden your knowledge while actively contributing to the improvement of the Golem Network.
+
+We have rewards for 10 people (100 USD each) that you will be able to claim via Upwork after completing the task.
 Note that only those who filled out the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
 
-If you have any questions, we encourage you to contact the `Ray on Golem` team directly on Discord: `#Ray on Golem` channel in the Golem projects section.
+If you have any questions, we encourage you to contact the Ray on Golem team directly on Discord: `#Ray on Golem` channel in the Golem projects section.
 
-We also encourage you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
+We also invite you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
 
 ## Task: parallelize the hash cracker script with Ray and execute it on Ray on Golem
 
@@ -71,16 +75,18 @@ You will notice that it runs very fast for hashes of 3-character words, ok-ish f
 Your task is to parallelize the code and execute it on the Ray on Golem cluster.
 The goal is to benefit from distributed execution on the Ray on Golem cluster so that it takes less time than executed locally.
 
-Our original hash cracker code was a bit more straightforward, but it was more challenging to parallelize as the obvious candidate for the Ray task was too small.
-So now the code is a bit more complex, but it should be easier to parallelize as it now allows more control over the sizes of the tasks.
+We designed the example code so that it's easily parallelizable and allows precise control over the sizes of individual tasks.
+While it may seem overly complex initially, its structure should make it straightforward to convert to Ray on Golem.
 
 One additional challenge (and a learning opportunity) here is that we would like to avoid waiting for Ray on Golem to scan the whole of the word space.
 We would like the code to stop the computation when it finds the match. 
-You might need to use Ray mechanisms which are not described in Ray on Golem docs (we suggest you check out `ray.wait()`).
+You might wish to use Ray mechanisms which are not directly described in our docs for Ray on Golem.
+We suggest you check out the `ray.wait()` function, which allows you to retrieve individual results as soon as they're ready instead of waiting for all of them to finish.
 
 ### Acceptance criteria 
 
-At the end, we would like a code that finds the `golem` word for `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` hash in 10 minutes (using Ray on Golem).
+At the end, we would like a code that finds the word: `golem`, represented by the hash: `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` in 10 minutes, using Ray on Golem.
+The 10-minute criterion is not critical - the main point is for you to think of ways to optimize the time it takes the Ray on Golem cluster to find the solution.
 
 Please don't hesitate to talk to us on `#Ray on Golem` - we would love to see what you struggle with.
 At the same time, we don't want to waste your time on powering through the rough edges of our young product.
@@ -89,5 +95,7 @@ At the same time, we don't want to waste your time on powering through the rough
 
 The final step is to submit your solution, the logs, and your feedback via the [submission form](todo).
 
-The most attractive for us would be ideas for actual Ray on Golem applications. Ideally, the ones that you would like to implement yourself. We need reference usages and are willing to support their potential creators.
-
+Remember that your insights have the power to refine and propel Ray on Golem forward.
+Apart from the solution to above task, the most attractive feedback for us would be your ideas for real-life Ray on Golem applications.
+Ideally, the ones that you would like to implement yourself.
+We need reference usages and are willing to actively support their potential creators.
