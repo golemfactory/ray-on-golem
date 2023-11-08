@@ -23,10 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 def parse_sys_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Ray on Golem's webserver.")
+    parser = argparse.ArgumentParser(description="Ray on Golem")
     subparsers = parser.add_subparsers(dest="command")
 
-    webserver_parser = subparsers.add_parser("webserver")
+    webserver_parser = subparsers.add_parser("webserver", description="Ray on Golem's webserver.")
     webserver_parser.add_argument(
         "-p",
         "--port",
