@@ -12,7 +12,7 @@ We want to test Ray on Golem on **Linux**.
 The task described below will help you broaden your knowledge while contributing to the improvement of the Golem Network. 
 
 We have rewards for 10 people (100 USD each) - that you will be able to claim via Upwork after completing the task. 
-Note that only those who filled the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
+Note that only those who filled out the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
 
 If you have any questions, we encourage you to contact the `Ray on Golem` team directly on Discord: `#Ray on Golem` channel in the Golem projects section.
 
@@ -22,7 +22,7 @@ We also encourage you to visit https://www.golem.network/, where you can find mo
 
 **Goal**: Evaluate if Ray on Golem makes it easier to parallelize Python code. 
 
-**Task**: Parallelize the provided hash cracker code. Please show us the resulting code and logs from running it with Ray on Golem. The last but not least, share the feedback about your experience with Ray on Golem with us.
+**Task**: Parallelize the provided hash cracker code. Please show us the resulting code and logs from running it with Ray on Golem. Last but not least, share the feedback about your experience with Ray on Golem with us.
 
 **Steps**:
 - Go through Ray on Golem documentation
@@ -86,7 +86,7 @@ At the same time, we don't want to waste your time on powering through the rough
 
 ### Fill out the submission form
 
-The final step is to submit your solution, the logs and your feedback via the [submission form](todo).
+The final step is to submit your solution, the logs, and your feedback via the [submission form](todo).
 
-The most attractive for us would be ideas for actual Ray on Golem applications. Ideally the ones that you would like to implement yourself. We need reference usages and are willing to support their potential creators.
+The most attractive for us would be ideas for actual Ray on Golem applications. Ideally, the ones that you would like to implement yourself. We need reference usages and are willing to support their potential creators.
 
