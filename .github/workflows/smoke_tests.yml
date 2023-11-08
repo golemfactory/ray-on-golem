@@ -1,7 +1,7 @@
 name: Smoke tests
 
 on:
-  pull_request:
+  workflow_call:
 
 jobs:
   build:
@@ -23,20 +23,20 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-ansi
 
-      - name: Prepare `golem-cluster.local.yaml`
-        run: poetry run python -m utils.apply_overrides -o golem-cluster.local.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml
+      - name: Prepare `golem-cluster.tests.yaml`
+        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml
 
       - name: Call `ray up`
         env:
           PYTHONUNBUFFERED: 1
           RUST_LOG: "INFO,ya_erc20_driver::erc20::wallet=debug"
-        run: poetry run ray up golem-cluster.local.yaml -y
+        run: poetry run ray up golem-cluster.tests.yaml -y
 
       - name: Run `examples/calculate.pi`
-        run: poetry run ray submit golem-cluster.local.yaml examples/calculate_pi.py
+        run: poetry run ray submit golem-cluster.tests.yaml examples/calculate_pi.py
 
       - name: Call `ray down`
-        run: poetry run ray down golem-cluster.local.yaml -y
+        run: poetry run ray down golem-cluster.tests.yaml -y
 
       - name: Check node creation in logs
         run: poetry run python .github/workflows/smoke_tests.py /tmp/ray_on_golem/webserver_debug.log

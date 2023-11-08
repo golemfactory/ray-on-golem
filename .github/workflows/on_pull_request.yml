@@ -1,0 +1,6 @@
+on:
+  pull_request:
+
+job:
+  smoke_tests:
+    uses: ./.github/workflows/smoke_tests.yml
