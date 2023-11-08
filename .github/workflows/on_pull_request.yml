@@ -1,3 +1,5 @@
+name: On pull request
+
 on:
   pull_request:
 
