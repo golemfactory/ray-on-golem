@@ -1,4 +1,4 @@
-name: Build and publish the release
+name: On release
 
 on:
   release:
@@ -14,10 +14,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION}}
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - uses: Gr1N/setup-poetry@v8
+
       - run: poetry install
 
   build:
@@ -27,23 +30,30 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION}}
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - uses: Gr1N/setup-poetry@v8
+
       - name: Get git release tag
         run: echo "::set-output name=git-release-tag::ray-on-golem $(git describe --tags)"
         id: git_describe
+
       - name: Get package version
         run: echo "::set-output name=poetry-version::$(poetry version)"
         id: poetry_version
+
       - name: Fail on version mismatch
         run: exit 1
         if:
           ${{ steps.git_describe.outputs.git-release-tag !=
           steps.poetry_version.outputs.poetry-version }}
+
       - name: Build the release
         run: poetry build
+
       - name: Store the built package
         uses: actions/upload-artifact@v3
         with:
@@ -51,6 +61,7 @@ jobs:
           path: dist
 
   build_test_image:
+    name: Build Test VM Image
     needs: [build]
     if: ${{ env.EVENT == 'prereleased' }}
     uses: ./.github/workflows/build_image.yml
@@ -63,7 +74,14 @@ jobs:
       REGISTRY_USER: ${{ secrets.REGISTRY_TEST_USER }}
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TEST_TOKEN }}
 
+  smoke_tests:
+    name: Run Smoke Tests
+    needs: [build_test_image]
+    if: ${{ env.EVENT == 'prereleased' }}
+    uses: ./.github/workflows/smoke_tests.yml
+
   build_image:
+    name: Build VM Image
     needs: [build]
     if: ${{ env.EVENT == 'released' }}
     uses: ./.github/workflows/build_image.yml
@@ -84,15 +102,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION}}
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - uses: Gr1N/setup-poetry@v8
+
       - name: Retrieve the built package
         uses: actions/download-artifact@v2
         with:
           name: dist
           path: dist
+
       - name: Publish to test pypi
         run: |
           poetry config repositories.testpypi https://test.pypi.org/legacy/
@@ -106,15 +128,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION}}
+          python-version: ${{ env.PYTHON_VERSION }}
+
       - uses: Gr1N/setup-poetry@v8
+
       - name: Retrieve the built package
         uses: actions/download-artifact@v2
         with:
           name: dist
           path: dist
+
       - name: Publish to pypi
         run: |
           poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}

@@ -32,42 +32,58 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ inputs.ENV_PYTHON_VERSION }}
+
       - uses: Gr1N/setup-poetry@v8
+
       - name: Install requirements
         run: poetry install --no-ansi
+
       - name: Get Ray-On-Golem version
         run: echo "RAY_ON_GOLEM_VERSION=$(poetry version | sed 's/ray-on-golem //')" >> $GITHUB_ENV
+
       - name: Get Ray version
         run: echo "RAY_VERSION=$(poetry run pip freeze | grep 'ray==' | sed 's/ray==//')" >> $GITHUB_ENV
+
       - name: Set image version
         run: echo "IMAGE_VERSION=${{ env.RAY_ON_GOLEM_VERSION }}-py${{ inputs.IMAGE_PYTHON_VERSION }}-ray${{ env.RAY_VERSION }}" >> $GITHUB_ENV
+
       - name: Build DEV cluster config file
         run: poetry run poe dev_yaml
         if: ${{ inputs.IS_TEST_BUILD }}
+
       - name: Get DEV YAML image tag
         run: echo "YAML_IMAGE_TAG=$(poetry run yaml-get -p provider.parameters.node_config.demand.image_tag golem-cluster.dev.yaml)" >> $GITHUB_ENV
         if: ${{ inputs.IS_TEST_BUILD }}
+
       - name: Get Production YAML image tag
         run: echo "YAML_IMAGE_TAG=$(poetry run yaml-get -p provider.parameters.node_config.demand.image_tag golem-cluster.yaml)" >> $GITHUB_ENV
         if: ${{ ! inputs.IS_TEST_BUILD }}
+
       - name: Set YAML image tag
         run: echo "::set-output name=tag::${{ env.YAML_IMAGE_TAG }}"
         id: yaml_image_tag
+
       - name: Set pushed image tag
         run: echo "::set-output name=tag::${{ inputs.REGISTRY_REPOSITORY }}:${{ env.IMAGE_VERSION }}"
         id: pushed_image_tag
+
       - name: Test
         run: echo ${{ steps.pushed_image_tag.outputs.tag }} VS ${{ steps.yaml_image_tag.outputs.tag }}
+
       - name: Fail on YAML tag mismatch
         run: exit 1
         if:
           ${{ steps.yaml_image_tag.outputs.tag != steps.pushed_image_tag.outputs.tag }}
+
       - name: Build the image
         run: docker build -t ray-on-golem:${{ env.IMAGE_VERSION }} --build-arg="PYTHON_VERSION=${{ inputs.IMAGE_PYTHON_VERSION }}" .
+
       - name: Convert the image
         run: gvmkit-build ray-on-golem:${{ env.IMAGE_VERSION }}
+
       - name: Push the image
         run: REGISTRY_USER=${{ secrets.REGISTRY_USER }} REGISTRY_TOKEN=${{ secrets.REGISTRY_TOKEN }} poetry run gvmkit-build ray-on-golem:${{ env.IMAGE_VERSION }} --push-to ${{ steps.pushed_image_tag.outputs.tag }}
