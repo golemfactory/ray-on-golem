@@ -5,12 +5,11 @@ Welcome to the Ray on Golem Pre-Alpha Preview #2 Program description!
 Thank you for your interest in the Preview Program. 
 Its purpose is to test the new Ray on Golem solution with its documentation: https://docs.golem.network/docs/creators/ray.
 
-The pre-alpha release is a sneak-peak, with a happy path working on our test network. We published the release and decided 
-to run the preview program to get it out of the building - to start verifying the potential 
+The pre-alpha releases line is a sneak-peak, with a happy path working on our test network. We publish the releases and run the preview programs to get out of the building - to start verifying the potential 
 and decide if further investment in Ray on Golem is justified.
 
 We want to test Ray on Golem on **Linux**.
-The set of tasks described below will help you broaden your knowledge while contributing to the improvement of the Golem Network. 
+The task described below will help you broaden your knowledge while contributing to the improvement of the Golem Network. 
 
 We have rewards for 10 people (100 USD each) - that you will be able to claim via Upwork after completing the task. 
 Note that only those who filled the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
@@ -21,9 +20,9 @@ We also encourage you to visit https://www.golem.network/, where you can find mo
 
 ## Task: parallelize the hash cracker script with Ray and execute it on Ray on Golem
 
-**Goal**: Evaluate if Ray on Golem makes it easier to parallelize Python code
+**Goal**: Evaluate if Ray on Golem makes it easier to parallelize Python code. 
 
-**Task**: Parallelize the provided hash cracker code. Please show us the resulting code and logs from running it with Ray on Golem.
+**Task**: Parallelize the provided hash cracker code. Please show us the resulting code and logs from running it with Ray on Golem. The last but not least, share the feedback about your experience with Ray on Golem with us.
 
 **Steps**:
 - Go through Ray on Golem documentation
@@ -36,7 +35,7 @@ We also encourage you to visit https://www.golem.network/, where you can find mo
 ### The documentation
 Take a look at this [documentation](https://docs.golem.network/docs/creators/ray).
 
-While doing that consider its clarity, purpose & completeness - we will be asking about this at the end.
+While doing that consider its clarity, purpose, structure & completeness - we will be asking about this at the end.
 The direction we should take with the docs is an important aspect of the Preview Program for us.
 
 ### The code
@@ -46,7 +45,7 @@ It takes a sha256 hash of some unknown word as input and looks for a word that r
 The code doesn't know anything about Golem or Ray.
 
 ```bash
-python hash_cracker_ray_ready.py -l 4 de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec
+python hash_cracker_ray_ready.py -l 4 -n 16 de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec
 ```
 ```
 scanning: de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec: a, fffg
@@ -76,9 +75,18 @@ Our original hash cracker code was a bit more straightforward, but it was more c
 So now the code is a bit more complex, but it should be easier to parallelize as it now allows more control over the sizes of the tasks.
 
 One additional challenge (and a learning opportunity) here is that we would like to avoid waiting for Ray on Golem to scan the whole of the word space.
-We would like to stop the computation when we find the match.
+We would like the code to stop the computation when it finds the match.
+
+### Acceptance criteria 
+
+At the end, we would like a code that finds the `golem` word for `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` hash in 10 minutes (using Ray on Golem).
+
+Please don't hesitate to talk to us on `#Ray on Golem` - we would love to see what you struggle with.
+At the same time, we don't want to waste your time on powering through the rough edges of our young product.
 
 ### Fill out the submission form
 
-At the end, we would like a code that finds the `golem` word for `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` hash in 10 minutes.
+The final step is to submit your solution, the logs and your feedback via the [submission form](todo).
+
+The most attractive for us would be ideas for actual Ray on Golem applications. Ideally the ones that you would like to implement yourself. We need reference usages and are willing to support their potential creators.
 
