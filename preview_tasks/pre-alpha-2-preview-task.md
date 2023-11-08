@@ -17,6 +17,7 @@ The task described below will help you broaden your knowledge while actively con
 
 We have rewards for 10 people (100 USD each) that you will be able to claim via Upwork after completing the task.
 Note that only those who filled out the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
+We estimate the task should take 1-3 hours to complete.
 
 If you have any questions, we encourage you to contact the Ray on Golem team directly on Discord: `#Ray on Golem` channel in the Golem projects section.
 
