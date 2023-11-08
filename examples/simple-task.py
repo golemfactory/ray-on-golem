@@ -18,6 +18,7 @@ def output_cluster_info():
         )
     )
 
+
 # cluster information before the computation
 output_cluster_info()
 
