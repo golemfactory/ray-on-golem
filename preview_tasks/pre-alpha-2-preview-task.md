@@ -8,7 +8,7 @@ With Ray on Golem, we're aiming to make this as straightforward as possible, and
 Therefore, we'd like to thank you for your interest in the Preview Program.
 Its purpose is to field test the new Ray on Golem along with its documentation: https://docs.golem.network/docs/creators/ray.
 
-Our current line of releases is a sneak-peek, with a happy path working on our test network.
+Our current line of releases is a sneak peek, with a happy path working on our test network.
 We publish these releases and run subsequent editions of our preview program with the aim of verifying the potential
 of our product against real users' needs.
 
