@@ -1,0 +1,1 @@
+from ray_on_golem.network_stats.services.network_stats import NetworkStatsService
