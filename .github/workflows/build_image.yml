@@ -83,7 +83,7 @@ jobs:
         run: docker build -t ray-on-golem:${{ env.IMAGE_VERSION }} --build-arg="PYTHON_VERSION=${{ inputs.IMAGE_PYTHON_VERSION }}" .
 
       - name: Convert the image
-        run: gvmkit-build ray-on-golem:${{ env.IMAGE_VERSION }}
+        run: poetry run gvmkit-build ray-on-golem:${{ env.IMAGE_VERSION }}
 
       - name: Push the image
         run: REGISTRY_USER=${{ secrets.REGISTRY_USER }} REGISTRY_TOKEN=${{ secrets.REGISTRY_TOKEN }} poetry run gvmkit-build ray-on-golem:${{ env.IMAGE_VERSION }} --push-to ${{ steps.pushed_image_tag.outputs.tag }}
