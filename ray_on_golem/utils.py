@@ -11,6 +11,7 @@ from typing import Dict
 from aiohttp.web_runner import GracefulExit
 
 from ray_on_golem.exceptions import RayOnGolemError
+from ray_on_golem.server.settings import TMP_PATH
 
 
 async def run_subprocess(
@@ -77,3 +78,10 @@ def rolloverLogFiles():
 def get_last_lines_from_file(file_path: Path, max_lines: int) -> str:
     with file_path.open() as file:
         return "".join(deque(file, max_lines))
+
+
+def prepare_tmp_dir():
+    try:
+        TMP_PATH.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass

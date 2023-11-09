@@ -1,7 +1,7 @@
-import argparse
 import logging
 import logging.config
 
+import click
 from aiohttp import web
 
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
@@ -14,44 +14,51 @@ from ray_on_golem.server.settings import (
     YAGNA_PATH,
 )
 from ray_on_golem.server.views import routes
+from ray_on_golem.utils import prepare_tmp_dir
 
 logger = logging.getLogger(__name__)
 
 
-def parse_sys_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Ray on Golem's webserver.")
-    parser.add_argument(
-        "-p",
-        "--port",
-        type=int,
-        default=4578,
-        help="port for Ray on Golem's webserver to listen on, default: %(default)s",
-    )
-    parser.add_argument(
-        "--self-shutdown",
-        action="store_true",
-        help="flag to enable self-shutdown after last node termination, default: %(default)s",
-    )
-    parser.add_argument("--no-self-shutdown", action="store_false", dest="self_shutdown")
-    parser.add_argument(
-        "--registry-stats",
-        action="store_true",
-        help="flag to enable collection of Golem Registry stats about resolved images, default: %(default)s",
-    )
-    parser.add_argument(
-        "--no-registry-stats",
-        action="store_false",
-        dest="registry_stats",
-    )
-    parser.set_defaults(self_shutdown=False, registry_stats=True)
-    return parser.parse_args()
+@click.command(
+    name="webserver",
+    help="Run Ray on Golem's webserver.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port for Ray on Golem's webserver to listen on.",
+)
+@click.option(
+    "--self-shutdown",
+    is_flag=True,
+    help="Enable self-shutdown after last node termination.",
+)
+@click.option(
+    "--registry-stats/--no-registry-stats",
+    default=True,
+    help="Enable collection of Golem Registry stats about resolved images.",
+)
+def main(port: int, self_shutdown: bool, registry_stats: bool):
+    logging.config.dictConfig(LOGGING_CONFIG)
 
+    app = create_application(port, self_shutdown, registry_stats)
 
-def prepare_tmp_dir():
+    logger.info(f"Starting server... {port=}, {self_shutdown=}, {registry_stats=}")
+
     try:
-        TMP_PATH.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        pass
+        web.run_app(
+            app,
+            port=app["port"],
+            print=None,
+            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
+        )
+    except Exception:
+        logger.info("Server unexpectedly died, bye!")
+    else:
+        logger.info("Stopping server done, bye!")
 
 
 def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> web.Application:
@@ -96,6 +103,7 @@ async def startup_print(app: web.Application) -> None:
 
 
 async def shutdown_print(app: web.Application) -> None:
+    print("")  # explicit new line to console to visually better handle ^C
     logger.info("Stopping server gracefully, forcing after `%s`...", RAY_ON_GOLEM_SHUTDOWN_DEADLINE)
 
 
@@ -128,30 +136,6 @@ async def ray_service_ctx(app: web.Application) -> None:
     await ray_service.shutdown()
 
 
-def main():
-    prepare_tmp_dir()
-    args = parse_sys_args()
-
-    logging.config.dictConfig(LOGGING_CONFIG)
-
-    app = create_application(args.port, args.self_shutdown, args.registry_stats)
-
-    logger.info(
-        "Starting server... {}".format(", ".join(f"{k}={v}" for k, v in args.__dict__.items()))
-    )
-
-    try:
-        web.run_app(
-            app,
-            port=app["port"],
-            print=None,
-            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
-        )
-    except Exception:
-        logger.info("Server unexpectedly died, bye!")
-    else:
-        logger.info("Stopping server done, bye!")
-
-
 if __name__ == "__main__":
+    prepare_tmp_dir()
     main()
