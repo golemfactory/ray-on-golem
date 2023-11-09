@@ -63,7 +63,7 @@ jobs:
   build_test_image:
     name: Build Test VM Image
     needs: [build]
-    if: ${{ env.EVENT == 'prereleased' }}
+    if: ${{ github.event.action == 'prereleased' }}
     uses: ./.github/workflows/build_image.yml
     with:
       IS_TEST_BUILD: true
@@ -77,13 +77,13 @@ jobs:
   smoke_tests:
     name: Run Smoke Tests
     needs: [build_test_image]
-    if: ${{ env.EVENT == 'prereleased' }}
+    if: ${{ github.event.action == 'prereleased' }}
     uses: ./.github/workflows/smoke_tests.yml
 
   build_image:
     name: Build VM Image
     needs: [build]
-    if: ${{ env.EVENT == 'released' }}
+    if: ${{ github.event.action == 'released' }}
     uses: ./.github/workflows/build_image.yml
     with:
       IS_TEST_BUILD: false
@@ -98,7 +98,7 @@ jobs:
     needs: [build_test_image]
     name: Publish the release to test.pypi
     runs-on: ubuntu-latest
-    if: ${{ env.EVENT == 'prereleased' }}
+    if: ${{ github.event.action == 'prereleased' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -124,7 +124,7 @@ jobs:
     needs: [build_image]
     name: Publish the release
     runs-on: ubuntu-latest
-    if: ${{ env.EVENT == 'released' }}
+    if: ${{ github.event.action == 'released' }}
 
     steps:
       - uses: actions/checkout@v4
