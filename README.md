@@ -42,7 +42,7 @@ We have tested Ray on Golem on Ubuntu and on WSL, but it should work on other Li
 We use this version to show the direction and get feedback.
 
 There is one Ray on Golem image. It contains `ray 2.7.1` and `python 3.10.13`.
-It should work with any combination of local ray & python versions. Please let us know if you have any troubles because of that (on [`#Ray on Golem` discord channel](https://chat.golem.network/))
+It should work with any combination of local ray and python versions. Please let us know if you have any troubles because of that (on [`#Ray on Golem` discord channel](https://chat.golem.network/))
 
 The images include only basic libraries, if you need any dependencies, 
 you can use `pip` via [cluster yaml `initialization_commands`](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/cluster-yaml-reference#initializationcommands)
@@ -60,7 +60,7 @@ It limits the explanation to the bare minimum - if you are looking for more deta
 The first step is installing Ray on Golem. It will install Ray as a dependency.
 
 ```bash
-# install ray-on-golem & ray (recommended within a clean virtual environment)
+# install ray-on-golem and ray (recommended within a clean virtual environment)
 pip3 install -U ray-on-golem
 ```
 
