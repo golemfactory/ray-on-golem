@@ -57,37 +57,26 @@ class GolemNodeProvider(NodeProvider):
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         config = deepcopy(cluster_config)
 
-        provider_parameters: Dict = config["provider"]["parameters"]
-        provider_parameters.setdefault("webserver_port", 4578)
-        provider_parameters.setdefault("enable_registry_stats", True)
-        provider_parameters.setdefault("network", "goerli")
-        provider_parameters.setdefault("budget", 1)
+        cls._apply_config_defaults(config)
 
+        provider_parameters = config["provider"]["parameters"]
         ray_on_golem_client = cls._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
         )
 
-        auth: Dict = config["auth"]
-        auth.setdefault("ssh_user", "root")
-
-        if "ssh_private_key" not in auth:
-            ssh_key_path = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
-            auth["ssh_private_key"] = str(ssh_key_path)
-
-            if not ssh_key_path.exists():
+        auth = config["auth"]
+        default_ssh_private_key = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
+        if auth["ssh_private_key"] == default_ssh_private_key:
+            if not default_ssh_private_key.exists():
                 ssh_key_base64 = ray_on_golem_client.get_or_create_default_ssh_key(
                     config["cluster_name"]
                 )
 
                 # FIXME: mitigate double file writing on local machine as get_or_create_default_ssh_key creates the file
-                ssh_key_path.parent.mkdir(parents=True, exist_ok=True)
-                with ssh_key_path.open("w") as f:
+                default_ssh_private_key.parent.mkdir(parents=True, exist_ok=True)
+                with default_ssh_private_key.open("w") as f:
                     f.write(ssh_key_base64)
-
-        # copy ssh details to provider namespace for cluster creation in __init__
-        provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
-        provider_parameters["_ssh_user"] = auth["ssh_user"]
 
         global_event_system.execute_callback(
             CreateClusterEvent.ssh_keypair_downloaded,
@@ -172,6 +161,26 @@ class GolemNodeProvider(NodeProvider):
 
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
         self._ray_on_golem_client.set_node_tags(node_id, tags)
+
+    @staticmethod
+    def _apply_config_defaults(config: Dict[str, Any]) -> None:
+        provider_parameters: Dict = config["provider"]["parameters"]
+        provider_parameters.setdefault("webserver_port", 4578)
+        provider_parameters.setdefault("enable_registry_stats", True)
+        provider_parameters.setdefault("network", "goerli")
+        provider_parameters.setdefault("budget", 1)
+
+        auth: Dict = config.setdefault("auth", {})
+        auth.setdefault("ssh_user", "root")
+
+        if "ssh_private_key" not in auth:
+            auth["ssh_private_key"] = str(
+                TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
+            )
+
+        # copy ssh details to provider namespace for cluster creation in __init__
+        provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
+        provider_parameters["_ssh_user"] = auth["ssh_user"]
 
     @staticmethod
     def _start_webserver(

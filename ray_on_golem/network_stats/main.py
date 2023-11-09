@@ -8,6 +8,7 @@ import click
 import yaml
 
 from ray_on_golem.network_stats.services import NetworkStatsService
+from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
 from ray_on_golem.server.settings import LOGGING_CONFIG, YAGNA_PATH
 from ray_on_golem.utils import prepare_tmp_dir
@@ -30,7 +31,7 @@ from ray_on_golem.utils import prepare_tmp_dir
 @click.option(
     "--enable-logging",
     is_flag=True,
-    default=True,
+    default=False,
     show_default=True,
     help="Enable verbose logging.",
 )
@@ -41,31 +42,31 @@ def main(cluster_config_file: str, duration: int, enable_logging: bool):
     with open(cluster_config_file) as file:
         config = yaml.safe_load(file.read())
 
+    GolemNodeProvider._apply_config_defaults(config)
+
     asyncio.run(_network_stats(config, duration))
 
 
 async def _network_stats(config: Dict, duration: int):
-    provider_config = config["provider"]
+    provider_params = config["provider"]["parameters"]
 
-    async with golem_network_stats_service(
-        provider_config["enable_registry_stats"]
-    ) as stats_service:
-        await stats_service.run(provider_config["parameters"], duration)
+    async with network_stats_service(provider_params["enable_registry_stats"]) as stats_service:
+        await stats_service.run(provider_params, duration)
 
 
 @asynccontextmanager
-async def golem_network_stats_service(registry_stats: bool) -> NetworkStatsService:
-    golem_network_stats_service: NetworkStatsService = NetworkStatsService(registry_stats)
+async def network_stats_service(registry_stats: bool) -> NetworkStatsService:
+    network_stats_service: NetworkStatsService = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
     )
 
     await yagna_service.init()
-    await golem_network_stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
+    await network_stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield golem_network_stats_service
+    yield network_stats_service
 
-    await golem_network_stats_service.shutdown()
+    await network_stats_service.shutdown()
     await yagna_service.shutdown()
 
 
