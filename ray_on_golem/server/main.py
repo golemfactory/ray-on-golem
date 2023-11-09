@@ -19,24 +19,25 @@ from ray_on_golem.utils import prepare_tmp_dir
 logger = logging.getLogger(__name__)
 
 
-@click.command(name="webserver", help="Run Ray on Golem's webserver.")
+@click.command(
+    name="webserver",
+    help="Run Ray on Golem's webserver.",
+    context_settings={"show_default": True},
+)
 @click.option(
     "-p",
     "--port",
     type=int,
-    show_default=True,
     default=4578,
     help="Port for Ray on Golem's webserver to listen on.",
 )
 @click.option(
     "--self-shutdown",
     is_flag=True,
-    show_default=True,
     help="Enable self-shutdown after last node termination.",
 )
 @click.option(
     "--registry-stats/--no-registry-stats",
-    show_default=True,
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )

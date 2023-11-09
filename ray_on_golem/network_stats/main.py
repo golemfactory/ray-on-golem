@@ -18,6 +18,7 @@ from ray_on_golem.utils import prepare_tmp_dir
     name="network-stats",
     short_help="Run Golem Network statistics.",
     help="Run Golem Network statistics based on given cluster config file.",
+    context_settings={"show_default": True},
 )
 @click.argument("cluster-config-file", type=click.Path(exists=True))
 @click.option(
@@ -25,14 +26,12 @@ from ray_on_golem.utils import prepare_tmp_dir
     "--duration",
     type=int,
     default=5,
-    show_default=True,
-    help="Set for how long gather stats, in minutes.",
+    help="Set the duration of the statistics gathering process, in minutes.",
 )
 @click.option(
     "--enable-logging",
     is_flag=True,
     default=False,
-    show_default=True,
     help="Enable verbose logging.",
 )
 def main(cluster_config_file: str, duration: int, enable_logging: bool):
