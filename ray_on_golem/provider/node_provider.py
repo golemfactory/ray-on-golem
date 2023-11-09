@@ -67,7 +67,7 @@ class GolemNodeProvider(NodeProvider):
 
         auth = config["auth"]
         default_ssh_private_key = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
-        if auth["ssh_private_key"] == default_ssh_private_key:
+        if auth["ssh_private_key"] == str(default_ssh_private_key):
             if not default_ssh_private_key.exists():
                 ssh_key_base64 = ray_on_golem_client.get_or_create_default_ssh_key(
                     config["cluster_name"]
