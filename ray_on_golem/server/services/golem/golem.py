@@ -378,30 +378,48 @@ class GolemService:
         ssh_proxy_command: str,
         ssh_user: str,
         ssh_private_key_path: Path,
+        num_retries = 3,
+        retry_interval = 1,
     ) -> None:
-        ssh_command = get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)
+        ssh_command = f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
 
-        logger.debug(f"Verifying ssh connection with:\n{ssh_command} uptime")
+        logger.debug(f"SSH connection check started on {activity}: cmd={ssh_command}")
 
-        process = await asyncio.create_subprocess_shell(
-            f"{ssh_command} uptime",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        debug_data = ""
 
-        stdout, stderr = await process.communicate()
+        async def check():
+            nonlocal debug_data
 
-        msg = f"Validation of ssh connection done on {activity}:\n[cmd exited with {process.returncode}]"
-        if stdout:
-            msg += f" [stdout] {stdout.decode().strip()}"
-        if stderr:
-            msg += f" [stderr] {stderr.decode().strip()}"
+            process = await asyncio.create_subprocess_shell(
+                ssh_command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
-        if process.returncode != 0:
-            logger.warning(msg)
-            raise Exception(msg)
+            stdout, stderr = await process.communicate()
 
-        logger.info(msg)
+            debug_data = f"{activity=}, exitcode={process.returncode}, {stdout=}, {stderr=}"
+
+            if process.returncode != 0:
+                raise Exception(f"SSH connection check failed. {debug_data}")
+
+        retry = num_retries
+
+        while retry > 0:
+            try:
+                await check()
+                break
+            except Exception as e:
+                retry -= 1
+                if retry:
+                    logger.warning(f"{str(e)}, retrying {retry}...")
+                    await asyncio.sleep(retry_interval)
+                    continue
+                else:
+                    raise
+
+        logger.info(f"SSH connection check successful on {activity}.")
+        logger.debug(debug_data)
 
     async def create_activities(
         self,

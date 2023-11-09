@@ -144,7 +144,7 @@ def main():
         web.run_app(
             app,
             port=app["port"],
-            print=None,
+            print=logger.info,
             shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
         )
     except Exception:
