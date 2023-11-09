@@ -33,7 +33,7 @@ click = "^8"
 pydantic = "<2"
 
 [tool.poetry.scripts]
-ray-on-golem = "ray_on_golem.server.run:main"
+ray-on-golem = "ray_on_golem.main:main"
 
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.22.0"

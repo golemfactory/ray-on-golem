@@ -111,7 +111,7 @@ class StatsPluginFactory:
         return self._counters[tag]
 
 
-class GolemNetworkStatsService:
+class NetworkStatsService:
     def __init__(self, registry_stats: bool) -> None:
         self._registry_stats = registry_stats
 
@@ -123,21 +123,21 @@ class GolemNetworkStatsService:
         self._stats_plugin_factory = StatsPluginFactory()
 
     async def init(self, yagna_appkey: str) -> None:
-        logger.info("Starting GolemNetworkStatsService...")
+        logger.info("Starting NetworkStatsService...")
 
         self._golem = GolemNode(app_key=yagna_appkey)
         self._yagna_appkey = yagna_appkey
         await self._golem.start()
 
-        logger.info("Starting GolemNetworkStatsService done")
+        logger.info("Starting NetworkStatsService done")
 
     async def shutdown(self) -> None:
-        logger.info("Stopping GolemNetworkStatsService...")
+        logger.info("Stopping NetworkStatsService...")
 
         await self._golem.aclose()
         self._golem = None
 
-        logger.info("Stopping GolemNetworkStatsService done")
+        logger.info("Stopping NetworkStatsService done")
 
     async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
         network: str = provider_parameters["network"]

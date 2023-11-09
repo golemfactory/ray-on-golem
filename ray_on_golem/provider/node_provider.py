@@ -14,7 +14,6 @@ from ray.autoscaler.node_provider import NodeProvider
 from ray_on_golem.client.client import RayOnGolemClient
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeConfigData, NodeId, ShutdownState
-from ray_on_golem.server.run import prepare_tmp_dir
 from ray_on_golem.server.settings import (
     LOGGING_DEBUG_PATH,
     RAY_ON_GOLEM_CHECK_DEADLINE,
@@ -26,6 +25,7 @@ from ray_on_golem.utils import (
     get_default_ssh_key_name,
     get_last_lines_from_file,
     is_running_on_golem_network,
+    prepare_tmp_dir,
 )
 
 logger = logging.getLogger(__name__)
