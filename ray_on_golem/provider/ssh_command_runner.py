@@ -1,13 +1,12 @@
 from ray.autoscaler._private.command_runner import SSHCommandRunner as BaseSshCommandRunner
+from ray_on_golem.server.services.utils import get_ssh_command
 
 
 class SSHCommandRunner(BaseSshCommandRunner):
     def remote_shell_command_str(self):
-        ssh_str = f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyCommand="{self.ssh_proxy_command}"'
-
-        if self.ssh_private_key:
-            ssh_str += f" -i {self.ssh_private_key}"
-
-        ssh_str += f" {self.ssh_user}@{self.ssh_ip}\n"
-
-        return ssh_str
+        return get_ssh_command(
+            ip=self.ssh_ip,
+            ssh_proxy_command=self.ssh_proxy_command,
+            ssh_user=self.ssh_user,
+            ssh_private_key_path=self.ssh_private_key
+        )

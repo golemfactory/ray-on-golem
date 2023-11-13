@@ -21,15 +21,15 @@ provider:
     # Polygon is for mainnet operations.
     network: "goerli"
 
-    # Maximum amount of GML that's going to be spent (not supported yet)
+    # Maximum amount of GLMs that's going to be spent for the whole cluster
     budget: 2
 
-    # Params for creating golem demands (same for head and workers)
     node_config:
+      # Parameters for golem demands (same for head and workers)
       demand:
         # if not provided, image_tag will be autodetected based on currently used python and ray versions
         # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.2.1-py3.10.13-ray2.7.1"
+        image_tag: "golem/ray-on-golem:0.3.0-py3.10.13-ray2.7.1"
         capabilities: ["vpn", "inet", "manifest-support"]
         min_mem_gib: 0
         min_cpu_threads: 0
