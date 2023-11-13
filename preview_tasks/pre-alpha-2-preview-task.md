@@ -35,7 +35,7 @@ We also invite you to visit https://www.golem.network/, where you can find more 
 - Parallelize it with Ray (i.e. make it run faster for bigger inputs)
 - Run it on Ray on Golem
 - Send us your code, the console logs of the code execution on Ray on Golem, and Ray on Golem debug log file.
-- Fill out the [submission form](todo) (code, logs and meaningful and thought-out feedback)
+- Fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/UlpvzPrD) (code, logs and meaningful and thought-out feedback)
 
 ### The documentation
 Take a look at this [documentation](https://docs.golem.network/docs/creators/ray).
@@ -94,7 +94,7 @@ At the same time, we don't want to waste your time on powering through the rough
 
 ### Fill out the submission form
 
-The final step is to submit your solution, the logs, and your feedback via the [submission form](todo).
+The final step is to submit your solution, the logs, and your feedback via the [submission form](https://qkjx8blh5hm.typeform.com/to/UlpvzPrD).
 
 Remember that your insights have the power to refine and propel Ray on Golem forward.
 Apart from the solution to the above task, the most attractive feedback for us would be your ideas for real-life Ray on Golem applications.
