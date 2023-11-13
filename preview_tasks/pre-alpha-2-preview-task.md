@@ -19,7 +19,7 @@ We have rewards for 10 people (100 USD each) that you will be able to claim via 
 Note that only those who filled out the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
 We estimate the task should take 1-3 hours to complete.
 
-If you have any questions, we encourage you to contact the Ray on Golem team directly on [Discord: `#Ray on Golem` channel](https://chat.golem.network) in the Golem projects section.
+If you have any questions, we encourage you to contact the Ray on Golem team directly on [Discord: `#Ray on Golem` channel](https://discord.com/invite/golem/) in the Golem projects section.
 
 We also invite you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
 
@@ -89,7 +89,7 @@ We suggest you check out the `ray.wait()` function, which allows you to retrieve
 In the end, we would like a code that finds the word: `golem`, represented by the hash: `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` in 10 minutes, using Ray on Golem.
 The 10-minute criterion is not critical - the main point is for you to think of ways to optimize the time it takes the Ray on Golem cluster to find the solution.
 
-Please don't hesitate to talk to us on [Discord: `#Ray on Golem` channel`](https://chat.golem.network) - we would love to see what you struggle with.
+Please don't hesitate to talk to us on [Discord: `#Ray on Golem` channel`](https://discord.com/invite/golem/) - we would love to see what you struggle with.
 At the same time, we don't want to waste your time on powering through the rough edges of our young product.
 
 ### Fill out the submission form
