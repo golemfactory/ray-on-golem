@@ -210,7 +210,7 @@ class NetworkStatsService:
         plugins.extend(
             [
                 ScoringBuffer(
-                    min_size=50,
+                    min_size=500,
                     max_size=1000,
                     fill_at_start=True,
                     proposal_scorers=(*stack.extra_proposal_scorers.values(),),
@@ -219,7 +219,7 @@ class NetworkStatsService:
                 self._stats_plugin_factory.create_counter_plugin("Negotiation initialized"),
                 self._stats_plugin_factory.create_negotiating_plugin(),
                 self._stats_plugin_factory.create_counter_plugin("Negotiated successfully"),
-                Buffer(min_size=1, max_size=50, fill_concurrency_size=8),
+                Buffer(min_size=800, max_size=1000, fill_concurrency_size=16),
             ]
         )
         stack.proposal_manager = DefaultProposalManager(
