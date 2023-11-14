@@ -1,9 +1,11 @@
-from typing import Dict
+from typing import Dict, List
 
 from yarl import URL
 
 
-def get_manifest(image_url: URL, image_hash: str) -> Dict:
+def get_manifest(
+    image_url: URL, image_hash: str, protocols: List[str], outbound_urls: List[str]
+) -> Dict:
     return {
         "version": "0.1.0",
         "createdAt": "2023-06-26T00:00:00.000000Z",
@@ -30,10 +32,8 @@ def get_manifest(image_url: URL, image_hash: str) -> Dict:
             "net": {
                 "inet": {
                     "out": {
-                        "protocols": ["https"],
-                        "urls": [
-                            "https://pypi.dev.golem.network",
-                        ],
+                        "protocols": protocols,
+                        "urls": outbound_urls,
                     }
                 }
             },

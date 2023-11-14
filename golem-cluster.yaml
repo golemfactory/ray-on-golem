@@ -27,10 +27,19 @@ provider:
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
-        # if not provided, image_tag will be autodetected based on currently used python and ray versions
-        # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
+        # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
         image_tag: "golem/ray-on-golem:0.3.0-py3.10.13-ray2.7.1"
+
+        # List of urls which will be added to the Computation Manifest
+        # Requires protocol to be defined in all URLs
+        # If not provided demand will not use Computation Manifest
+        outbound_urls: ["https://pypi.dev.golem.network"]
+
+        # Defaults to `["vpn", "inet"]`
+        # If outbound_urls is specified `"manifest-support"` will be added
         capabilities: ["vpn", "inet", "manifest-support"]
+
+        # Minimal values of parameters offered by Golem provider 
         min_mem_gib: 0
         min_cpu_threads: 0
         min_storage_gib: 0

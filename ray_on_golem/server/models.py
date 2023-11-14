@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from golem.resources import Activity
-from pydantic import BaseModel, root_validator
+from pydantic import AnyUrl, BaseModel, Field, root_validator
 
 NodeId = str
 Tags = Dict[str, str]
@@ -39,10 +39,11 @@ class SingleNodeRequestData(BaseModel):
 class DemandConfigData(BaseModel):
     image_hash: Optional[str] = None
     image_tag: Optional[str] = None
-    capabilities: List[str]
-    min_mem_gib: float
-    min_cpu_threads: int
-    min_storage_gib: float
+    capabilities: List[str] = ["vpn", "inet"]
+    outbound_urls: List[AnyUrl] = []
+    min_mem_gib: float = 0.0
+    min_cpu_threads: int = 0
+    min_storage_gib: float = 0.0
 
 
 class BudgetControlData(BaseModel):
@@ -81,7 +82,7 @@ class BudgetControlData(BaseModel):
 
 
 class NodeConfigData(BaseModel):
-    demand: DemandConfigData
+    demand: DemandConfigData = Field(default_factory=DemandConfigData)
     budget_control: Optional[BudgetControlData] = None
 
 
