@@ -17,8 +17,9 @@ The task described below will help you broaden your knowledge while actively con
 
 We have rewards for 10 people (100 USD each) that you will be able to claim via Upwork after completing the task.
 Note that only those who filled out the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
+We estimate the task should take 1-3 hours to complete.
 
-If you have any questions, we encourage you to contact the Ray on Golem team directly on Discord: `#Ray on Golem` channel in the Golem projects section.
+If you have any questions, we encourage you to contact the Ray on Golem team directly on [Discord: `#Ray on Golem` channel](https://discord.gg/golem) in the Golem projects section.
 
 We also invite you to visit https://www.golem.network/, where you can find more basic information about our open-source project.
 
@@ -34,7 +35,7 @@ We also invite you to visit https://www.golem.network/, where you can find more 
 - Parallelize it with Ray (i.e. make it run faster for bigger inputs)
 - Run it on Ray on Golem
 - Send us your code, the console logs of the code execution on Ray on Golem, and Ray on Golem debug log file.
-- Fill out the [submission form](todo) (code, logs and meaningful and thought-out feedback)
+- Fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/UlpvzPrD) (code, logs and meaningful and thought-out feedback)
 
 ### The documentation
 Take a look at this [documentation](https://docs.golem.network/docs/creators/ray).
@@ -43,13 +44,13 @@ While doing that consider its clarity, purpose, structure & completeness - we wi
 The direction we should take with the docs is an important aspect of the Preview Program for us.
 
 ### The code
-Take a look at this [piece of code](https://github.com/golemfactory/ray-on-golem/raw/main/examples/hash_cracker_ray_ready.py)
+Take a look at this [piece of code](https://github.com/golemfactory/ray-on-golem/raw/main/examples/hash_cracker_ray_ready.py).
 
 It takes a sha256 hash of some unknown word as input and looks for a word that results in a match.
 The code doesn't know anything about Golem or Ray.
 
 ```bash
-python hash_cracker_ray_ready.py -l 4 -n 16 de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec
+python hash_cracker_ray_ready.py --length 4 --num-chunks 16 de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec
 ```
 ```
 scanning: de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec: a, fffg
@@ -81,19 +82,19 @@ While it may seem overly complex initially, its structure should make it straigh
 One additional challenge (and a learning opportunity) here is that we would like to avoid waiting for Ray on Golem to scan the whole of the word space.
 We would like the code to stop the computation when it finds the match. 
 You might wish to use Ray mechanisms which are not directly described in our docs for Ray on Golem.
-We suggest you check out the `ray.wait()` function, which allows you to retrieve individual results as soon as they're ready instead of waiting for all of them to finish.
+We suggest you check out the [`ray.wait()`](https://docs.ray.io/en/latest/ray-core/api/doc/ray.wait.html) function, which allows you to retrieve individual results as soon as they're ready instead of waiting for all of them to finish.
 
 ### Acceptance criteria 
 
 In the end, we would like a code that finds the word: `golem`, represented by the hash: `4c5cddb7859b93eebf26c551518c021a31fa0013b2c03afa5b541cbc8bd079a6` in 10 minutes, using Ray on Golem.
 The 10-minute criterion is not critical - the main point is for you to think of ways to optimize the time it takes the Ray on Golem cluster to find the solution.
 
-Please don't hesitate to talk to us on `#Ray on Golem` - we would love to see what you struggle with.
+Please don't hesitate to talk to us on [Discord: `#Ray on Golem` channel`](https://discord.gg/golem) - we would love to see what you struggle with.
 At the same time, we don't want to waste your time on powering through the rough edges of our young product.
 
 ### Fill out the submission form
 
-The final step is to submit your solution, the logs, and your feedback via the [submission form](todo).
+The final step is to submit your solution, the logs, and your feedback via the [submission form](https://qkjx8blh5hm.typeform.com/to/UlpvzPrD).
 
 Remember that your insights have the power to refine and propel Ray on Golem forward.
 Apart from the solution to the above task, the most attractive feedback for us would be your ideas for real-life Ray on Golem applications.

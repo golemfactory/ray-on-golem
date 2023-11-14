@@ -37,7 +37,7 @@ parser.add_argument(
     "-l", "--length", type=int, default=3, help="brute force length, default: %(default)s"
 )
 parser.add_argument(
-    "-n",
+    "-c",
     "--num-chunks",
     help="number of chunks to divide the range into, default=%(default)s",
     type=int,
