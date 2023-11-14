@@ -50,7 +50,7 @@ It takes a sha256 hash of some unknown word as input and looks for a word that r
 The code doesn't know anything about Golem or Ray.
 
 ```bash
-python hash_cracker_ray_ready.py -l 4 -n 16 de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec
+python hash_cracker_ray_ready.py --length 4 --num-chunks 16 de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec
 ```
 ```
 scanning: de6c0da53ac2bf2b6954e400767106011e4471db7a412cce0388e3441e0ad2ec: a, fffg
@@ -82,7 +82,7 @@ While it may seem overly complex initially, its structure should make it straigh
 One additional challenge (and a learning opportunity) here is that we would like to avoid waiting for Ray on Golem to scan the whole of the word space.
 We would like the code to stop the computation when it finds the match. 
 You might wish to use Ray mechanisms which are not directly described in our docs for Ray on Golem.
-We suggest you check out the `ray.wait()` function, which allows you to retrieve individual results as soon as they're ready instead of waiting for all of them to finish.
+We suggest you check out the [`ray.wait()`](https://docs.ray.io/en/latest/ray-core/api/doc/ray.wait.html) function, which allows you to retrieve individual results as soon as they're ready instead of waiting for all of them to finish.
 
 ### Acceptance criteria 
 
