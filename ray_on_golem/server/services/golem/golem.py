@@ -81,7 +81,7 @@ class GolemService:
             del self._stacks_locks[stack_hash]
 
     async def _get_or_create_stack_from_node_config(
-        self, node_config: NodeConfigData, budget: float, network: str
+        self, node_config: NodeConfigData, budget_limit: float, network: str
     ) -> ManagerStack:
         stack_hash = self._get_hash_from_node_config(node_config)
 
@@ -91,7 +91,7 @@ class GolemService:
                 logger.info(f"Creating new stack `{stack_hash}`...")
 
                 self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, budget, network
+                    node_config, budget_limit, network
                 )
                 await stack.start()
 
@@ -104,7 +104,7 @@ class GolemService:
         return hashlib.md5(node_config.json().encode()).hexdigest()
 
     async def _create_stack(
-        self, node_config: NodeConfigData, budget: float, network: str
+        self, node_config: NodeConfigData, budget_limit: float, network: str
     ) -> ManagerStack:
         stack = ManagerStack()
 
@@ -112,10 +112,12 @@ class GolemService:
             node_config.demand
         )
 
-        ManagerStackNodeConfigHelper.apply_cost_management_avg_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_cost_management_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_avg_usage(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
-        stack.payment_manager = PayAllPaymentManager(self._golem, budget=budget, network=network)
+        stack.payment_manager = PayAllPaymentManager(
+            self._golem, budget=budget_limit, network=network
+        )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
@@ -196,10 +198,12 @@ class GolemService:
         ssh_proxy_command: str,
         ssh_user: str,
         ssh_private_key_path: Path,
-        num_retries = 3,
-        retry_interval = 1,
+        num_retries=3,
+        retry_interval=1,
     ) -> None:
-        ssh_command = f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
+        ssh_command = (
+            f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
+        )
 
         logger.debug(f"SSH connection check started on {activity}: cmd={ssh_command}")
 
@@ -246,10 +250,10 @@ class GolemService:
         ssh_public_key: str,
         ssh_user: str,
         ssh_private_key_path: Path,
-        budget: float,
+        budget_limit: float,
         network: str,
     ) -> AsyncIterator[Tuple[Activity, str, str]]:
-        stack = await self._get_or_create_stack_from_node_config(node_config, budget, network)
+        stack = await self._get_or_create_stack_from_node_config(node_config, budget_limit, network)
 
         coros = [
             self._create_activity_retry(stack, ssh_public_key, ssh_user, ssh_private_key_path)

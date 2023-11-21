@@ -22,7 +22,7 @@ provider:
     network: "goerli"
 
     # Maximum amount of GML that's going to be spent (not supported yet)
-    budget: 2
+    budget_limit: 2
 
     # Params for creating golem demands (same for head and workers)
     node_config:

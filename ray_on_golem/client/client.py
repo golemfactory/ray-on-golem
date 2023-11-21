@@ -20,7 +20,7 @@ class RayOnGolemClient:
     def create_cluster(
         self,
         network: str,
-        budget: int,
+        budget_limit: int,
         node_config: NodeConfigData,
         ssh_private_key: str,
         ssh_user: str,
@@ -29,7 +29,7 @@ class RayOnGolemClient:
             url=settings.URL_CREATE_CLUSTER,
             request_data=models.CreateClusterRequestData(
                 network=network,
-                budget=budget,
+                budget_limit=budget_limit,
                 node_config=node_config,
                 ssh_private_key=ssh_private_key,
                 ssh_user=ssh_user,

@@ -8,11 +8,13 @@ def get_ssh_command(
     proxy_command_str = f"ProxyCommand={ssh_proxy_command}"
     ssh_user_str = f"{ssh_user}@{ip}"
 
-    return " ".join([
-        "ssh",
-        "-o StrictHostKeyChecking=no",
-        "-o UserKnownHostsFile=/dev/null",
-        f'-o {quote(proxy_command_str)}',
-        f"-i {quote(str(ssh_private_key_path))}" if ssh_private_key_path else "",
-        quote(ssh_user_str),
-    ])
+    return " ".join(
+        [
+            "ssh",
+            "-o StrictHostKeyChecking=no",
+            "-o UserKnownHostsFile=/dev/null",
+            f"-o {quote(proxy_command_str)}",
+            f"-i {quote(str(ssh_private_key_path))}" if ssh_private_key_path else "",
+            quote(ssh_user_str),
+        ]
+    )

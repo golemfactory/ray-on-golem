@@ -22,7 +22,7 @@ provider:
     network: "goerli"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
-    budget: 2
+    budget_limit: 2
 
     node_config:
       # Parameters for golem demands (same for head and workers)
@@ -35,16 +35,16 @@ provider:
         min_cpu_threads: 0
         min_storage_gib: 0
 
-      cost_management:  # TODO: Consider more suitable parameter name
-        # Estimated average load and duration for worker that tells cost management to pick the least expensive Golem provider offers first.
+      budget_control:
+        # Estimated average load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
         # If not provided, offers will be picked at random.
         # Both values need to be defined or undefined together.
-        average_cpu_load: 0.8
-        average_duration_minutes: 20
+        expected_cpu_load: 0.8
+        expected_duration_minutes: 20
 
         # Amount of GLMs for average usage which Golem provider offer will be rejected if exceeded.
-        # Requires "average_cpu_load" and "average_duration_minutes" parameters to take effect.
-        max_average_usage_cost: 1.5
+        # Requires "expected_cpu_load" and "expected_duration_minutes" parameters to take effect.
+        max_expected_usage_cost: 1.5
 
         # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
         max_initial_price: 0.5
