@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 class ManagerStackNodeConfigHelper:
     @staticmethod
-    def apply_budget_control_avg_usage(stack: ManagerStack, node_config: NodeConfigData) -> None:
+    def apply_budget_control_expected_usage(
+        stack: ManagerStack, node_config: NodeConfigData
+    ) -> None:
         budget_control = node_config.budget_control
 
         if budget_control is None or not budget_control.is_expected_usage_cost_enabled():

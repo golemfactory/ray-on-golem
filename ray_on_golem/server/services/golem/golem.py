@@ -112,7 +112,7 @@ class GolemService:
             node_config.demand
         )
 
-        ManagerStackNodeConfigHelper.apply_budget_control_avg_usage(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
         stack.payment_manager = PayAllPaymentManager(
