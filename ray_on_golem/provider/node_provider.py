@@ -47,7 +47,7 @@ class GolemNodeProvider(NodeProvider):
         )
         self._ray_on_golem_client.create_cluster(
             network=provider_parameters["network"],
-            budget=provider_parameters["budget"],
+            budget_limit=provider_parameters["budget_limit"],
             node_config=NodeConfigData(**provider_parameters["node_config"]),
             ssh_private_key=provider_parameters["_ssh_private_key"],
             ssh_user=provider_parameters["_ssh_user"],
@@ -168,7 +168,7 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters.setdefault("webserver_port", 4578)
         provider_parameters.setdefault("enable_registry_stats", True)
         provider_parameters.setdefault("network", "goerli")
-        provider_parameters.setdefault("budget", 1)
+        provider_parameters.setdefault("budget_limit", 1)
 
         auth: Dict = config.setdefault("auth", {})
         auth.setdefault("ssh_user", "root")

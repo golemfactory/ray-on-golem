@@ -141,10 +141,10 @@ class NetworkStatsService:
 
     async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
         network: str = provider_parameters["network"]
-        budget: int = provider_parameters["budget"]
+        budget_limit: int = provider_parameters["budget_limit"]
         node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
 
-        stack = await self._create_stack(node_config, budget, network)
+        stack = await self._create_stack(node_config, budget_limit, network)
         await stack.start()
 
         print(f"Gathering stats data for {duration_minutes} minutes...")
@@ -178,7 +178,7 @@ class NetworkStatsService:
             )
 
     async def _create_stack(
-        self, node_config: NodeConfigData, budget: float, network: str
+        self, node_config: NodeConfigData, budget_limit: float, network: str
     ) -> ManagerStack:
         stack = ManagerStack()
 
@@ -186,10 +186,12 @@ class NetworkStatsService:
             node_config.demand
         )
 
-        ManagerStackNodeConfigHelper.apply_cost_management_avg_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_cost_management_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
-        stack.payment_manager = PayAllPaymentManager(self._golem, budget=budget, network=network)
+        stack.payment_manager = PayAllPaymentManager(
+            self._golem, budget=budget_limit, network=network
+        )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
