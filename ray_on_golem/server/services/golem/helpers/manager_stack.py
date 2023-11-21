@@ -20,7 +20,7 @@ class ManagerStackNodeConfigHelper:
             return
 
         linear_average_cost = LinearAverageCostPricing(
-            expected_cpu_load=node_config.budget_control.expected_cpu_load,
+            average_cpu_load=node_config.budget_control.expected_cpu_load,
             average_duration=timedelta(
                 minutes=node_config.budget_control.expected_duration_minutes
             ),
