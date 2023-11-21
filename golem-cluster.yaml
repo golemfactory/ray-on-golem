@@ -36,13 +36,13 @@ provider:
         min_storage_gib: 0
 
       budget_control:
-        # Estimated average load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
+        # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
         # If not provided, offers will be picked at random.
         # Both values need to be defined or undefined together.
         expected_cpu_load: 0.8
         expected_duration_minutes: 20
 
-        # Amount of GLMs for average usage which Golem provider offer will be rejected if exceeded.
+        # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
         # Requires "expected_cpu_load" and "expected_duration_minutes" parameters to take effect.
         max_expected_usage_cost: 1.5
 
