@@ -35,10 +35,6 @@ provider:
         # If not provided demand will not use Computation Manifest
         outbound_urls: ["https://pypi.dev.golem.network"]
 
-        # Defaults to `["vpn", "inet"]`
-        # If outbound_urls is specified `"manifest-support"` will be added
-        capabilities: ["vpn", "inet", "manifest-support"]
-
         # Minimal values of parameters offered by Golem provider 
         min_mem_gib: 0
         min_cpu_threads: 0
@@ -79,13 +75,13 @@ available_node_types:
     max_workers: 0
 
     # The node type's CPU and GPU resources
-    resources: {"CPU": 1}
+    resources: {}
 
     node_config: {} # TODO: Demand description here
   ray.worker.default:
     min_workers: 1
     max_workers: 10
-    resources: {"CPU": 1}
+    resources: {}
     node_config: {}
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
