@@ -72,7 +72,7 @@ class DemandConfigHelper:
 
         if image_tag is not None and image_hash is not None:
             raise RayOnGolemServerError(
-                "Only one of `image_tag` and `image_hash` parameters should be defined!"
+                "Either the `image_tag` or `image_hash` is allowed, not both."
             )
 
         if image_tag is None and image_hash is None:
