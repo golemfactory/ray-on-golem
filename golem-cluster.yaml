@@ -27,10 +27,15 @@ provider:
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
-        # if not provided, image_tag will be autodetected based on currently used python and ray versions
-        # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
+        # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
         image_tag: "golem/ray-on-golem:0.3.0-py3.10.13-ray2.7.1"
-        capabilities: ["vpn", "inet", "manifest-support"]
+
+        # List of urls which will be added to the Computation Manifest
+        # Requires protocol to be defined in all URLs
+        # If not provided demand will not use Computation Manifest
+        outbound_urls: ["https://pypi.dev.golem.network"]
+
+        # Minimal values of parameters offered by Golem provider 
         min_mem_gib: 0
         min_cpu_threads: 0
         min_storage_gib: 0
@@ -70,13 +75,13 @@ available_node_types:
     max_workers: 0
 
     # The node type's CPU and GPU resources
-    resources: {"CPU": 1}
+    resources: {}
 
     node_config: {} # TODO: Demand description here
   ray.worker.default:
     min_workers: 1
     max_workers: 10
-    resources: {"CPU": 1}
+    resources: {}
     node_config: {}
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)

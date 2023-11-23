@@ -48,7 +48,7 @@ class GolemNodeProvider(NodeProvider):
         self._ray_on_golem_client.create_cluster(
             network=provider_parameters["network"],
             budget_limit=provider_parameters["budget_limit"],
-            node_config=NodeConfigData(**provider_parameters["node_config"]),
+            node_config=NodeConfigData(**(provider_parameters.get("node_config") or {})),
             ssh_private_key=provider_parameters["_ssh_private_key"],
             ssh_user=provider_parameters["_ssh_user"],
         )
