@@ -6,7 +6,6 @@ from yarl import URL
 
 from ray_on_golem.client.exceptions import RayOnGolemClientError, RayOnGolemClientValidationError
 from ray_on_golem.server import models, settings
-from ray_on_golem.server.models import NodeConfigData
 
 TResponseModel = TypeVar("TResponseModel")
 
@@ -19,21 +18,11 @@ class RayOnGolemClient:
 
     def create_cluster(
         self,
-        network: str,
-        budget_limit: int,
-        node_config: NodeConfigData,
-        ssh_private_key: str,
-        ssh_user: str,
+        cluster_config: dict,
     ) -> None:
         self._make_request(
             url=settings.URL_CREATE_CLUSTER,
-            request_data=models.CreateClusterRequestData(
-                network=network,
-                budget_limit=budget_limit,
-                node_config=node_config,
-                ssh_private_key=ssh_private_key,
-                ssh_user=ssh_user,
-            ),
+            request_data=models.CreateClusterRequestData(**cluster_config),
             response_model=models.EmptyResponseData,
             error_message="Couldn't create cluster",
         )

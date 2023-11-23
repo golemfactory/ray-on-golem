@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
+from golem.payload.defaults import DEFAULT_SUBNET
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
 
 from ray_on_golem.exceptions import RayOnGolemError
@@ -89,6 +90,7 @@ class RayService:
             raise RayServiceError("Node creation is available only after cluster bootstrap!")
 
         logger.info(f"Creating {count} nodes...")
+        logger.debug(f"{self._provider_config=}")
 
         created_nodes = {}
         async for activity, ip, ssh_proxy_command in self._golem_service.create_activities(
@@ -99,6 +101,7 @@ class RayService:
             ssh_private_key_path=self._ssh_private_key_path,
             budget_limit=self._provider_config.budget_limit,
             network=self._provider_config.network,
+            subnet_tag=self._provider_config.subnet_tag or DEFAULT_SUBNET,
         ):
             self._print_ssh_command(
                 ip, ssh_proxy_command, self._ssh_user, self._ssh_private_key_path
