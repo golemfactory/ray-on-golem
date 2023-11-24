@@ -121,8 +121,8 @@ class GolemService:
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
-            payload,
-            demand_expiration_timeout=timedelta(hours=8),
+            [payload],
+            demand_lifetime=timedelta(hours=8),
         )
         stack.proposal_manager = DefaultProposalManager(
             self._golem,
