@@ -30,7 +30,9 @@ class DemandConfigHelper:
     async def _get_repository_payload(
         self, demand_config: DemandConfigData, image_url: URL, image_hash: str
     ) -> Payload:
-        params = demand_config.dict(exclude={"image_hash", "image_tag", "outbound_urls"})
+        params = demand_config.dict(
+            exclude={"image_hash", "image_tag", "outbound_urls", "subnet_tag"}
+        )
         params["image_hash"] = image_hash
         params["image_url"] = image_url
         return RepositoryVmPayload(**params)
