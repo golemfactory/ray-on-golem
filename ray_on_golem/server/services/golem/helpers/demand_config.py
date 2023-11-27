@@ -76,9 +76,7 @@ class DemandConfigHelper:
             )
 
         if image_tag is None and image_hash is None:
-            raise RayOnGolemServerError(
-                "Either the `image_tag` or `image_hash` is required."
-            )
+            raise RayOnGolemServerError("Either the `image_tag` or `image_hash` is required.")
 
         if image_hash is not None:
             image_url = await self._get_image_url_from_hash(image_hash)

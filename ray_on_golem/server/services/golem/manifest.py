@@ -1,12 +1,15 @@
+import logging
 from typing import Dict, List
 
 from yarl import URL
+
+logger = logging.getLogger(__name__)
 
 
 def get_manifest(
     image_url: URL, image_hash: str, protocols: List[str], outbound_urls: List[str]
 ) -> Dict:
-    return {
+    manifest = {
         "version": "0.1.0",
         "createdAt": "2023-06-26T00:00:00.000000Z",
         "expiresAt": "2100-01-01T00:00:00.000000Z",
@@ -39,3 +42,5 @@ def get_manifest(
             },
         },
     }
+    logger.debug("Manifest generated: {manifest}")
+    return manifest
