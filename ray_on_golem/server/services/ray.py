@@ -2,15 +2,18 @@ import asyncio
 import logging
 from asyncio.subprocess import Process
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
 from golem.payload.defaults import DEFAULT_SUBNET
+from golem.utils.asyncio import create_task_with_logging
+from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
 
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.exceptions import NodeNotFound
-from ray_on_golem.server.models import Node, NodeId, NodeState, ProviderConfigData, Tags
+from ray_on_golem.server.models import Node, NodeData, NodeId, NodeState, ProviderConfigData, Tags
 from ray_on_golem.server.services.golem import GolemService
 from ray_on_golem.server.services.utils import get_ssh_command
 from ray_on_golem.utils import (
@@ -73,66 +76,74 @@ class RayService:
 
             logger.info(f"Destroying {len(self._nodes)} nodes...")
 
-            for node in self._nodes.values():
-                await node.activity.destroy()
+            await asyncio.gather(
+                *[
+                    node.activity.destroy()
+                    for node in self._nodes.values()
+                    if node.activity is not None
+                ]
+            )
 
             logger.info(f"Destroying {len(self._nodes)} nodes done")
 
             self._nodes.clear()
 
-    async def create_nodes(
+    async def request_nodes(
         self, node_config: Dict[str, Any], count: int, tags: Tags
-    ) -> Dict[NodeId, Dict]:
-        # TODO: handle pending state
+    ) -> List[NodeId]:
         # TODO: Use node_config from yaml.available_node_types not, from yaml.provider
 
         if not self._provider_config:
-            raise RayServiceError("Node creation is available only after cluster bootstrap!")
+            raise RayServiceError("Node requesting is available only after cluster bootstrap!")
 
-        logger.info(f"Creating {count} nodes...")
-        logger.debug(f"{self._provider_config=}")
+        created_node_ids = []
+        async with self._nodes_lock:
+            for _ in range(count):
+                node_id = self._get_new_node_id()
+                created_node_ids.append(node_id)
 
-        created_nodes = {}
-        async for activity, ip, ssh_proxy_command in self._golem_service.create_activities(
-            node_config=self._provider_config.node_config,
-            count=count,
-            ssh_public_key=self._ssh_public_key,
-            ssh_user=self._ssh_user,
-            ssh_private_key_path=self._ssh_private_key_path,
-            budget_limit=self._provider_config.budget_limit,
-            network=self._provider_config.network,
-            subnet_tag=self._provider_config.subnet_tag or DEFAULT_SUBNET,
-        ):
-            self._print_ssh_command(
-                ip, ssh_proxy_command, self._ssh_user, self._ssh_private_key_path
-            )
-
-            node_id = self._get_new_node_id()
-
-            async with self._nodes_lock:
-                self._nodes[node_id] = created_nodes[node_id] = Node(
+                self._nodes[node_id] = Node(
                     node_id=node_id,
-                    state=NodeState.running,
                     tags=tags,
-                    internal_ip=ip,
-                    ssh_proxy_command=ssh_proxy_command,
-                    activity=activity,
                 )
 
-        logger.info(f"Creating {count} nodes done")
+                create_task_with_logging(
+                    self._create_node(node_id),
+                    trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
+                )
 
-        # TODO: Consider running tunnel on every head node
+        logger.info(f"Requested {count} nodes")
+        logger.debug(f"{self._provider_config=}")
+
+        return created_node_ids
+
+    async def _create_node(self, node_id: NodeId) -> None:
+        activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
+            self._provider_config.node_config,
+            self._ssh_public_key,
+            self._ssh_user,
+            self._ssh_private_key_path,
+            self._provider_config.budget_limit,
+            self._provider_config.network,
+            subnet_tag=self._provider_config.subnet_tag or DEFAULT_SUBNET,
+            add_state_log=partial(self._add_node_state_log, node_id),
+        )
+
+        self._print_ssh_command(ip, ssh_proxy_command, self._ssh_user, self._ssh_private_key_path)
+
+        async with self._get_node_context(node_id) as node:  # type: Node
+            node.state = NodeState.running
+            node.internal_ip = ip
+            node.ssh_proxy_command = ssh_proxy_command
+            node.activity = activity
+
+        # TODO: check if node is a head node
         if not self._is_head_node_to_webserver_tunnel_running():
             await self._start_head_node_to_webserver_tunnel()
 
-        return {
-            node_id: node.dict(
-                exclude={
-                    "activity",
-                },
-            )
-            for node_id, node in created_nodes.items()
-        }
+    async def _add_node_state_log(self, node_id: NodeId, log_entry: str) -> None:
+        async with self._get_node_context(node_id) as node:  # type: Node
+            node.state_log.append(log_entry)
 
     def _get_new_node_id(self) -> NodeId:
         node_id = f"node{self._nodes_id_counter}"
@@ -142,53 +153,61 @@ class RayService:
     async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         logger.info(f"Terminating `{node_id}` node...")
 
-        async with self._get_node_context(node_id) as node:
-            node.state = NodeState.stopping
+        async with self._get_node_context(node_id) as node:  # type: Node
+            node.state = NodeState.terminating
 
-        await node.activity.destroy()
+        if node.activity:
+            await node.activity.destroy()
 
-        async with self._get_node_context(node_id) as node:
-            del self._nodes[node.node_id]
+        async with self._get_node_context(node_id) as node:  # type: Node
+            node.state = NodeState.terminated
+            node.activity = None
 
             logger.info(f"Terminating `{node_id}` node done")
 
             return {node.node_id: node.dict(exclude={"activity"})}
 
+    async def get_cluster_data(self) -> Dict[NodeId, NodeData]:
+        async with self._nodes_lock:
+            return {node.node_id: NodeData.parse_obj(node) for node in self._nodes.values()}
+
     async def get_non_terminated_nodes_ids(
         self, tags_to_match: Optional[Dict[str, str]] = None
     ) -> List[NodeId]:
         async with self._nodes_lock:
-            if tags_to_match is None:
-                return list(self._nodes.keys())
-
-            return [
-                node_id
-                for node_id, node in self._nodes.items()
-                if are_dicts_equal(node.tags, tags_to_match)
+            nodes = [
+                node
+                for node in self._nodes.values()
+                if node.state not in [NodeState.terminating, NodeState.terminated]
             ]
 
+        if tags_to_match is None:
+            return [node.node_id for node in nodes]
+
+        return [node.node_id for node in nodes if are_dicts_equal(node.tags, tags_to_match)]
+
     async def is_node_running(self, node_id: NodeId) -> bool:
-        async with self._get_node_context(node_id) as node:
+        async with self._get_node_context(node_id) as node:  # type: Node
             return node.state == NodeState.running
 
     async def is_node_terminated(self, node_id: NodeId) -> bool:
-        async with self._get_node_context(node_id) as node:
-            return node.state not in [NodeState.pending, NodeState.running]
+        async with self._get_node_context(node_id) as node:  # type: Node
+            return node.state in [NodeState.terminating, NodeState.terminated]
 
     async def get_node_tags(self, node_id: NodeId) -> Dict:
-        async with self._get_node_context(node_id) as node:
+        async with self._get_node_context(node_id) as node:  # type: Node
             return node.tags
 
-    async def get_node_internal_ip(self, node_id: NodeId) -> str:
-        async with self._get_node_context(node_id) as node:
+    async def get_node_internal_ip(self, node_id: NodeId) -> Optional[str]:
+        async with self._get_node_context(node_id) as node:  # type: Node
             return node.internal_ip
 
-    async def get_ssh_proxy_command(self, node_id: NodeId) -> str:
-        async with self._get_node_context(node_id) as node:
+    async def get_ssh_proxy_command(self, node_id: NodeId) -> Optional[str]:
+        async with self._get_node_context(node_id) as node:  # type: Node
             return node.ssh_proxy_command
 
     async def set_node_tags(self, node_id: NodeId, tags: Tags) -> None:
-        async with self._get_node_context(node_id) as node:
+        async with self._get_node_context(node_id) as node:  # type: Node
             node.tags.update(tags)
 
     async def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
@@ -227,6 +246,8 @@ class RayService:
             for node in self._nodes.values():
                 if node.tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD:
                     return node
+
+            raise NodeNotFound
 
     def _print_ssh_command(
         self, ip: str, ssh_proxy_command: str, ssh_user: str, ssh_private_key_path: Path
