@@ -13,7 +13,7 @@ from ray.autoscaler.node_provider import NodeProvider
 
 from ray_on_golem.client.client import RayOnGolemClient
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
-from ray_on_golem.server.models import NodeConfigData, NodeId, ShutdownState
+from ray_on_golem.server.models import NodeId, ShutdownState
 from ray_on_golem.server.settings import (
     LOGGING_DEBUG_PATH,
     RAY_ON_GOLEM_CHECK_DEADLINE,
@@ -36,22 +36,21 @@ WEBSERVER_ERRFILE = TMP_PATH / "webserver.err"
 
 
 class GolemNodeProvider(NodeProvider):
-    def __init__(self, provider_config: dict, cluster_name: str):
+    def __init__(self, provider_config: Dict[str, Any], cluster_name: str):
         super().__init__(provider_config, cluster_name)
 
-        provider_parameters = provider_config["parameters"]
+        provider_parameters: Dict = provider_config["parameters"]
 
         self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
         )
-        self._ray_on_golem_client.create_cluster(
-            network=provider_parameters["network"],
-            budget_limit=provider_parameters["budget_limit"],
-            node_config=NodeConfigData(**(provider_parameters.get("node_config") or {})),
-            ssh_private_key=provider_parameters["_ssh_private_key"],
-            ssh_user=provider_parameters["_ssh_user"],
-        )
+
+        ssh_arg_mapping = {"_ssh_private_key": "ssh_private_key", "_ssh_user": "ssh_user"}
+        provider_parameters = {
+            ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()
+        }
+        self._ray_on_golem_client.create_cluster(provider_parameters)
 
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:

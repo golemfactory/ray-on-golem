@@ -1,12 +1,10 @@
 import base64
 import json
 import logging
-from dataclasses import dataclass
 from typing import Tuple
 
 import aiohttp
-from golem.node import SUBNET
-from golem.payload import ManifestVmPayload, Payload, RepositoryVmPayload, constraint, prop
+from golem.payload import ManifestVmPayload, Payload, RepositoryVmPayload
 from yarl import URL
 
 from ray_on_golem.server.exceptions import RayOnGolemServerError, RegistryRequestError
@@ -32,28 +30,16 @@ class DemandConfigHelper:
     async def _get_repository_payload(
         self, demand_config: DemandConfigData, image_url: URL, image_hash: str
     ) -> Payload:
-        @dataclass
-        class CustomRepositoryVmPayload(RepositoryVmPayload):
-            subnet_constraint: str = constraint("golem.node.debug.subnet", "=", default=SUBNET)
-            debit_notes_accept_timeout: int = prop(
-                "golem.com.payment.debit-notes.accept-timeout?", default=240
-            )
-
-        params = demand_config.dict(exclude={"image_hash", "image_tag", "outbound_urls"})
+        params = demand_config.dict(
+            exclude={"image_hash", "image_tag", "outbound_urls", "subnet_tag"}
+        )
         params["image_hash"] = image_hash
         params["image_url"] = image_url
-        return CustomRepositoryVmPayload(**params)
+        return RepositoryVmPayload(**params)
 
     async def _get_manifest_payload(
         self, demand_config: DemandConfigData, image_url: URL, image_hash: str
     ) -> Payload:
-        @dataclass
-        class CustomManifestVmPayload(ManifestVmPayload):
-            subnet_constraint: str = constraint("golem.node.debug.subnet", "=", default=SUBNET)
-            debit_notes_accept_timeout: int = prop(
-                "golem.com.payment.debit-notes.accept-timeout?", default=240
-            )
-
         manifest = get_manifest(
             image_url,
             image_hash,
@@ -62,9 +48,11 @@ class DemandConfigHelper:
         )
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
-        params = demand_config.dict(exclude={"image_hash", "image_tag", "outbound_urls"})
+        params = demand_config.dict(
+            exclude={"image_hash", "image_tag", "outbound_urls", "subnet_tag"}
+        )
         params["manifest"] = manifest
-        return CustomManifestVmPayload(**params)
+        return ManifestVmPayload(**params)
 
     async def _get_image_url_and_hash(self, demand_config: DemandConfigData) -> Tuple[URL, str]:
         image_tag = demand_config.image_tag

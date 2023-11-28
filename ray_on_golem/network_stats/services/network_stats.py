@@ -18,7 +18,7 @@ from golem.managers import (
 )
 from golem.managers.base import ProposalNegotiator
 from golem.node import GolemNode
-from golem.payload import PayloadSyntaxParser
+from golem.payload.defaults import DEFAULT_SUBNET
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
@@ -46,12 +46,11 @@ class ProposalCounterPlugin(ProposalManagerPlugin):
 class StatsNegotiatingPlugin(NegotiatingPlugin):
     def __init__(
         self,
-        demand_offer_parser: Optional[PayloadSyntaxParser] = None,
         proposal_negotiators: Optional[Sequence[ProposalNegotiator]] = None,
         *args,
         **kwargs,
     ) -> None:
-        super().__init__(demand_offer_parser, proposal_negotiators, *args, **kwargs)
+        super().__init__(proposal_negotiators, *args, **kwargs)
         self.fails = defaultdict(int)
 
     async def get_proposal(self) -> Proposal:
@@ -142,9 +141,10 @@ class NetworkStatsService:
     async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
         network: str = provider_parameters["network"]
         budget_limit: int = provider_parameters["budget_limit"]
+        subnet_tag: str = provider_parameters.get("subnet_tag", DEFAULT_SUBNET)
         node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
 
-        stack = await self._create_stack(node_config, budget_limit, network)
+        stack = await self._create_stack(node_config, budget_limit, network, subnet_tag)
         await stack.start()
 
         print(f"Gathering stats data for {duration_minutes} minutes...")
@@ -178,7 +178,11 @@ class NetworkStatsService:
             )
 
     async def _create_stack(
-        self, node_config: NodeConfigData, budget_limit: float, network: str
+        self,
+        node_config: NodeConfigData,
+        budget_limit: float,
+        network: str,
+        subnet_tag: str,
     ) -> ManagerStack:
         stack = ManagerStack()
 
@@ -195,8 +199,9 @@ class NetworkStatsService:
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
-            payload,
-            demand_expiration_timeout=timedelta(hours=8),
+            [payload],
+            demand_lifetime=timedelta(hours=8),
+            subnet_tag=subnet_tag,
         )
 
         plugins = [

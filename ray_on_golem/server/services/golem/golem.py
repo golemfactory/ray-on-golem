@@ -81,17 +81,22 @@ class GolemService:
             del self._stacks_locks[stack_hash]
 
     async def _get_or_create_stack_from_node_config(
-        self, node_config: NodeConfigData, budget_limit: float, network: str
+        self,
+        node_config: NodeConfigData,
+        budget_limit: float,
+        network: str,
+        subnet_tag: str,
     ) -> ManagerStack:
         stack_hash = self._get_hash_from_node_config(node_config)
 
         async with self._stacks_locks[stack_hash]:
             stack = self._stacks.get(stack_hash)
             if stack is None:
-                logger.info(f"Creating new stack `{stack_hash}`...")
-
+                logger.info(
+                    f"Creating new stack `{stack_hash}`... {budget_limit=}, {network=}, {subnet_tag=}"
+                )
                 self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, budget_limit, network
+                    node_config, budget_limit, network, subnet_tag=subnet_tag
                 )
                 await stack.start()
 
@@ -104,7 +109,11 @@ class GolemService:
         return hashlib.md5(node_config.json().encode()).hexdigest()
 
     async def _create_stack(
-        self, node_config: NodeConfigData, budget_limit: float, network: str
+        self,
+        node_config: NodeConfigData,
+        budget_limit: float,
+        network: str,
+        subnet_tag: str,
     ) -> ManagerStack:
         stack = ManagerStack()
 
@@ -121,8 +130,9 @@ class GolemService:
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
-            payload,
-            demand_expiration_timeout=timedelta(hours=8),
+            [payload],
+            demand_lifetime=timedelta(hours=8),
+            subnet_tag=subnet_tag,
         )
         stack.proposal_manager = DefaultProposalManager(
             self._golem,
@@ -252,8 +262,11 @@ class GolemService:
         ssh_private_key_path: Path,
         budget_limit: float,
         network: str,
+        subnet_tag: str,
     ) -> AsyncIterator[Tuple[Activity, str, str]]:
-        stack = await self._get_or_create_stack_from_node_config(node_config, budget_limit, network)
+        stack = await self._get_or_create_stack_from_node_config(
+            node_config, budget_limit, network, subnet_tag
+        )
 
         coros = [
             self._create_activity_retry(stack, ssh_public_key, ssh_user, ssh_private_key_path)

@@ -92,6 +92,7 @@ class ProviderConfigData(BaseModel):
     node_config: NodeConfigData
     ssh_private_key: str
     ssh_user: str
+    subnet_tag: Optional[str]
 
 
 class CreateClusterRequestData(ProviderConfigData):
