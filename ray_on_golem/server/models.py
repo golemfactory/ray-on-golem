@@ -11,7 +11,8 @@ Tags = Dict[str, str]
 class NodeState(Enum):
     pending = "pending"
     running = "running"
-    stopping = "stopping"
+    terminating = "terminating"
+    terminated = "terminated"
 
 
 class ShutdownState(Enum):
@@ -20,13 +21,17 @@ class ShutdownState(Enum):
     WILL_SHUTDOWN = "will_shutdown"
 
 
-class Node(BaseModel):
+class NodeData(BaseModel):
     node_id: NodeId
-    state: NodeState
     tags: Tags
-    internal_ip: str
-    ssh_proxy_command: str
-    activity: Activity
+    state: NodeState = NodeState.pending
+    state_log: List[str] = []
+    internal_ip: Optional[str] = None
+    ssh_proxy_command: Optional[str] = None
+
+
+class Node(NodeData):
+    activity: Optional[Activity] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -34,6 +39,14 @@ class Node(BaseModel):
 
 class SingleNodeRequestData(BaseModel):
     node_id: NodeId
+
+
+class GetClusterDataRequestData(BaseModel):
+    pass
+
+
+class GetClusterDataResponseData(BaseModel):
+    cluster_data: Dict[NodeId, NodeData]
 
 
 class DemandConfigData(BaseModel):
@@ -107,14 +120,14 @@ class NonTerminatedNodesResponseData(BaseModel):
     nodes_ids: List[NodeId]
 
 
-class CreateNodesRequestData(BaseModel):
+class RequestNodesRequestData(BaseModel):
     node_config: Dict[str, Any]
     count: int
     tags: Tags
 
 
-class CreateNodesResponseData(BaseModel):
-    created_nodes: Dict[NodeId, Dict]
+class RequestNodesResponseData(BaseModel):
+    requested_nodes: List[NodeId]
 
 
 class SetNodeTagsRequestData(BaseModel):
@@ -139,7 +152,7 @@ class GetNodeTagsResponseData(BaseModel):
 
 
 class GetNodeIpAddressResponseData(BaseModel):
-    ip_address: str
+    ip_address: Optional[str]
 
 
 class EmptyResponseData(BaseModel):
@@ -147,7 +160,7 @@ class EmptyResponseData(BaseModel):
 
 
 class GetSshProxyCommandResponseData(BaseModel):
-    ssh_proxy_command: str
+    ssh_proxy_command: Optional[str]
 
 
 class GetOrCreateDefaultSshKeyRequestData(BaseModel):

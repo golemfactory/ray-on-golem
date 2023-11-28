@@ -59,6 +59,19 @@ async def is_node_running(request: web.Request) -> web.Response:
     return web.Response(text=response_data.json())
 
 
+@routes.post(settings.URL_GET_CLUSTER_DATA)
+async def get_cluster_data(request: web.Request) -> web.Response:
+    ray_service: RayService = request.app["ray_service"]
+
+    models.GetClusterDataRequestData.parse_raw(await request.text())
+
+    cluster_data = await ray_service.get_cluster_data()
+
+    response_data = models.GetClusterDataResponseData(cluster_data=cluster_data)
+
+    return web.Response(text=response_data.json())
+
+
 @routes.post(settings.URL_IS_TERMINATED)
 async def is_node_terminated(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
@@ -114,17 +127,17 @@ async def set_node_tags(request: web.Request) -> web.Response:
     return web.Response(text=response_data.json())
 
 
-@routes.post(settings.URL_CREATE_NODES)
-async def create_nodes(request: web.Request) -> web.Response:
+@routes.post(settings.URL_REQUEST_NODES)
+async def request_nodes(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
 
-    request_data = models.CreateNodesRequestData.parse_raw(await request.text())
+    request_data = models.RequestNodesRequestData.parse_raw(await request.text())
 
-    created_nodes = await ray_service.create_nodes(
+    requested_nodes = await ray_service.request_nodes(
         request_data.node_config, request_data.count, request_data.tags
     )
 
-    response_data = models.CreateNodesResponseData(created_nodes=created_nodes)
+    response_data = models.RequestNodesResponseData(requested_nodes=requested_nodes)
 
     return web.Response(text=response_data.json())
 
