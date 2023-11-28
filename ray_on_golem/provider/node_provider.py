@@ -36,10 +36,10 @@ WEBSERVER_ERRFILE = TMP_PATH / "webserver.err"
 
 
 class GolemNodeProvider(NodeProvider):
-    def __init__(self, provider_config: dict, cluster_name: str):
+    def __init__(self, provider_config: Dict[str, Any], cluster_name: str):
         super().__init__(provider_config, cluster_name)
 
-        provider_parameters: dict = provider_config["parameters"]
+        provider_parameters: Dict = provider_config["parameters"]
 
         self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
