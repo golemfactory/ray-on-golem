@@ -176,17 +176,24 @@ class GolemService:
         # Gives pre-scored providers from 0.5 to 1.0 score
         return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
 
+    @staticmethod
+    async def _get_provider_desc(context: WorkContext):
+        return f"{await context.get_provider_name()} ({await context.get_provider_id()})"
+
     async def _start_activity(
         self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
     ):
-        logger.info(f"Deploying image on `{context._activity}`")
+        activity = context.activity
+        provider_desc = await self._get_provider_desc(context)
 
-        await add_state_log("[4/9] Deploying image on activity...")
+        logger.info(f"Deploying image on {provider_desc}, {ip=}, {activity=}")
+
+        await add_state_log(f"[4/9] Deploying image...")
         deploy_args = {"net": [self._network.deploy_args(ip)]}
         await context.deploy(deploy_args, timeout=timedelta(minutes=5))
 
         await add_state_log("[5/9] Starting activity...")
-        logger.info(f"Starting `{context._activity}`")
+        logger.info(f"Starting activity on {provider_desc}, {ip=}, {activity=}")
         await context.start()
 
     async def _upload_node_configuration(
@@ -197,8 +204,9 @@ class GolemService:
         *,
         add_state_log: Callable[[str], Awaitable[None]],
     ):
-        logger.info(f"Running initial commands on `{context._activity}`")
-        await add_state_log("[6/9] Running bootstrap commands on activity...")
+        provider_desc = await self._get_provider_desc(context)
+        logger.info(f"Running initial commands on {provider_desc}, {ip=}, {context.activity=}")
+        await add_state_log("[6/9] Running bootstrap commands...")
         hostname = ip.replace(".", "-")
         await context.run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
         await context.run(f"echo 'NODE_IP={ip}' >> /etc/environment")
@@ -209,15 +217,18 @@ class GolemService:
         await context.run(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
 
     async def _start_ssh_server(
-        self, context: WorkContext, *, add_state_log: Callable[[str], Awaitable[None]]
+        self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
     ):
-        logger.info(f"Starting ssh service on `{context._activity}`")
-        await add_state_log("[7/9] Starting ssh service on activity...")
+        logger.info(
+            "Starting ssh service on "
+            f"{await self._get_provider_desc(context)}, {ip=}, {context.activity=}"
+        )
+        await add_state_log("[7/9] Starting ssh service...")
         await context.run("service ssh start")
 
     async def _verify_ssh_connection(
         self,
-        activity: Activity,
+        context: WorkContext,
         ip: str,
         ssh_proxy_command: str,
         ssh_user: str,
@@ -227,12 +238,16 @@ class GolemService:
         *,
         add_state_log: Callable[[str], Awaitable[None]],
     ) -> None:
+        activity = context.activity
         ssh_command = (
             f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
         )
 
-        logger.debug(f"SSH connection check started on {activity}: cmd={ssh_command}")
-        await add_state_log("[8/9] Checking SSH connection to activity...")
+        logger.debug(
+            "SSH connection check started on "
+            f"{await self._get_provider_desc(context)}, {ip=}, {activity=}: cmd={ssh_command}."
+        )
+        await add_state_log("[8/9] Checking SSH connection...")
 
         debug_data = ""
 
@@ -267,7 +282,10 @@ class GolemService:
                 else:
                     raise
 
-        logger.info(f"SSH connection check successful on {activity}.")
+        logger.info(
+            "SSH connection check successful on "
+            f"{await self._get_provider_desc(context)}, {ip=}, {activity=}."
+        )
         logger.debug(debug_data)
 
     async def create_activity(
@@ -316,7 +334,9 @@ class GolemService:
         await add_state_log("[1/9] Getting agreement...")
         agreement = await stack.agreement_manager.get_agreement()
 
-        await add_state_log("[2/9] Creating activity...")
+        proposal = agreement.proposal
+        provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
+        await add_state_log(f"[2/9] Creating activity on provider: {provider_desc}...")
         activity = await agreement.create_activity()
         try:
             await add_state_log("[3/9] Adding activity to internal VPN...")
@@ -329,10 +349,10 @@ class GolemService:
             await self._upload_node_configuration(
                 work_context, ip, public_ssh_key, add_state_log=add_state_log
             )
-            await self._start_ssh_server(work_context, add_state_log=add_state_log)
+            await self._start_ssh_server(work_context, ip, add_state_log=add_state_log)
 
             await self._verify_ssh_connection(
-                activity,
+                work_context,
                 ip,
                 ssh_proxy_command,
                 ssh_user,
@@ -345,9 +365,11 @@ class GolemService:
             await activity.destroy()
             raise
 
-        await add_state_log("[9/9] Activity ready")
-
-        logger.info(f"Creating new activity done with `{activity}` on ip `{ip}`")
+        await add_state_log(f"[9/9] Activity ready on provider: {provider_desc}")
+        logger.info(
+            "Creating new activity done on "
+            f"{await self._get_provider_desc(work_context)}, {ip=}, {activity=}"
+        )
 
         return activity, ip, ssh_proxy_command
 
