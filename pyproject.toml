@@ -8,7 +8,7 @@ packages = [{include = "ray_on_golem"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-ray = {version="^2.7.1", extras=["default"]}
+ray = {version="==2.8.0", extras=["default"]}
 #golem-core = { path="../golem-core-python", develop=true }
 golem-core = { git="https://github.com/golemfactory/golem-core-python.git", branch="main" }
 #golem-core = "^0.2.0"
@@ -17,13 +17,13 @@ requests = "^2"
 click = "^8"
 pydantic = "<2"
 websocat = "^1.12.0"
-golem-node = "0.12.3"
+golem-node = "0.13.2"
 
 setuptools = "*"
 
 [tool.poetry.group.ray.dependencies]
 python = "^3.8"
-ray = {version="==2.7.1", extras=["default"]}
+ray = {version="==2.8.0", extras=["default"]}
 # golem-core = { path="../golem-core-python", develop=true }
 golem-core = { git="https://github.com/golemfactory/golem-core-python.git", branch="main" }
 #golem-core = "^0.2.0"
