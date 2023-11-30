@@ -213,6 +213,7 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters.setdefault("webserver_port", 4578)
         provider_parameters.setdefault("enable_registry_stats", True)
         provider_parameters.setdefault("network", "goerli")
+        provider_parameters.setdefault("subnet_tag", "public")
         provider_parameters.setdefault("budget_limit", 1)
 
         auth: Dict = config.setdefault("auth", {})

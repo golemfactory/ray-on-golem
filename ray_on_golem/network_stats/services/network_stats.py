@@ -141,7 +141,7 @@ class NetworkStatsService:
     async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
         payment_network: str = provider_parameters["payment_network"]
         total_budget: float = provider_parameters["total_budget"]
-        subnet_tag: str = provider_parameters.get("subnet_tag", DEFAULT_SUBNET)
+        subnet_tag: str = provider_parameters["subnet_tag"]
         node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
 
         stack = await self._create_stack(node_config, total_budget, payment_network, subnet_tag)

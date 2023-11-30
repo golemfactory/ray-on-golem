@@ -127,7 +127,7 @@ class RayService:
             ssh_private_key_path=self._ssh_private_key_path,
             total_budget=self._provider_config.total_budget,
             payment_network=self._provider_config.payment_network,
-            subnet_tag=self._provider_config.subnet_tag or DEFAULT_SUBNET,
+            subnet_tag=self._provider_config.subnet_tag,
             add_state_log=partial(self._add_node_state_log, node_id),
         )
 
