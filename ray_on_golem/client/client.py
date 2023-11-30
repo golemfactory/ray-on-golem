@@ -20,7 +20,6 @@ class RayOnGolemClient:
         self,
         cluster_config: Dict[str, Any],
     ) -> None:
-
         request_data = models.CreateClusterRequestData(**cluster_config)
 
         self._make_request(
