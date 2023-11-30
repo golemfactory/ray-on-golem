@@ -188,7 +188,7 @@ class GolemService:
 
         logger.info(f"Deploying image on {provider_desc}, {ip=}, {activity=}")
 
-        await add_state_log(f"[4/9] Deploying image...")
+        await add_state_log("[4/9] Deploying image...")
         deploy_args = {"net": [self._network.deploy_args(ip)]}
         await context.deploy(deploy_args, timeout=timedelta(minutes=5))
 
