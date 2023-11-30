@@ -62,14 +62,14 @@ class ManagerStackNodeConfigHelper:
             proposal_plugins[
                 f"Reject if max_cpu_hour_price exceeds {budget_control.max_cpu_per_hour_price}"
             ] = RejectIfCostsExceeds(
-                budget_control.max_cpu_per_hour_price / 60 / 60, LinearCoeffsCost("price_cpu_sec")
+                budget_control.max_cpu_per_hour_price / 3600, LinearCoeffsCost("price_cpu_sec")
             )
 
         if budget_control.max_env_per_hour_price is not None:
             proposal_plugins[
                 f"Reject if per cpu max_env_per_hour_price exceeds {budget_control.max_env_per_hour_price}"
             ] = RejectIfCostsExceeds(
-                budget_control.max_env_per_hour_price / 60 / 60,
+                budget_control.max_env_per_hour_price / 3600,
                 LinearCoeffsCost("price_duration_sec"),
             )
 
