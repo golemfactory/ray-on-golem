@@ -19,10 +19,10 @@ provider:
     # Blockchain used for payments.
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
-    network: "goerli"
+    payment_network: "goerli"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
-    budget_limit: 2
+    total_budget: 5
 
     node_config:
       # Parameters for golem demands (same for head and workers)
@@ -36,29 +36,35 @@ provider:
         outbound_urls: ["https://pypi.dev.golem.network"]
 
         # Minimal values of parameters offered by Golem provider 
-        min_mem_gib: 0
-        min_cpu_threads: 0
-        min_storage_gib: 0
+        min_mem_gib: 1
+        min_cpu_threads: 1
+        min_storage_gib: 1
+
+        # Maximal values of parameters offered by Golem provider
+        max_cpu_threads: null
 
       budget_control:
-        # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
-        # If not provided, offers will be picked at random.
-        # Both values need to be defined or undefined together.
-        expected_cpu_load: 0.8
-        expected_duration_minutes: 20
+        per_cpu_expected_usage:
+          # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
+          # If not provided, offers will be picked at random.
+          cpu_load: 0.8
+          duration_hours: 0.5 # 30 minutes
 
-        # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
-        # Requires "expected_cpu_load" and "expected_duration_minutes" parameters to take effect.
-        max_expected_usage_cost: 1.5
+          # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
+          # Max cost is calculated as a sum of:
+          # - start_price / duration / cpu count
+          # - (env_per_hour_price * duration ) / cpu count
+          # - cpu_per_hour_price / duration / cpu_load
+          max_cost: 1.5
 
         # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
-        max_initial_price: 0.5
+        max_start_price: 0.5
 
-        # Amount of GLMs for CPU utilisation per second which Golem provider offer will be rejected if exceeded.
-        max_cpu_sec_price: 0.0005
+        # Amount of GLMs for CPU utilisation per hour which Golem provider offer will be rejected if exceeded.
+        max_cpu_per_hour_price: 0.5
 
         # Amount of GLMs for each second that worker runs which Golem provider offer will be rejected if exceeded.
-        max_duration_sec_price: 0.0005
+        max_env_per_hour_price: 0.5
 
 # The files or directories to copy to the head and worker nodes
 file_mounts: {

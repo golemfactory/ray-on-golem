@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from golem.resources import Activity
-from pydantic import AnyUrl, BaseModel, Field, root_validator
+from pydantic import AnyUrl, BaseModel, Field
 
 NodeId = str
 Tags = Dict[str, str]
@@ -57,41 +57,21 @@ class DemandConfigData(BaseModel):
     min_mem_gib: float = 0.0
     min_cpu_threads: int = 0
     min_storage_gib: float = 0.0
+    max_cpu_threads: Optional[int] = None
+
+
+class PerCpuExpectedUsageData(BaseModel):
+    cpu_load: float
+    duration_hours: float
+    max_cost: Optional[float] = None
 
 
 class BudgetControlData(BaseModel):
-    expected_cpu_load: Optional[float] = None
-    expected_duration_minutes: Optional[float] = None
+    per_cpu_expected_usage: Optional[PerCpuExpectedUsageData] = None
 
-    max_expected_usage_cost: Optional[float] = None
-    max_initial_price: Optional[float] = None
-    max_cpu_sec_price: Optional[float] = None
-    max_duration_sec_price: Optional[float] = None
-
-    @root_validator
-    def check_expected_fields(cls, values):
-        expected_cpu_load = values.get("expected_cpu_load")
-        expected_duration_minutes = values.get("expected_duration_minutes")
-        max_expected_usage_cost = values.get("max_expected_usage_cost")
-
-        if expected_cpu_load is None != expected_duration_minutes is None:
-            raise ValueError(
-                "Both `expected_cpu_load` and `expected_duration_minutes` parameter should be "
-                "defined together!"
-            )
-
-        if max_expected_usage_cost is not None and (
-            expected_cpu_load is None or expected_duration_minutes is None
-        ):
-            raise ValueError(
-                "Parameter `max_expected_usage_cost` requires `expected_cpu_load` "
-                "and `expected_duration_minutes` parameters to be defined!"
-            )
-
-        return values
-
-    def is_expected_usage_cost_enabled(self):
-        return self.expected_cpu_load is not None and self.expected_duration_minutes is not None
+    max_start_price: Optional[float] = None
+    max_cpu_per_hour_price: Optional[float] = None
+    max_env_per_hour_price: Optional[float] = None
 
 
 class NodeConfigData(BaseModel):
@@ -100,12 +80,12 @@ class NodeConfigData(BaseModel):
 
 
 class ProviderConfigData(BaseModel):
-    network: str
-    budget_limit: int
+    payment_network: str
+    total_budget: float
     node_config: NodeConfigData
     ssh_private_key: str
     ssh_user: str
-    subnet_tag: Optional[str]
+    subnet_tag: str
 
 
 class CreateClusterRequestData(ProviderConfigData):

@@ -83,8 +83,8 @@ class GolemService:
     async def _get_or_create_stack_from_node_config(
         self,
         node_config: NodeConfigData,
-        budget_limit: float,
-        network: str,
+        total_budget: float,
+        payment_network: str,
         subnet_tag: str,
     ) -> ManagerStack:
         stack_hash = self._get_hash_from_node_config(node_config)
@@ -93,10 +93,10 @@ class GolemService:
             stack = self._stacks.get(stack_hash)
             if stack is None:
                 logger.info(
-                    f"Creating new stack `{stack_hash}`... {budget_limit=}, {network=}, {subnet_tag=}"
+                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}, {subnet_tag=}"
                 )
                 self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, budget_limit, network, subnet_tag=subnet_tag
+                    node_config, total_budget, payment_network, subnet_tag
                 )
                 await stack.start()
 
@@ -111,13 +111,13 @@ class GolemService:
     async def _create_stack(
         self,
         node_config: NodeConfigData,
-        budget_limit: float,
-        network: str,
+        total_budget: float,
+        payment_network: str,
         subnet_tag: str,
     ) -> ManagerStack:
         stack = ManagerStack()
 
-        payload = await self._demand_config_helper.get_payload_from_demand_config(
+        payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
 
@@ -125,12 +125,12 @@ class GolemService:
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
         stack.payment_manager = PayAllPaymentManager(
-            self._golem, budget=budget_limit, network=network
+            self._golem, budget=total_budget, network=payment_network
         )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
-            [payload],
+            payloads,
             demand_lifetime=timedelta(hours=8),
             subnet_tag=subnet_tag,
         )
@@ -138,7 +138,7 @@ class GolemService:
             self._golem,
             stack.demand_manager.get_initial_proposal,
             plugins=(
-                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(network, set())),
+                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
                 *stack.extra_proposal_plugins.values(),
                 ScoringBuffer(
                     min_size=50,
@@ -146,7 +146,9 @@ class GolemService:
                     fill_at_start=True,
                     proposal_scorers=(
                         *stack.extra_proposal_scorers.values(),
-                        MapScore(partial(self._score_with_provider_data, network=network)),
+                        MapScore(
+                            partial(self._score_with_provider_data, payment_network=payment_network)
+                        ),
                     ),
                     update_interval=timedelta(seconds=10),
                 ),
@@ -163,12 +165,12 @@ class GolemService:
         return stack
 
     def _score_with_provider_data(
-        self, proposal_data: ProposalData, network: str
+        self, proposal_data: ProposalData, payment_network: str
     ) -> Optional[float]:
         provider_id = proposal_data.issuer_id
 
         try:
-            prescored_providers = PROVIDERS_SCORED[network]
+            prescored_providers = PROVIDERS_SCORED[payment_network]
             provider_pos = prescored_providers.index(provider_id)
         except (KeyError, ValueError):
             return 0
@@ -220,10 +222,7 @@ class GolemService:
         self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
     ):
         provider_desc = await self._get_provider_desc(context)
-        logger.info(
-            "Starting ssh service on "
-            f"{provider_desc}, {ip=}, {context.activity=}"
-        )
+        logger.info("Starting ssh service on " f"{provider_desc}, {ip=}, {context.activity=}")
         await add_state_log("[7/9] Starting ssh service...")
         await context.run("service ssh start")
 
@@ -291,18 +290,18 @@ class GolemService:
 
     async def create_activity(
         self,
+        *,
         node_config: NodeConfigData,
         public_ssh_key: str,
         ssh_user: str,
         ssh_private_key_path: Path,
-        budget_limit: float,
-        network: str,
+        total_budget: float,
+        payment_network: str,
         subnet_tag: str,
-        *,
         add_state_log: Callable[[str], Awaitable[None]],
     ) -> Tuple[Activity, str, str]:
         stack = await self._get_or_create_stack_from_node_config(
-            node_config, budget_limit, network, subnet_tag
+            node_config, total_budget, payment_network, subnet_tag
         )
 
         while True:
