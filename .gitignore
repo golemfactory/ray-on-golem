@@ -1,3 +1,5 @@
+.secrets
+.vars
 .idea/
 log.log
 __pycache__/

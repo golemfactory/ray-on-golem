@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from golem.resources import Activity
-from pydantic import BaseModel, root_validator
+from pydantic import AnyUrl, BaseModel, Field
 
 NodeId = str
 Tags = Dict[str, str]
@@ -11,7 +11,8 @@ Tags = Dict[str, str]
 class NodeState(Enum):
     pending = "pending"
     running = "running"
-    stopping = "stopping"
+    terminating = "terminating"
+    terminated = "terminated"
 
 
 class ShutdownState(Enum):
@@ -20,13 +21,17 @@ class ShutdownState(Enum):
     WILL_SHUTDOWN = "will_shutdown"
 
 
-class Node(BaseModel):
+class NodeData(BaseModel):
     node_id: NodeId
-    state: NodeState
     tags: Tags
-    internal_ip: str
-    ssh_proxy_command: str
-    activity: Activity
+    state: NodeState = NodeState.pending
+    state_log: List[str] = []
+    internal_ip: Optional[str] = None
+    ssh_proxy_command: Optional[str] = None
+
+
+class Node(NodeData):
+    activity: Optional[Activity] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -36,60 +41,51 @@ class SingleNodeRequestData(BaseModel):
     node_id: NodeId
 
 
+class GetClusterDataRequestData(BaseModel):
+    pass
+
+
+class GetClusterDataResponseData(BaseModel):
+    cluster_data: Dict[NodeId, NodeData]
+
+
 class DemandConfigData(BaseModel):
     image_hash: Optional[str] = None
     image_tag: Optional[str] = None
-    capabilities: List[str]
-    min_mem_gib: float
-    min_cpu_threads: int
-    min_storage_gib: float
+    capabilities: List[str] = ["vpn", "inet"]
+    outbound_urls: List[AnyUrl] = []
+    min_mem_gib: float = 0.0
+    min_cpu_threads: int = 0
+    min_storage_gib: float = 0.0
+    max_cpu_threads: Optional[int] = None
 
 
-class CostManagementData(BaseModel):
-    average_cpu_load: Optional[float] = None
-    average_duration_minutes: Optional[float] = None
+class PerCpuExpectedUsageData(BaseModel):
+    cpu_load: float
+    duration_hours: float
+    max_cost: Optional[float] = None
 
-    max_average_usage_cost: Optional[float] = None
-    max_initial_price: Optional[float] = None
-    max_cpu_sec_price: Optional[float] = None
-    max_duration_sec_price: Optional[float] = None
 
-    @root_validator
-    def check_average_fields(cls, values):
-        average_cpu_load = values.get("average_cpu_load")
-        average_duration_minutes = values.get("average_duration_minutes")
-        max_average_usage_cost = values.get("max_average_usage_cost")
+class BudgetControlData(BaseModel):
+    per_cpu_expected_usage: Optional[PerCpuExpectedUsageData] = None
 
-        if average_cpu_load is None != average_duration_minutes is None:
-            raise ValueError(
-                "Both `average_cpu_load` and `average_duration_minutes` parameter should be defined together!"
-            )
-
-        if max_average_usage_cost is not None and (
-            average_cpu_load is None or average_duration_minutes is None
-        ):
-            raise ValueError(
-                "Parameter `max_average_usage_cost` requires `average_cpu_load` and `average_duration_minutes`"
-                " parameters to be defined!"
-            )
-
-        return values
-
-    def is_average_usage_cost_enabled(self):
-        return self.average_cpu_load is not None and self.average_duration_minutes is not None
+    max_start_price: Optional[float] = None
+    max_cpu_per_hour_price: Optional[float] = None
+    max_env_per_hour_price: Optional[float] = None
 
 
 class NodeConfigData(BaseModel):
-    demand: DemandConfigData
-    cost_management: Optional[CostManagementData] = None
+    demand: DemandConfigData = Field(default_factory=DemandConfigData)
+    budget_control: Optional[BudgetControlData] = None
 
 
 class ProviderConfigData(BaseModel):
-    network: str
-    budget: int
+    payment_network: str
+    total_budget: float
     node_config: NodeConfigData
     ssh_private_key: str
     ssh_user: str
+    subnet_tag: str
 
 
 class CreateClusterRequestData(ProviderConfigData):
@@ -104,14 +100,14 @@ class NonTerminatedNodesResponseData(BaseModel):
     nodes_ids: List[NodeId]
 
 
-class CreateNodesRequestData(BaseModel):
+class RequestNodesRequestData(BaseModel):
     node_config: Dict[str, Any]
     count: int
     tags: Tags
 
 
-class CreateNodesResponseData(BaseModel):
-    created_nodes: Dict[NodeId, Dict]
+class RequestNodesResponseData(BaseModel):
+    requested_nodes: List[NodeId]
 
 
 class SetNodeTagsRequestData(BaseModel):
@@ -136,7 +132,7 @@ class GetNodeTagsResponseData(BaseModel):
 
 
 class GetNodeIpAddressResponseData(BaseModel):
-    ip_address: str
+    ip_address: Optional[str]
 
 
 class EmptyResponseData(BaseModel):
@@ -144,7 +140,7 @@ class EmptyResponseData(BaseModel):
 
 
 class GetSshProxyCommandResponseData(BaseModel):
-    ssh_proxy_command: str
+    ssh_proxy_command: Optional[str]
 
 
 class GetOrCreateDefaultSshKeyRequestData(BaseModel):

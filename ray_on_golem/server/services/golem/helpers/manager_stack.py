@@ -1,8 +1,12 @@
 import logging
 from datetime import timedelta
 
-from golem.managers import LinearAverageCostPricing, MapScore, RejectIfCostsExceeds
-from golem.managers.proposal.plugins.linear_coeffs import LinearCoeffsCost
+from golem.managers import (
+    LinearCoeffsCost,
+    LinearPerCpuAverageCostPricing,
+    MapScore,
+    RejectIfCostsExceeds,
+)
 
 from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
@@ -12,52 +16,65 @@ logger = logging.getLogger(__name__)
 
 class ManagerStackNodeConfigHelper:
     @staticmethod
-    def apply_cost_management_avg_usage(stack: ManagerStack, node_config: NodeConfigData) -> None:
-        cost_management = node_config.cost_management
+    def apply_budget_control_expected_usage(
+        stack: ManagerStack, node_config: NodeConfigData
+    ) -> None:
+        per_cpu_expected_usage = node_config.budget_control.per_cpu_expected_usage
 
-        if cost_management is None or not cost_management.is_average_usage_cost_enabled():
-            logger.debug("Cost management based on average usage is not enabled")
+        if per_cpu_expected_usage is None:
+            logger.debug("Budget control based on per cpu expected usage is not enabled")
             return
 
-        linear_average_cost = LinearAverageCostPricing(
-            average_cpu_load=node_config.cost_management.average_cpu_load,
-            average_duration=timedelta(
-                minutes=node_config.cost_management.average_duration_minutes
-            ),
+        linear_per_cpu_average_cost = LinearPerCpuAverageCostPricing(
+            average_cpu_load=per_cpu_expected_usage.cpu_load,
+            average_duration=timedelta(hours=per_cpu_expected_usage.duration_hours),
         )
 
-        stack.extra_proposal_scorers["Sort by linear average cost"] = MapScore(
-            linear_average_cost, normalize=True, normalize_flip=True
+        stack.extra_proposal_scorers["Sort by linear per cpu average cost"] = MapScore(
+            linear_per_cpu_average_cost, normalize=True, normalize_flip=True
         )
 
-        max_average_usage_cost = node_config.cost_management.max_average_usage_cost
-        if max_average_usage_cost is not None:
+        max_cost = per_cpu_expected_usage.max_cost
+        if max_cost is not None:
             stack.extra_proposal_plugins[
-                f"Reject if max_average_usage_cost exceeds {node_config.cost_management.max_average_usage_cost}"
-            ] = RejectIfCostsExceeds(max_average_usage_cost, linear_average_cost)
-            logger.debug("Cost management based on average usage applied with max limits")
+                f"Reject if per cpu expected max_cost exceeds {max_cost}"
+            ] = RejectIfCostsExceeds(max_cost, linear_per_cpu_average_cost)
+            logger.debug("Budget control based on per cpu expected usage applied with max limits")
         else:
-            logger.debug("Cost management based on average usage applied without max limits")
+            logger.debug(
+                "Budget control based on per cpu expected usage applied without max limits"
+            )
 
     @staticmethod
-    def apply_cost_management_hard_limits(stack: ManagerStack, node_config: NodeConfigData) -> None:
+    def apply_budget_control_hard_limits(stack: ManagerStack, node_config: NodeConfigData) -> None:
         # TODO: Consider creating RejectIfCostsExceeds variant for multiple values
         proposal_plugins = {}
-        field_names = {
-            "max_initial_price": "price_initial",
-            "max_cpu_sec_price": "price_cpu_sec",
-            "max_duration_sec_price": "price_duration_sec",
-        }
+        budget_control = node_config.budget_control
 
-        for cost_field_name, coef_field_name in field_names.items():
-            cost_max_value = getattr(node_config.cost_management, cost_field_name, None)
-            if cost_max_value is not None:
-                proposal_plugins[
-                    f"Reject if {coef_field_name} exceeds {cost_max_value}"
-                ] = RejectIfCostsExceeds(cost_max_value, LinearCoeffsCost(coef_field_name))
+        if budget_control.max_start_price is not None:
+            proposal_plugins[
+                f"Reject if max_start_price exceeds {budget_control.max_start_price}"
+            ] = RejectIfCostsExceeds(
+                budget_control.max_start_price, LinearCoeffsCost("price_initial")
+            )
+
+        if budget_control.max_cpu_per_hour_price is not None:
+            proposal_plugins[
+                f"Reject if max_cpu_hour_price exceeds {budget_control.max_cpu_per_hour_price}"
+            ] = RejectIfCostsExceeds(
+                budget_control.max_cpu_per_hour_price / 3600, LinearCoeffsCost("price_cpu_sec")
+            )
+
+        if budget_control.max_env_per_hour_price is not None:
+            proposal_plugins[
+                f"Reject if per cpu max_env_per_hour_price exceeds {budget_control.max_env_per_hour_price}"
+            ] = RejectIfCostsExceeds(
+                budget_control.max_env_per_hour_price / 3600,
+                LinearCoeffsCost("price_duration_sec"),
+            )
 
         if proposal_plugins:
             stack.extra_proposal_plugins.update(proposal_plugins)
-            logger.debug("Cost management based on max limits applied")
+            logger.debug("Budget control based on max limits applied")
         else:
-            logger.debug("Cost management based on max limits is not enabled")
+            logger.debug("Budget control based on max limits is not enabled")

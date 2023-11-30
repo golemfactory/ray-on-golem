@@ -52,7 +52,7 @@ def main(port: int, self_shutdown: bool, registry_stats: bool):
         web.run_app(
             app,
             port=app["port"],
-            print=logger.info,
+            print=None,
             shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
         )
     except Exception:

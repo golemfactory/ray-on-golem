@@ -18,7 +18,6 @@ from golem.managers import (
 )
 from golem.managers.base import ProposalNegotiator
 from golem.node import GolemNode
-from golem.payload import PayloadSyntaxParser
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
@@ -46,12 +45,11 @@ class ProposalCounterPlugin(ProposalManagerPlugin):
 class StatsNegotiatingPlugin(NegotiatingPlugin):
     def __init__(
         self,
-        demand_offer_parser: Optional[PayloadSyntaxParser] = None,
         proposal_negotiators: Optional[Sequence[ProposalNegotiator]] = None,
         *args,
         **kwargs,
     ) -> None:
-        super().__init__(demand_offer_parser, proposal_negotiators, *args, **kwargs)
+        super().__init__(proposal_negotiators, *args, **kwargs)
         self.fails = defaultdict(int)
 
     async def get_proposal(self) -> Proposal:
@@ -140,11 +138,12 @@ class NetworkStatsService:
         logger.info("Stopping NetworkStatsService done")
 
     async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
-        network: str = provider_parameters["network"]
-        budget: int = provider_parameters["budget"]
+        payment_network: str = provider_parameters["payment_network"]
+        total_budget: float = provider_parameters["total_budget"]
+        subnet_tag: str = provider_parameters["subnet_tag"]
         node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
 
-        stack = await self._create_stack(node_config, budget, network)
+        stack = await self._create_stack(node_config, total_budget, payment_network, subnet_tag)
         await stack.start()
 
         print(f"Gathering stats data for {duration_minutes} minutes...")
@@ -178,28 +177,35 @@ class NetworkStatsService:
             )
 
     async def _create_stack(
-        self, node_config: NodeConfigData, budget: float, network: str
+        self,
+        node_config: NodeConfigData,
+        total_budget: float,
+        payment_network: str,
+        subnet_tag: str,
     ) -> ManagerStack:
         stack = ManagerStack()
 
-        payload = await self._demand_config_helper.get_payload_from_demand_config(
+        payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
 
-        ManagerStackNodeConfigHelper.apply_cost_management_avg_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_cost_management_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
-        stack.payment_manager = PayAllPaymentManager(self._golem, budget=budget, network=network)
+        stack.payment_manager = PayAllPaymentManager(
+            self._golem, budget=total_budget, network=payment_network
+        )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
-            payload,
-            demand_expiration_timeout=timedelta(hours=8),
+            payloads,
+            demand_lifetime=timedelta(hours=8),
+            subnet_tag=subnet_tag,
         )
 
         plugins = [
             self._stats_plugin_factory.create_counter_plugin("Initial"),
-            BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(network, set())),
+            BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
             self._stats_plugin_factory.create_counter_plugin("Not blacklisted"),
         ]
 
@@ -210,16 +216,16 @@ class NetworkStatsService:
         plugins.extend(
             [
                 ScoringBuffer(
-                    min_size=50,
+                    min_size=500,
                     max_size=1000,
                     fill_at_start=True,
                     proposal_scorers=(*stack.extra_proposal_scorers.values(),),
                     update_interval=timedelta(seconds=10),
                 ),
-                self._stats_plugin_factory.create_counter_plugin("Scored"),
+                self._stats_plugin_factory.create_counter_plugin("Negotiation initialized"),
                 self._stats_plugin_factory.create_negotiating_plugin(),
-                self._stats_plugin_factory.create_counter_plugin("Negotiated"),
-                Buffer(min_size=1, max_size=50, fill_concurrency_size=10),
+                self._stats_plugin_factory.create_counter_plugin("Negotiated successfully"),
+                Buffer(min_size=800, max_size=1000, fill_concurrency_size=16),
             ]
         )
         stack.proposal_manager = DefaultProposalManager(

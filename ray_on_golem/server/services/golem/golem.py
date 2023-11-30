@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import AsyncIterator, Dict, Optional, Tuple
+from typing import Awaitable, Callable, Dict, Optional, Tuple
 
 from golem.managers import (
     AddChosenPaymentPlatform,
@@ -81,17 +81,22 @@ class GolemService:
             del self._stacks_locks[stack_hash]
 
     async def _get_or_create_stack_from_node_config(
-        self, node_config: NodeConfigData, budget: float, network: str
+        self,
+        node_config: NodeConfigData,
+        total_budget: float,
+        payment_network: str,
+        subnet_tag: str,
     ) -> ManagerStack:
         stack_hash = self._get_hash_from_node_config(node_config)
 
         async with self._stacks_locks[stack_hash]:
             stack = self._stacks.get(stack_hash)
             if stack is None:
-                logger.info(f"Creating new stack `{stack_hash}`...")
-
+                logger.info(
+                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}, {subnet_tag=}"
+                )
                 self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, budget, network
+                    node_config, total_budget, payment_network, subnet_tag
                 )
                 await stack.start()
 
@@ -104,29 +109,36 @@ class GolemService:
         return hashlib.md5(node_config.json().encode()).hexdigest()
 
     async def _create_stack(
-        self, node_config: NodeConfigData, budget: float, network: str
+        self,
+        node_config: NodeConfigData,
+        total_budget: float,
+        payment_network: str,
+        subnet_tag: str,
     ) -> ManagerStack:
         stack = ManagerStack()
 
-        payload = await self._demand_config_helper.get_payload_from_demand_config(
+        payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
 
-        ManagerStackNodeConfigHelper.apply_cost_management_avg_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_cost_management_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
-        stack.payment_manager = PayAllPaymentManager(self._golem, budget=budget, network=network)
+        stack.payment_manager = PayAllPaymentManager(
+            self._golem, budget=total_budget, network=payment_network
+        )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
-            payload,
-            demand_expiration_timeout=timedelta(hours=8),
+            payloads,
+            demand_lifetime=timedelta(hours=8),
+            subnet_tag=subnet_tag,
         )
         stack.proposal_manager = DefaultProposalManager(
             self._golem,
             stack.demand_manager.get_initial_proposal,
             plugins=(
-                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(network, set())),
+                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
                 *stack.extra_proposal_plugins.values(),
                 ScoringBuffer(
                     min_size=50,
@@ -134,7 +146,9 @@ class GolemService:
                     fill_at_start=True,
                     proposal_scorers=(
                         *stack.extra_proposal_scorers.values(),
-                        MapScore(partial(self._score_with_provider_data, network=network)),
+                        MapScore(
+                            partial(self._score_with_provider_data, payment_network=payment_network)
+                        ),
                     ),
                     update_interval=timedelta(seconds=10),
                 ),
@@ -151,12 +165,12 @@ class GolemService:
         return stack
 
     def _score_with_provider_data(
-        self, proposal_data: ProposalData, network: str
+        self, proposal_data: ProposalData, payment_network: str
     ) -> Optional[float]:
         provider_id = proposal_data.issuer_id
 
         try:
-            prescored_providers = PROVIDERS_SCORED[network]
+            prescored_providers = PROVIDERS_SCORED[payment_network]
             provider_pos = prescored_providers.index(provider_id)
         except (KeyError, ValueError):
             return 0
@@ -164,18 +178,37 @@ class GolemService:
         # Gives pre-scored providers from 0.5 to 1.0 score
         return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
 
-    async def _start_activity(self, context: WorkContext, ip: str):
-        logger.info(f"Deploying image on `{context._activity}`")
+    @staticmethod
+    async def _get_provider_desc(context: WorkContext):
+        return f"{await context.get_provider_name()} ({await context.get_provider_id()})"
+
+    async def _start_activity(
+        self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
+    ):
+        activity = context.activity
+        provider_desc = await self._get_provider_desc(context)
+
+        logger.info(f"Deploying image on {provider_desc}, {ip=}, {activity=}")
+
+        await add_state_log("[4/9] Deploying image...")
         deploy_args = {"net": [self._network.deploy_args(ip)]}
         await context.deploy(deploy_args, timeout=timedelta(minutes=5))
 
-        logger.info(f"Starting `{context._activity}`")
+        await add_state_log("[5/9] Starting activity...")
+        logger.info(f"Starting activity on {provider_desc}, {ip=}, {activity=}")
         await context.start()
 
     async def _upload_node_configuration(
-        self, context: WorkContext, ip: str, ssh_public_key_data: str
+        self,
+        context: WorkContext,
+        ip: str,
+        ssh_public_key_data: str,
+        *,
+        add_state_log: Callable[[str], Awaitable[None]],
     ):
-        logger.info(f"Running initial commands on `{context._activity}`")
+        provider_desc = await self._get_provider_desc(context)
+        logger.info(f"Running initial commands on {provider_desc}, {ip=}, {context.activity=}")
+        await add_state_log("[6/9] Running bootstrap commands...")
         hostname = ip.replace(".", "-")
         await context.run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
         await context.run(f"echo 'NODE_IP={ip}' >> /etc/environment")
@@ -185,23 +218,36 @@ class GolemService:
         await context.run("mkdir -p /root/.ssh")
         await context.run(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
 
-    async def _start_ssh_server(self, context: WorkContext):
-        logger.info(f"Starting ssh service on `{context._activity}`")
+    async def _start_ssh_server(
+        self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
+    ):
+        provider_desc = await self._get_provider_desc(context)
+        logger.info("Starting ssh service on " f"{provider_desc}, {ip=}, {context.activity=}")
+        await add_state_log("[7/9] Starting ssh service...")
         await context.run("service ssh start")
 
     async def _verify_ssh_connection(
         self,
-        activity: Activity,
+        context: WorkContext,
         ip: str,
         ssh_proxy_command: str,
         ssh_user: str,
         ssh_private_key_path: Path,
-        num_retries = 3,
-        retry_interval = 1,
+        num_retries=3,
+        retry_interval=1,
+        *,
+        add_state_log: Callable[[str], Awaitable[None]],
     ) -> None:
-        ssh_command = f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
+        activity = context.activity
+        ssh_command = (
+            f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
+        )
 
-        logger.debug(f"SSH connection check started on {activity}: cmd={ssh_command}")
+        logger.debug(
+            "SSH connection check started on "
+            f"{await self._get_provider_desc(context)}, {ip=}, {activity=}: cmd={ssh_command}."
+        )
+        await add_state_log("[8/9] Checking SSH connection...")
 
         debug_data = ""
 
@@ -236,52 +282,43 @@ class GolemService:
                 else:
                     raise
 
-        logger.info(f"SSH connection check successful on {activity}.")
+        logger.info(
+            "SSH connection check successful on "
+            f"{await self._get_provider_desc(context)}, {ip=}, {activity=}."
+        )
         logger.debug(debug_data)
 
-    async def create_activities(
+    async def create_activity(
         self,
+        *,
         node_config: NodeConfigData,
-        count: int,
-        ssh_public_key: str,
-        ssh_user: str,
-        ssh_private_key_path: Path,
-        budget: float,
-        network: str,
-    ) -> AsyncIterator[Tuple[Activity, str, str]]:
-        stack = await self._get_or_create_stack_from_node_config(node_config, budget, network)
-
-        coros = [
-            self._create_activity_retry(stack, ssh_public_key, ssh_user, ssh_private_key_path)
-            for _ in range(count)
-        ]
-
-        for coro in asyncio.as_completed(coros):
-            try:
-                result = await coro
-            except Exception:
-                logger.warning("Unable to create activity, abandoning", exc_info=True)
-                continue
-            await self._network.refresh_nodes()
-
-            yield result
-
-    async def _create_activity_retry(
-        self,
-        stack: ManagerStack,
         public_ssh_key: str,
         ssh_user: str,
         ssh_private_key_path: Path,
+        total_budget: float,
+        payment_network: str,
+        subnet_tag: str,
+        add_state_log: Callable[[str], Awaitable[None]],
     ) -> Tuple[Activity, str, str]:
+        stack = await self._get_or_create_stack_from_node_config(
+            node_config, total_budget, payment_network, subnet_tag
+        )
+
         while True:
             try:
                 return await self._create_activity(
-                    stack, public_ssh_key, ssh_user, ssh_private_key_path
+                    stack,
+                    public_ssh_key,
+                    ssh_user,
+                    ssh_private_key_path,
+                    add_state_log=add_state_log,
                 )
             except RuntimeError:
                 raise
             except Exception:
-                logger.warning("Failed to create activity, retrying", exc_info=True)
+                msg = "Failed to create activity, retrying"
+                await add_state_log(msg)
+                logger.warning(msg, exc_info=True)
 
     async def _create_activity(
         self,
@@ -289,29 +326,50 @@ class GolemService:
         public_ssh_key: str,
         ssh_user: str,
         ssh_private_key_path: Path,
+        *,
+        add_state_log: Callable[[str], Awaitable[None]],
     ) -> Tuple[Activity, str, str]:
         logger.info(f"Creating new activity...")
 
+        await add_state_log("[1/9] Getting agreement...")
         agreement = await stack.agreement_manager.get_agreement()
+
+        proposal = agreement.proposal
+        provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
+        await add_state_log(f"[2/9] Creating activity on provider: {provider_desc}...")
         activity = await agreement.create_activity()
         try:
+            await add_state_log("[3/9] Adding activity to internal VPN...")
             ip = await self._network.create_node(activity.parent.parent.data.issuer_id)
             connection_uri = self._get_connection_uri(ip)
             ssh_proxy_command = self._get_ssh_proxy_command(connection_uri)
 
             work_context = WorkContext(activity)
-            await self._start_activity(work_context, ip)
-            await self._upload_node_configuration(work_context, ip, public_ssh_key)
-            await self._start_ssh_server(work_context)
+            await self._start_activity(work_context, ip, add_state_log=add_state_log)
+            await self._upload_node_configuration(
+                work_context, ip, public_ssh_key, add_state_log=add_state_log
+            )
+            await self._start_ssh_server(work_context, ip, add_state_log=add_state_log)
 
             await self._verify_ssh_connection(
-                activity, ip, ssh_proxy_command, ssh_user, ssh_private_key_path
+                work_context,
+                ip,
+                ssh_proxy_command,
+                ssh_user,
+                ssh_private_key_path,
+                add_state_log=add_state_log,
             )
+
+            await self._network.refresh_nodes()
         except Exception:
             await activity.destroy()
             raise
 
-        logger.info(f"Creating new activity done with `{activity}` on ip `{ip}`")
+        await add_state_log(f"[9/9] Activity ready on provider: {provider_desc}")
+        logger.info(
+            "Creating new activity done on "
+            f"{await self._get_provider_desc(work_context)}, {ip=}, {activity=}"
+        )
 
         return activity, ip, ssh_proxy_command
 

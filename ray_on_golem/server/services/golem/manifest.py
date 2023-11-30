@@ -1,10 +1,15 @@
-from typing import Dict
+import logging
+from typing import Dict, List
 
 from yarl import URL
 
+logger = logging.getLogger(__name__)
 
-def get_manifest(image_url: URL, image_hash: str) -> Dict:
-    return {
+
+def get_manifest(
+    image_url: URL, image_hash: str, protocols: List[str], outbound_urls: List[str]
+) -> Dict:
+    manifest = {
         "version": "0.1.0",
         "createdAt": "2023-06-26T00:00:00.000000Z",
         "expiresAt": "2100-01-01T00:00:00.000000Z",
@@ -30,12 +35,12 @@ def get_manifest(image_url: URL, image_hash: str) -> Dict:
             "net": {
                 "inet": {
                     "out": {
-                        "protocols": ["https"],
-                        "urls": [
-                            "https://pypi.dev.golem.network",
-                        ],
+                        "protocols": protocols,
+                        "urls": outbound_urls,
                     }
                 }
             },
         },
     }
+    logger.debug(f"Manifest generated: {manifest}")
+    return manifest

@@ -1,10 +1,11 @@
 import logging
 import subprocess
+import time
 from copy import deepcopy
 from datetime import datetime
 from functools import lru_cache
 from types import ModuleType
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from ray.autoscaler._private.cli_logger import cli_logger
 from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
@@ -13,7 +14,7 @@ from ray.autoscaler.node_provider import NodeProvider
 
 from ray_on_golem.client.client import RayOnGolemClient
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
-from ray_on_golem.server.models import NodeConfigData, NodeId, ShutdownState
+from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
 from ray_on_golem.server.settings import (
     LOGGING_DEBUG_PATH,
     RAY_ON_GOLEM_CHECK_DEADLINE,
@@ -29,29 +30,25 @@ from ray_on_golem.utils import (
 )
 
 logger = logging.getLogger(__name__)
-WEBSERVER_LOG_GROUP = "Ray On Golem webserver"
-
-WEBSERVER_OUTFILE = TMP_PATH / "webserver.out"
-WEBSERVER_ERRFILE = TMP_PATH / "webserver.err"
+LOG_GROUP = "Ray On Golem"
 
 
 class GolemNodeProvider(NodeProvider):
-    def __init__(self, provider_config: dict, cluster_name: str):
+    def __init__(self, provider_config: Dict[str, Any], cluster_name: str):
         super().__init__(provider_config, cluster_name)
 
-        provider_parameters = provider_config["parameters"]
+        provider_parameters: Dict = provider_config["parameters"]
 
         self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
         )
-        self._ray_on_golem_client.create_cluster(
-            network=provider_parameters["network"],
-            budget=provider_parameters["budget"],
-            node_config=NodeConfigData(**provider_parameters["node_config"]),
-            ssh_private_key=provider_parameters["_ssh_private_key"],
-            ssh_user=provider_parameters["_ssh_user"],
-        )
+
+        ssh_arg_mapping = {"_ssh_private_key": "ssh_private_key", "_ssh_user": "ssh_user"}
+        provider_parameters = {
+            ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()
+        }
+        self._ray_on_golem_client.create_cluster(provider_parameters)
 
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -64,6 +61,7 @@ class GolemNodeProvider(NodeProvider):
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
         )
+        # TODO: SAVE wallet address
 
         auth = config["auth"]
         default_ssh_private_key = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
@@ -128,11 +126,58 @@ class GolemNodeProvider(NodeProvider):
         tags: Dict[str, str],
         count: int,
     ) -> Dict[NodeId, Dict]:
-        return self._ray_on_golem_client.create_nodes(
-            node_config=node_config,
-            count=count,
-            tags=tags,
-        )
+        with cli_logger.group(LOG_GROUP):
+            cli_logger.print(f"Requesting {count} nodes...")
+
+            requested_node_ids = self._ray_on_golem_client.request_nodes(
+                node_config=node_config,
+                count=count,
+                tags=tags,
+            )
+
+            started_at = datetime.now()
+            nodes_last_log_size = {node_id: 0 for node_id in requested_node_ids}
+
+            while True:
+                cluster_state = self._ray_on_golem_client.get_cluster_state()
+                monitored_nodes = {
+                    node.node_id: node
+                    for node in cluster_state.values()
+                    if node.node_id in requested_node_ids
+                }
+                nodes_log_size = {
+                    node.node_id: len(node.state_log) for node in monitored_nodes.values()
+                }
+
+                self._print_node_state(
+                    f"Requested nodes status after {datetime.now() - started_at}",
+                    monitored_nodes.values(),
+                    nodes_last_log_size,
+                )
+
+                nodes_last_log_size = nodes_log_size
+
+                if all([node.state == NodeState.running for node in monitored_nodes.values()]):
+                    cli_logger.success(f"All {count} requested nodes ready")
+
+                    return monitored_nodes
+
+                time.sleep(5)
+
+    def _print_node_state(
+        self, group: str, nodes: Iterable[NodeData], nodes_last_log_size: Dict[NodeId, int]
+    ):
+        with cli_logger.group(group):
+            for node in nodes:
+                for i in range(nodes_last_log_size[node.node_id], len(node.state_log) - 1):
+                    cli_logger.print((" " * (len(node.node_id) + 2)) + node.state_log[i])
+
+                try:
+                    log = node.state_log[-1]
+                except IndexError:
+                    log = "<none>"
+
+                cli_logger.labeled_value(node.node_id, log)
 
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         terminated_nodes = self._ray_on_golem_client.terminate_node(node_id)
@@ -153,10 +198,10 @@ class GolemNodeProvider(NodeProvider):
     def node_tags(self, node_id: NodeId) -> Dict:
         return self._ray_on_golem_client.get_node_tags(node_id)
 
-    def internal_ip(self, node_id: NodeId) -> str:
+    def internal_ip(self, node_id: NodeId) -> Optional[str]:
         return self._ray_on_golem_client.get_node_internal_ip(node_id)
 
-    def external_ip(self, node_id: NodeId) -> str:
+    def external_ip(self, node_id: NodeId) -> Optional[str]:
         return self._ray_on_golem_client.get_node_internal_ip(node_id)
 
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
@@ -168,7 +213,8 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters.setdefault("webserver_port", 4578)
         provider_parameters.setdefault("enable_registry_stats", True)
         provider_parameters.setdefault("network", "goerli")
-        provider_parameters.setdefault("budget", 1)
+        provider_parameters.setdefault("subnet_tag", "public")
+        provider_parameters.setdefault("budget_limit", 1)
 
         auth: Dict = config.setdefault("auth", {})
         auth.setdefault("ssh_user", "root")
@@ -188,7 +234,7 @@ class GolemNodeProvider(NodeProvider):
         port: int,
         registry_stats: bool,
     ) -> None:
-        with cli_logger.group(WEBSERVER_LOG_GROUP):
+        with cli_logger.group(LOG_GROUP):
             if ray_on_golem_client.is_webserver_running():
                 cli_logger.print("Not starting webserver, as it's already running")
                 return
@@ -246,7 +292,7 @@ class GolemNodeProvider(NodeProvider):
 
     @staticmethod
     def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:
-        with cli_logger.group(WEBSERVER_LOG_GROUP):
+        with cli_logger.group(LOG_GROUP):
             if not ray_on_golem_client.is_webserver_running():
                 cli_logger.print("Not stopping webserver, as it's already not running")
                 return

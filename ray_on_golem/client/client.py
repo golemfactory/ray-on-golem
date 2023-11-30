@@ -6,7 +6,6 @@ from yarl import URL
 
 from ray_on_golem.client.exceptions import RayOnGolemClientError, RayOnGolemClientValidationError
 from ray_on_golem.server import models, settings
-from ray_on_golem.server.models import NodeConfigData
 
 TResponseModel = TypeVar("TResponseModel")
 
@@ -19,40 +18,30 @@ class RayOnGolemClient:
 
     def create_cluster(
         self,
-        network: str,
-        budget: int,
-        node_config: NodeConfigData,
-        ssh_private_key: str,
-        ssh_user: str,
+        cluster_config: Dict[str, Any],
     ) -> None:
         self._make_request(
             url=settings.URL_CREATE_CLUSTER,
-            request_data=models.CreateClusterRequestData(
-                network=network,
-                budget=budget,
-                node_config=node_config,
-                ssh_private_key=ssh_private_key,
-                ssh_user=ssh_user,
-            ),
+            request_data=models.CreateClusterRequestData(**cluster_config),
             response_model=models.EmptyResponseData,
             error_message="Couldn't create cluster",
         )
 
-    def create_nodes(
+    def request_nodes(
         self, node_config: Dict[str, Any], count: int, tags: models.Tags
-    ) -> Dict[models.NodeId, Dict]:
+    ) -> List[models.NodeId]:
         response = self._make_request(
-            url=settings.URL_CREATE_NODES,
-            request_data=models.CreateNodesRequestData(
+            url=settings.URL_REQUEST_NODES,
+            request_data=models.RequestNodesRequestData(
                 node_config=node_config,
                 count=count,
                 tags=tags,
             ),
-            response_model=models.CreateNodesResponseData,
-            error_message="Couldn't create node",
+            response_model=models.RequestNodesResponseData,
+            error_message="Couldn't request nodes",
         )
 
-        return response.created_nodes
+        return response.requested_nodes
 
     def terminate_node(self, node_id: models.NodeId) -> Dict[models.NodeId, Dict]:
         response = self._make_request(
@@ -65,6 +54,16 @@ class RayOnGolemClient:
         )
 
         return response.terminated_nodes
+
+    def get_cluster_state(self) -> Dict[models.NodeId, models.NodeData]:
+        response = self._make_request(
+            url=settings.URL_GET_CLUSTER_DATA,
+            request_data=models.GetClusterDataRequestData(),
+            response_model=models.GetClusterDataResponseData,
+            error_message="Couldn't get cluster data",
+        )
+
+        return response.cluster_data
 
     def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
         response = self._make_request(
@@ -124,7 +123,7 @@ class RayOnGolemClient:
             error_message="Couldn't get node internal_ip",
         )
 
-        return str(response.ip_address)
+        return response.ip_address
 
     def set_node_tags(self, node_id: models.NodeId, tags: models.Tags) -> None:
         self._make_request(

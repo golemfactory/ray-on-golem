@@ -1,7 +1,8 @@
 import argparse
+import sys
 from pathlib import Path
 from typing import Final
-import sys
+
 import yaml
 
 from .yaml import load_yamls
