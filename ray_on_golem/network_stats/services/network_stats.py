@@ -18,7 +18,6 @@ from golem.managers import (
 )
 from golem.managers.base import ProposalNegotiator
 from golem.node import GolemNode
-from golem.payload.defaults import DEFAULT_SUBNET
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException

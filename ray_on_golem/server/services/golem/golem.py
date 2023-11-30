@@ -222,10 +222,7 @@ class GolemService:
         self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
     ):
         provider_desc = await self._get_provider_desc(context)
-        logger.info(
-            "Starting ssh service on "
-            f"{provider_desc}, {ip=}, {context.activity=}"
-        )
+        logger.info("Starting ssh service on " f"{provider_desc}, {ip=}, {context.activity=}")
         await add_state_log("[7/9] Starting ssh service...")
         await context.run("service ssh start")
 
