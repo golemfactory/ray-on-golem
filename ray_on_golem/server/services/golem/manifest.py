@@ -42,5 +42,5 @@ def get_manifest(
             },
         },
     }
-    logger.debug("Manifest generated: {manifest}")
+    logger.debug(f"Manifest generated: {manifest}")
     return manifest
