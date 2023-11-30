@@ -139,12 +139,12 @@ class NetworkStatsService:
         logger.info("Stopping NetworkStatsService done")
 
     async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
-        network: str = provider_parameters["network"]
-        budget_limit: int = provider_parameters["budget_limit"]
+        payment_network: str = provider_parameters["payment_network"]
+        total_budget: float = provider_parameters["total_budget"]
         subnet_tag: str = provider_parameters.get("subnet_tag", DEFAULT_SUBNET)
         node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
 
-        stack = await self._create_stack(node_config, budget_limit, network, subnet_tag)
+        stack = await self._create_stack(node_config, total_budget, payment_network, subnet_tag)
         await stack.start()
 
         print(f"Gathering stats data for {duration_minutes} minutes...")
@@ -180,13 +180,13 @@ class NetworkStatsService:
     async def _create_stack(
         self,
         node_config: NodeConfigData,
-        budget_limit: float,
-        network: str,
+        total_budget: float,
+        payment_network: str,
         subnet_tag: str,
     ) -> ManagerStack:
         stack = ManagerStack()
 
-        payload = await self._demand_config_helper.get_payload_from_demand_config(
+        payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
 
@@ -194,19 +194,19 @@ class NetworkStatsService:
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
         stack.payment_manager = PayAllPaymentManager(
-            self._golem, budget=budget_limit, network=network
+            self._golem, budget=total_budget, network=payment_network
         )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
             stack.payment_manager.get_allocation,
-            [payload],
+            payloads,
             demand_lifetime=timedelta(hours=8),
             subnet_tag=subnet_tag,
         )
 
         plugins = [
             self._stats_plugin_factory.create_counter_plugin("Initial"),
-            BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(network, set())),
+            BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
             self._stats_plugin_factory.create_counter_plugin("Not blacklisted"),
         ]
 

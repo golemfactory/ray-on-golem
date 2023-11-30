@@ -20,11 +20,9 @@ class RayOnGolemClient:
         self,
         cluster_config: Dict[str, Any],
     ) -> None:
-        request_data = models.CreateClusterRequestData(**cluster_config)
-
         self._make_request(
             url=settings.URL_CREATE_CLUSTER,
-            request_data=request_data,
+            request_data=models.CreateClusterRequestData(**cluster_config),
             response_model=models.EmptyResponseData,
             error_message="Couldn't create cluster",
         )

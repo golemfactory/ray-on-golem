@@ -61,6 +61,8 @@ class RayService:
     async def create_cluster(self, provider_config: ProviderConfigData) -> None:
         self._provider_config = provider_config
 
+        # TODO: CALL FUND with payment network and get yagna wallet address
+
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
         self._ssh_user = provider_config.ssh_user
@@ -119,12 +121,12 @@ class RayService:
 
     async def _create_node(self, node_id: NodeId) -> None:
         activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
-            self._provider_config.node_config,
-            self._ssh_public_key,
-            self._ssh_user,
-            self._ssh_private_key_path,
-            self._provider_config.budget_limit,
-            self._provider_config.network,
+            node_config=self._provider_config.node_config,
+            public_ssh_key=self._ssh_public_key,
+            ssh_user=self._ssh_user,
+            ssh_private_key_path=self._ssh_private_key_path,
+            total_budget=self._provider_config.total_budget,
+            payment_network=self._provider_config.payment_network,
             subnet_tag=self._provider_config.subnet_tag or DEFAULT_SUBNET,
             add_state_log=partial(self._add_node_state_log, node_id),
         )

@@ -61,6 +61,7 @@ class GolemNodeProvider(NodeProvider):
             provider_parameters["webserver_port"],
             provider_parameters["enable_registry_stats"],
         )
+        # TODO: SAVE wallet address
 
         auth = config["auth"]
         default_ssh_private_key = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
