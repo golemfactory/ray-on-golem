@@ -55,8 +55,7 @@ class StatsNegotiatingPlugin(NegotiatingPlugin):
     async def get_proposal(self) -> Proposal:
         while True:
             proposal = await self._get_proposal()
-
-            demand_data = await self._get_demand_data_from_proposal(proposal)
+            demand_data = await proposal.demand.get_demand_data()
 
             try:
                 negotiated_proposal = await self._negotiate_proposal(demand_data, proposal)
