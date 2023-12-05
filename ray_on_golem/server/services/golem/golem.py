@@ -329,10 +329,35 @@ class GolemService:
         *,
         add_state_log: Callable[[str], Awaitable[None]],
     ) -> Tuple[Activity, str, str]:
+
+        async def test():
+            prev_cnt = 0
+            while True:
+                logger.info(stack.demand_manager)
+                logger.info(stack.demand_manager._proposals_count)
+                cnt = stack.demand_manager._proposals_count
+                if cnt != prev_cnt:
+                    await add_state_log(f"[1/9] Getting agreement... {stack.demand_manager._proposals_count} offers collected")
+                    prev_cnt = cnt
+                await asyncio.sleep(5)
+
         logger.info(f"Creating new activity...")
 
         await add_state_log("[1/9] Getting agreement...")
+
+        agr_task = asyncio.create_task(test())
+
+        logger.info(f"------------------------------------------------- BEFORE GET AGREEMENT")
+
         agreement = await stack.agreement_manager.get_agreement()
+
+        logger.info(f"------------------------------------------------- AFTER GET AGREEMENT")
+
+        agr_task.cancel()
+        try:
+            await asyncio.gather(agr_task)
+        except asyncio.CancelledError:
+            pass
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
