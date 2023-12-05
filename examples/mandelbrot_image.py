@@ -1,6 +1,7 @@
 import argparse
 import math
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import NamedTuple, Tuple
 
 import ray
@@ -64,6 +65,7 @@ def draw_mandelbrot(
     x_range: Tuple[float, float],
     y_range: Tuple[float, float],
     max_iter: int,
+    output_path: Path,
     num_chunks: int = 1,
     use_ray: bool = True,
 ):
@@ -121,9 +123,10 @@ def draw_mandelbrot(
 
     current_time_str = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S%z")
     filename = f"mandel-{size.x}x{size.y}-{current_time_str}.png"
-    img.save(filename, "PNG")
+    filepath = output_path / Path(filename)
+    img.save(filepath, "PNG")
 
-    print(f"{datetime.now()}: saved as {filename}")
+    print(f"{datetime.now()}: saved as {filepath}")
 
 
 def argument_parser():
@@ -176,6 +179,13 @@ def argument_parser():
     parser.add_argument(
         "-R", "--no-use-ray", dest="use_ray", action="store_false", help="don't use ray"
     )
+    parser.add_argument(
+        "-o",
+        "--output-path",
+        help="path to where save the result image, default=%(default)s",
+        type=Path,
+        default=Path("."),
+    )
     parser.set_defaults(use_ray=True)
 
     return parser
@@ -204,6 +214,7 @@ draw_mandelbrot(
         args.center[1] + ZOOM_BASE / (args.zoom * aspect_ratio),
     ),
     max_iter=args.max_iterations,
+    output_path=args.output_path,
     num_chunks=args.num_chunks,
     use_ray=args.use_ray,
 )
