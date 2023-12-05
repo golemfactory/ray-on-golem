@@ -3,10 +3,8 @@ import colorful
 import requests
 import socket
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from traceback import print_exc
-from typing import Set, List, Tuple
-from urllib.request import urlopen, Request
+from datetime import datetime
+from typing import Set, List
 
 urls = [
     'https://ipfs.io/ipfs/QmZtmD2qt6fJot32nabSP3CUjicnypEBz7bHVDhPQt9aAy',
@@ -48,7 +46,7 @@ class UrlResult:
 def exc_causes(e: BaseException):
     causes = [f"{type(e)}: {e}"]
     if e.__cause__:
-        causes.extend(exception_causes(e.__cause__))
+        causes.extend(exc_causes(e.__cause__))
     return causes
 
 
@@ -67,12 +65,14 @@ def get_url_len(url: str, num_attempts: int, timeout: int, keep_alive: bool) -> 
     while attempt < num_attempts:
         try:
             attempt += 1
-            if not keep_alive:
-                headers = {}
-            else:
+            if keep_alive:
                 headers = {
                     "Connection": "Keep-Alive",
                     "Keep-Alive": "timeout=60, max=10"
+                }
+            else:
+                headers = {
+                    "Connection": "close",
                 }
             response = requests.get(url, timeout=timeout, headers=headers)
             if response.status_code == 200:
@@ -100,9 +100,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-r", "--num-requests", type=int, default=DEFAULT_NUM_REQUESTS)
 parser.add_argument("-a", "--num-attempts", type=int, default=DEFAULT_NUM_ATTEMPTS)
 parser.add_argument("-t", "--timeout", type=int, default=DEFAULT_TIMEOUT)
-parser.add_argument("-k", "--keep-alive", dest="keep_alive", action="store_true")
+parser.add_argument("-k", "--keep-alive", dest="keep_alive", action="store_true", default=True)
 parser.add_argument("-K", "--no-keep-alive", dest="keep_alive", action="store_false")
 args = parser.parse_args()
+
+print(colorful.bold_white(f"Running with: {vars(args)}"))
 
 refs = [
     get_url_len.remote(
