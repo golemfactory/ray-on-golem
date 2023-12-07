@@ -30,7 +30,14 @@ from ray_on_golem.utils import (
 )
 
 LOG_GROUP = "Ray On Golem"
-MAINNET_PAYMENT_NETWORKS = ("mainnet", "polygon",)
+
+PAYMENT_NETWORK_MAINNET = "mainnet"
+PAYMENT_NETWORK_POLYGON = "polygon"
+
+ONBOARDING_MESSAGE = {
+    PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
+    PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -322,16 +329,13 @@ class GolemNodeProvider(NodeProvider):
             cli_logger.print("Requesting webserver shutdown done, will stop soon")
 
     def _print_mainnet_onboarding_message(self, yagna_payment_status_output: str) -> None:
-        if self._payment_network not in MAINNET_PAYMENT_NETWORKS:
+        if self._payment_network not in ONBOARDING_MESSAGE:
             return
 
         cli_logger.newline()
 
         with cli_logger.indented():
-            cli_logger.print(
-                "Running Ray on Golem on the mainnet requires GLM and MATIC tokens on the Polygon blockchain"
-                " (see: https://docs.golem.network/docs/creators/ray/mainnet)."
-            )
+            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network))
             cli_logger.print("Your wallet:")
 
             with cli_logger.indented():
