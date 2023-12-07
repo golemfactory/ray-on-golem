@@ -1,0 +1,127 @@
+# Ray on Golem cluster name
+cluster_name: golem-cluster
+
+# The maximum number of workers the cluster will have at any given time
+max_workers: 10
+
+# The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
+idle_timeout_minutes: 2
+
+# The cloud provider-specific configuration properties.
+provider:
+  type: "external"
+  use_internal_ips: true
+  module: "ray_on_golem.provider.node_provider.GolemNodeProvider"
+  parameters:
+    # Port of golem webserver that has connection with golem network
+    webserver_port: 4578
+
+    # Blockchain used for payments.
+    # Goerli means running free nodes on testnet,
+    # Polygon is for mainnet operations.
+    payment_network: "goerli"
+
+    # Maximum amount of GLMs that's going to be spent for the whole cluster
+    total_budget: 5
+
+    node_config:
+      # Parameters for golem demands (same for head and workers)
+      demand:
+        # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
+        image_tag: "golem/ray-on-golem:0.4.0-py3.10.13-ray2.7.1"
+
+        # List of urls which will be added to the Computation Manifest
+        # Requires protocol to be defined in all URLs
+        # If not provided demand will not use Computation Manifest
+        outbound_urls: ["https://ipfs.io"]
+
+        # Minimal values of parameters offered by Golem provider 
+        min_mem_gib: 1
+        min_cpu_threads: 1
+        min_storage_gib: 1
+
+        # Maximal values of parameters offered by Golem provider
+        max_cpu_threads: null
+
+      budget_control:
+        per_cpu_expected_usage:
+          # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
+          # If not provided, offers will be picked at random.
+          cpu_load: 0.8
+          duration_hours: 0.5 # 30 minutes
+
+          # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
+          # Max cost is calculated as a sum of:
+          # - start_price / duration / cpu count
+          # - (env_per_hour_price * duration ) / cpu count
+          # - cpu_per_hour_price / duration / cpu_load
+          max_cost: 1.5
+
+        # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
+        max_start_price: 0.5
+
+        # Amount of GLMs for CPU utilisation per hour which Golem provider offer will be rejected if exceeded.
+        max_cpu_per_hour_price: 0.5
+
+        # Amount of GLMs for each second that worker runs which Golem provider offer will be rejected if exceeded.
+        max_env_per_hour_price: 0.5
+
+# The files or directories to copy to the head and worker nodes
+file_mounts: {
+  # <remote_path>: <local_path>
+}
+
+# Tells the autoscaler the allowed node types and the resources they provide
+available_node_types:
+  ray.head.default:
+    # The minimum number of worker nodes of this type to launch
+    min_workers: 0
+
+    # The maximum number of worker nodes of this type to launch
+    max_workers: 0
+
+    # The node type's CPU and GPU resources
+    resources: {}
+
+    node_config: {} # TODO: Demand description here
+  ray.worker.default:
+    min_workers: 1
+    max_workers: 10
+    resources: {}
+    node_config: {}
+
+# List of commands that will be run to initialize the nodes (before `setup_commands`)
+#initialization_commands: [
+#  "pip install endplay",
+#]
+initialization_commands: []
+
+# List of shell commands to run to set up nodes
+setup_commands: []
+
+# Custom commands that will be run on the head node after common setup.
+head_setup_commands: []
+
+# Custom commands that will be run on worker nodes after common setup.
+worker_setup_commands: []
+
+# Command to start ray on the head node. You don't need to change this.
+head_start_ray_commands: [
+  "ray start --head --node-ip-address $NODE_IP --include-dashboard=True --dashboard-host 0.0.0.0 --disable-usage-stats --autoscaling-config=~/ray_bootstrap_config.yaml",
+]
+
+# Command to start ray on worker nodes. You don't need to change this.
+worker_start_ray_commands: [
+  "ray start --address $RAY_HEAD_IP:6379",
+]
+
+# Authentication credentials that Ray will use to launch nodes
+# auth:
+  # Custom username for ssh
+  # ssh_user: "root"
+
+  # If ssh_private_key will be not provided, temporary key will be created and used
+  # ssh_private_key: "~/.ssh/id_rsa"
+
+# A list of paths to the files or directories to copy from the head node to the worker nodes
+cluster_synced_files: []
