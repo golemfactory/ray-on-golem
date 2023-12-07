@@ -332,7 +332,11 @@ class GolemService:
         logger.info(f"Creating new activity...")
 
         await add_state_log("[1/9] Getting agreement...")
-        agreement = await stack.agreement_manager.get_agreement()
+        try:
+            agreement = await stack.agreement_manager.get_agreement()
+        except Exception as e:
+            logger.info(f"--------------------------------------------------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1 {type(e)}, {e=}")
+            raise
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
