@@ -73,7 +73,10 @@ async def get_cluster_data(request: web.Request) -> web.Response:
 
     models.GetClusterDataRequestData.parse_raw(await request.text())
 
-    cluster_data = await ray_service.get_cluster_data()
+    try:
+        cluster_data = await ray_service.get_cluster_data()
+    except RuntimeError as e:
+        return web.Response(status=500, reason=str(e))
 
     response_data = models.GetClusterDataResponseData(cluster_data=cluster_data)
 

@@ -20,9 +20,9 @@ from golem.managers import (
     ScoringBuffer,
     WorkContext,
 )
+from golem.managers.payment import AllocationError
 from golem.node import GolemNode
 from golem.resources import Activity, Network, ProposalData
-from golem.managers.payment.pay_all import AllocationException
 
 from yarl import URL
 
@@ -34,6 +34,8 @@ from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST
 from ray_on_golem.server.services.utils import get_ssh_command
 
 logger = logging.getLogger(__name__)
+
+
 
 
 class GolemService:
@@ -315,7 +317,7 @@ class GolemService:
                     ssh_private_key_path,
                     add_state_log=add_state_log,
                 )
-            except (RuntimeError, AllocationException):
+            except (RuntimeError, AllocationError):
                 await add_state_log("Unrecoverable error while creating the activity")
                 raise
             except Exception:

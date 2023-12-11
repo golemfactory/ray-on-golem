@@ -64,7 +64,10 @@ class RayOnGolemClient:
             error_message="Couldn't get cluster data",
         )
 
-        return response.cluster_data
+        if response.cluster_data:
+            return response.cluster_data
+
+        raise Exception(response)
 
     def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
         response = self._make_request(
@@ -195,7 +198,7 @@ class RayOnGolemClient:
         )
 
         if response.status_code != 200:
-            raise RayOnGolemClientError(f"{error_message}: {response.text}")
+            raise RayOnGolemClientError(f"{error_message}: {response.status_code} - {response.text}")
 
         try:
             return response_model.parse_raw(response.text)

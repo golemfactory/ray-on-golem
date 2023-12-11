@@ -6,6 +6,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
+from golem.managers.payment import AllocationError
 from golem.utils.asyncio import create_task_with_logging
 from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
@@ -57,6 +58,7 @@ class RayService:
         self._ssh_public_key_path: Optional[Path] = None
         self._ssh_public_key: Optional[str] = None
         self._ssh_user: Optional[str] = None
+        self._unrecoverable_error = False
 
     async def shutdown(self) -> None:
         logger.info("Stopping RayService...")
@@ -138,16 +140,20 @@ class RayService:
         return created_node_ids
 
     async def _create_node(self, node_id: NodeId) -> None:
-        activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
-            node_config=self._provider_config.node_config,
-            public_ssh_key=self._ssh_public_key,
-            ssh_user=self._ssh_user,
-            ssh_private_key_path=self._ssh_private_key_path,
-            total_budget=self._provider_config.total_budget,
-            payment_network=self._provider_config.payment_network,
-            subnet_tag=self._provider_config.subnet_tag,
-            add_state_log=partial(self._add_node_state_log, node_id),
-        )
+        try:
+            activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
+                node_config=self._provider_config.node_config,
+                public_ssh_key=self._ssh_public_key,
+                ssh_user=self._ssh_user,
+                ssh_private_key_path=self._ssh_private_key_path,
+                total_budget=self._provider_config.total_budget,
+                payment_network=self._provider_config.payment_network,
+                subnet_tag=self._provider_config.subnet_tag,
+                add_state_log=partial(self._add_node_state_log, node_id),
+            )
+        except AllocationError as e:
+            self._unrecoverable_error = str(e)
+            raise
 
         self._print_ssh_command(ip, ssh_proxy_command, self._ssh_user, self._ssh_private_key_path)
 
@@ -188,6 +194,8 @@ class RayService:
             return {node.node_id: node.dict(exclude={"activity"})}
 
     async def get_cluster_data(self) -> Dict[NodeId, NodeData]:
+        if self._unrecoverable_error:
+            raise RuntimeError(self._unrecoverable_error)
         async with self._nodes_lock:
             return {node.node_id: NodeData.parse_obj(node) for node in self._nodes.values()}
 
