@@ -15,7 +15,7 @@ of our product against real users' needs.
 At the time, we're limiting our tests to Ray on Golem on **Linux**, since we want to focus on the core experience and not on idiosyncrasies of particular platforms on which Golem or Ray in general can run.
 The task described below will help you broaden your knowledge while actively contributing to the improvement of the Golem Network.
 
-We have rewards for 10 people (100 USD each) that you will be able to claim via Upwork after completing the task.
+We have rewards for 10 people (USD 90 + 10 to cover the expense of aquiring mainnet funds) that you will be able to claim via Upwork after completing the task.
 Note that only those who filled out the qualification survey and were contacted on Discord with a link to Upwork are eligible to participate.
 We estimate the task should take 1-3 hours to complete.
 
@@ -40,14 +40,18 @@ We also invite you to visit https://www.golem.network/, where you can find more 
 - Send us your wallet address (so we can see real GLMs), the console output of the code execution on the mainnet, and Ray on Golem debug log file.
 - Fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/UlpvzPrD) (wallet, the logs, and meaningful and thought-out feedback)
 
+**Troubleshooting**
+
+Should anything goes wrong check out the [troubleshooting section](https://docs.golem.network/docs/creators/ray/troubleshooting). 
+If this doesn't help please reach out to us on [Discord: `#Ray on Golem` channel](https://discord.gg/golem). Ideally uploading [webserver debug logs](https://docs.golem.network/docs/creators/ray/troubleshooting#ray-on-golem-s-log-files).
+
 ### The documentation
 
 While going over the documentation consider its clarity, purpose, structure & completeness - we will be asking about this at the end.
 The direction we should take with the docs is an important aspect of the Preview Program for us.
 
 After you succeed in running the code on the mainnet please read two new articles. 
-While doing that consider additionally the potential usability of the presented mechanisms
-
+While doing that consider additionally the potential usability of the presented mechanisms.
 
 ### Acceptance criteria 
 
