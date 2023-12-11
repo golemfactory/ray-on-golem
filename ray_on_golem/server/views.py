@@ -26,9 +26,17 @@ async def create_cluster(request: web.Request) -> web.Response:
 
     request_data = models.CreateClusterRequestData.parse_raw(await request.text())
 
-    await ray_service.create_cluster(provider_config=request_data)
+    (
+        is_cluster_just_created,
+        wallet_address,
+        yagna_payment_status_output,
+    ) = await ray_service.create_cluster(provider_config=request_data)
 
-    response_data = models.EmptyResponseData()
+    response_data = models.CreateClusterResponseData(
+        is_cluster_just_created=is_cluster_just_created,
+        wallet_address=wallet_address,
+        yagna_payment_status_output=yagna_payment_status_output,
+    )
 
     return web.Response(text=response_data.json())
 

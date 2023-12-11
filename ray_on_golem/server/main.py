@@ -85,6 +85,7 @@ def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> 
     app["ray_service"] = RayService(
         ray_on_golem_port=port,
         golem_service=app["golem_service"],
+        yagna_service=app["yagna_service"],
         tmp_path=TMP_PATH,
     )
 

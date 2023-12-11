@@ -29,8 +29,17 @@ from ray_on_golem.utils import (
     prepare_tmp_dir,
 )
 
-logger = logging.getLogger(__name__)
 LOG_GROUP = "Ray On Golem"
+
+PAYMENT_NETWORK_MAINNET = "mainnet"
+PAYMENT_NETWORK_POLYGON = "polygon"
+
+ONBOARDING_MESSAGE = {
+    PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
+    PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
+}
+
+logger = logging.getLogger(__name__)
 
 
 class GolemNodeProvider(NodeProvider):
@@ -48,7 +57,16 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters = {
             ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()
         }
-        self._ray_on_golem_client.create_cluster(provider_parameters)
+        self._payment_network = provider_parameters["payment_network"].lower().strip()
+
+        cluster_creation_response = self._ray_on_golem_client.create_cluster(provider_parameters)
+
+        self._wallet_address = cluster_creation_response.wallet_address
+        self._is_cluster_just_created = cluster_creation_response.is_cluster_just_created
+
+        self._print_mainnet_onboarding_message(
+            cluster_creation_response.yagna_payment_status_output
+        )
 
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -309,3 +327,24 @@ class GolemNodeProvider(NodeProvider):
                 return
 
             cli_logger.print("Requesting webserver shutdown done, will stop soon")
+
+    def _print_mainnet_onboarding_message(self, yagna_payment_status_output: str) -> None:
+        if self._payment_network not in ONBOARDING_MESSAGE:
+            return
+
+        cli_logger.newline()
+
+        with cli_logger.indented():
+            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network))
+            cli_logger.print("Your wallet:")
+
+            with cli_logger.indented():
+                for line in yagna_payment_status_output.splitlines():
+                    cli_logger.print(line)
+
+            cli_logger.newline()
+            cli_logger.print(
+                "You can use the Golem Onboarding portal to top up: https://golemfactory.github.io"
+                f"/onboarding_production/?yagnaAddress={self._wallet_address}"
+            )
+            cli_logger.newline()

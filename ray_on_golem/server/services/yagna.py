@@ -42,7 +42,6 @@ class YagnaService:
             logger.info("Not starting Yagna, as it was started externally")
         else:
             await self._run_yagna()
-            await self._run_yagna_payment_fund()
 
         self.yagna_appkey = await self._get_or_create_yagna_appkey()
 
@@ -147,26 +146,46 @@ class YagnaService:
 
         logger.info("Stopping Yagna done")
 
-    async def _run_yagna_payment_fund(self) -> None:
+    async def run_payment_fund(self, network: str) -> None:
         for _ in range(5):
-            logger.debug("Preparing testnet fund...")
+            logger.debug(f"Preparing `{network}` funds...")
             try:
-                await run_subprocess_output(self._yagna_path, "payment", "fund")
+                await run_subprocess_output(
+                    self._yagna_path, "payment", "fund", "--network", network
+                )
                 # await asyncio.sleep(5)  # FIXME: Funds are sometime not available ASAP
             except RayOnGolemError as e:
-                logger.error("Preparing testnet fund failed with error: %s", e)
+                logger.error(f"Preparing `{network}` funds failed with error: %s", e)
             else:
                 output = json.loads(
-                    await run_subprocess_output(self._yagna_path, "payment", "status", "--json")
+                    await run_subprocess_output(
+                        self._yagna_path, "payment", "status", "--network", network, "--json"
+                    )
                 )
 
                 logger.debug(
-                    "Preparing testnet fund done with balance of %.2f tGLMs",
+                    f"Preparing `{network}` funds done with balance of %.2f %s",
                     float(output["amount"]),
+                    output["token"],
                 )
                 return
 
-        raise YagnaServiceError("Can't prepare testnet fund!")
+        raise YagnaServiceError(f"Can't prepare `{network}` funds!")
+
+    async def fetch_payment_status(self, network: str) -> str:
+        output = await run_subprocess_output(
+            self._yagna_path, "payment", "status", "--network", network
+        )
+        return output.decode()
+
+    async def fetch_wallet_address(self) -> str:
+        id_list = json.loads(await run_subprocess_output(self._yagna_path, "id", "list", "--json"))
+
+        for identity in id_list:
+            if identity["default"]:
+                return identity["address"]
+
+        raise YagnaServiceError(f"Default wallet not found for app_key `{self.yagna_appkey}`!")
 
     async def _get_or_create_yagna_appkey(self) -> str:
         if YAGNA_APPKEY:
