@@ -19,6 +19,7 @@ from ray_on_golem.server.settings import (
     LOGGING_DEBUG_PATH,
     RAY_ON_GOLEM_CHECK_DEADLINE,
     RAY_ON_GOLEM_PATH,
+    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
     RAY_ON_GOLEM_START_DEADLINE,
     TMP_PATH,
 )
@@ -246,16 +247,20 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
         provider_parameters["_ssh_user"] = auth["ssh_user"]
 
-    @staticmethod
+    @classmethod
     def _start_webserver(
+        cls,
         ray_on_golem_client: RayOnGolemClient,
         port: int,
         registry_stats: bool,
     ) -> None:
         with cli_logger.group(LOG_GROUP):
-            if ray_on_golem_client.is_webserver_running():
+            webserver_state = ray_on_golem_client.get_webserver_state()
+            if webserver_state:
                 cli_logger.print("Not starting webserver, as it's already running")
                 return
+            elif webserver_state is False:
+                cls._wait_for_shutdown(ray_on_golem_client)
 
             cli_logger.print(
                 "Starting webserver with deadline up to `{}`...", RAY_ON_GOLEM_START_DEADLINE
@@ -286,7 +291,7 @@ class GolemNodeProvider(NodeProvider):
                 try:
                     proc.communicate(timeout=check_seconds)
                 except subprocess.TimeoutExpired:
-                    if ray_on_golem_client.is_webserver_running():
+                    if ray_on_golem_client.get_webserver_state():
                         cli_logger.print("Starting webserver done")
                         return
                 else:
@@ -311,8 +316,8 @@ class GolemNodeProvider(NodeProvider):
     @staticmethod
     def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:
         with cli_logger.group(LOG_GROUP):
-            if not ray_on_golem_client.is_webserver_running():
-                cli_logger.print("Not stopping webserver, as it's already not running")
+            if not ray_on_golem_client.get_webserver_state():
+                cli_logger.print("Not stopping webserver, as it's already not running or shutting down")
                 return
 
             cli_logger.print("Requesting webserver shutdown...")
@@ -327,6 +332,34 @@ class GolemNodeProvider(NodeProvider):
                 return
 
             cli_logger.print("Requesting webserver shutdown done, will stop soon")
+
+    @staticmethod
+    def _wait_for_shutdown(ray_on_golem_client: RayOnGolemClient) -> None:
+        cli_logger.print(
+            "Previous webserver instance is still shutting down, waiting with deadline up to `{}`...",
+            RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
+        )
+
+        wait_deadline = datetime.now() + RAY_ON_GOLEM_SHUTDOWN_DEADLINE
+        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
+
+        time.sleep(check_seconds)
+        while datetime.now() < wait_deadline:
+            webserver_state = ray_on_golem_client.get_webserver_state()
+            if webserver_state is None:
+                cli_logger.print("Previous webserver instance shutdown done")
+                return
+
+            cli_logger.print(
+                "Previous webserver instance is not yet shutdown, waiting additional `{}` seconds...",
+                check_seconds,
+            )
+            time.sleep(check_seconds)
+
+        cli_logger.abort(
+            "Previous webserver instance is still running! Deadline of `{}` reached.",
+            RAY_ON_GOLEM_START_DEADLINE,
+        )
 
     def _print_mainnet_onboarding_message(self, yagna_payment_status_output: str) -> None:
         if self._payment_network not in ONBOARDING_MESSAGE:

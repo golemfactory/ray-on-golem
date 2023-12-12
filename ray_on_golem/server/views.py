@@ -17,7 +17,11 @@ routes = web.RouteTableDef()
 #  custom URL with custom payload
 @routes.get(settings.URL_HEALTH_CHECK)
 async def health_check(request: web.Request) -> web.Response:
-    return web.Response(text="ok")
+    response_data = models.HealthCheckResponseData(
+        is_shutting_down=request.app.get("shutting_down", False)
+    )
+
+    return web.Response(text=response_data.json())
 
 
 @routes.post(settings.URL_CREATE_CLUSTER)
@@ -209,6 +213,7 @@ async def self_shutdown(request):
         logger.info(f"Received a self-shutdown request, exiting in {shutdown_seconds} seconds...")
         loop = asyncio.get_event_loop()
         loop.call_later(shutdown_seconds, raise_graceful_exit)
+        request.app["shutting_down"] = True
 
     response_data = models.SelfShutdownResponseData(shutdown_state=shutdown_state)
 

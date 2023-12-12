@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Type, TypeVar
+from typing import Any, Dict, List, Optional, Type, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -171,16 +171,24 @@ class RayOnGolemClient:
 
         return response.shutdown_state
 
-    def is_webserver_running(self) -> bool:
+    def get_webserver_state(self) -> Optional[bool]:
         try:
             response = requests.get(
                 str(self._base_url / settings.URL_HEALTH_CHECK.lstrip("/")),
                 timeout=settings.RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds(),
             )
         except requests.ConnectionError:
-            return False
+            return None
         else:
-            return response.status_code == 200 and response.text == "ok"
+            if response.status_code != 200:
+                return None
+
+            try:
+                health_check = models.HealthCheckResponseData.parse_raw(response.text)
+            except ValidationError:
+                return None
+
+            return not health_check.is_shutting_down
 
     def _make_request(
         self,
