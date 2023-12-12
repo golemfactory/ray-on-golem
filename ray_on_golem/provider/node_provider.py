@@ -70,7 +70,7 @@ class GolemNodeProvider(NodeProvider):
 
         wallet_glm_amount = float(cluster_creation_response.yagna_payment_status.get("amount", "0"))
         if not wallet_glm_amount:
-            cli_logger.abort(f"You don't seem to have any GLM tokens on your Golem wallet.")
+            cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
