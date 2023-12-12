@@ -4,7 +4,7 @@ import logging
 from asyncio.subprocess import Process
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import aiohttp
 
@@ -146,7 +146,7 @@ class YagnaService:
 
         logger.info("Stopping Yagna done")
 
-    async def run_payment_fund(self, network: str) -> None:
+    async def run_payment_fund(self, network: str) -> Dict:
         for _ in range(5):
             logger.debug(f"Preparing `{network}` funds...")
             try:
@@ -168,7 +168,7 @@ class YagnaService:
                     float(output["amount"]),
                     output["token"],
                 )
-                return
+                return output
 
         raise YagnaServiceError(f"Can't prepare `{network}` funds!")
 
