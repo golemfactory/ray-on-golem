@@ -171,7 +171,7 @@ class RayOnGolemClient:
 
         return response.shutdown_state
 
-    def get_webserver_state(self) -> Optional[bool]:
+    def is_webserver_serviceable(self) -> Optional[bool]:
         try:
             response = requests.get(
                 str(self._base_url / settings.URL_HEALTH_CHECK.lstrip("/")),

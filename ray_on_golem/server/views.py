@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
 
+def reject_if_shutting_down(func):
+    async def wrapper(request: web.Request) -> web.Response:
+        if request.app.get("shutting_down"):
+            return web.HTTPBadRequest(text="Action not allowed while server is shutting down!")
+
+        return await func(request)
+
+    return wrapper
+
+
 # FIXME: This route should be a default root URL with basic server info instead of
 #  custom URL with custom payload
 @routes.get(settings.URL_HEALTH_CHECK)
@@ -140,6 +150,7 @@ async def set_node_tags(request: web.Request) -> web.Response:
 
 
 @routes.post(settings.URL_REQUEST_NODES)
+@reject_if_shutting_down
 async def request_nodes(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
 
@@ -155,6 +166,7 @@ async def request_nodes(request: web.Request) -> web.Response:
 
 
 @routes.post(settings.URL_TERMINATE_NODE)
+@reject_if_shutting_down
 async def terminate_node(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
 

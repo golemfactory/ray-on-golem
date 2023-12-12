@@ -255,11 +255,11 @@ class GolemNodeProvider(NodeProvider):
         registry_stats: bool,
     ) -> None:
         with cli_logger.group(LOG_GROUP):
-            webserver_state = ray_on_golem_client.get_webserver_state()
-            if webserver_state:
+            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
+            if webserver_serviceable:
                 cli_logger.print("Not starting webserver, as it's already running")
                 return
-            elif webserver_state is False:
+            elif webserver_serviceable is False:
                 cls._wait_for_shutdown(ray_on_golem_client)
 
             cli_logger.print(
@@ -291,7 +291,7 @@ class GolemNodeProvider(NodeProvider):
                 try:
                     proc.communicate(timeout=check_seconds)
                 except subprocess.TimeoutExpired:
-                    if ray_on_golem_client.get_webserver_state():
+                    if ray_on_golem_client.is_webserver_serviceable():
                         cli_logger.print("Starting webserver done")
                         return
                 else:
@@ -316,8 +316,13 @@ class GolemNodeProvider(NodeProvider):
     @staticmethod
     def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:
         with cli_logger.group(LOG_GROUP):
-            if not ray_on_golem_client.get_webserver_state():
-                cli_logger.print("Not stopping webserver, as it's already not running or shutting down")
+            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
+            if not webserver_serviceable:
+                if webserver_serviceable is None:
+                    cli_logger.print("Not stopping the webserver, as it's not running")
+                else:
+                    cli_logger.print("Not stopping the webserver, as it's already shutting down")
+
                 return
 
             cli_logger.print("Requesting webserver shutdown...")
@@ -345,8 +350,8 @@ class GolemNodeProvider(NodeProvider):
 
         time.sleep(check_seconds)
         while datetime.now() < wait_deadline:
-            webserver_state = ray_on_golem_client.get_webserver_state()
-            if webserver_state is None:
+            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
+            if webserver_serviceable is None:
                 cli_logger.print("Previous webserver instance shutdown done")
                 return
 
