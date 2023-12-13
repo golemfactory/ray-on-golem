@@ -13,11 +13,25 @@ logger = logging.getLogger(__name__)
 routes = web.RouteTableDef()
 
 
+def reject_if_shutting_down(func):
+    async def wrapper(request: web.Request) -> web.Response:
+        if request.app.get("shutting_down"):
+            return web.HTTPBadRequest(text="Action not allowed while server is shutting down!")
+
+        return await func(request)
+
+    return wrapper
+
+
 # FIXME: This route should be a default root URL with basic server info instead of
 #  custom URL with custom payload
 @routes.get(settings.URL_HEALTH_CHECK)
 async def health_check(request: web.Request) -> web.Response:
-    return web.Response(text="ok")
+    response_data = models.HealthCheckResponseData(
+        is_shutting_down=request.app.get("shutting_down", False)
+    )
+
+    return web.Response(text=response_data.json())
 
 
 @routes.post(settings.URL_CREATE_CLUSTER)
@@ -138,6 +152,7 @@ async def set_node_tags(request: web.Request) -> web.Response:
 
 
 @routes.post(settings.URL_REQUEST_NODES)
+@reject_if_shutting_down
 async def request_nodes(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
 
@@ -153,6 +168,7 @@ async def request_nodes(request: web.Request) -> web.Response:
 
 
 @routes.post(settings.URL_TERMINATE_NODE)
+@reject_if_shutting_down
 async def terminate_node(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
 
@@ -211,6 +227,7 @@ async def self_shutdown(request):
         logger.info(f"Received a self-shutdown request, exiting in {shutdown_seconds} seconds...")
         loop = asyncio.get_event_loop()
         loop.call_later(shutdown_seconds, raise_graceful_exit)
+        request.app["shutting_down"] = True
 
     response_data = models.SelfShutdownResponseData(shutdown_state=shutdown_state)
 

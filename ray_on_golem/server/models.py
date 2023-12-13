@@ -164,3 +164,7 @@ class SelfShutdownRequestData(BaseModel):
 
 class SelfShutdownResponseData(BaseModel):
     shutdown_state: ShutdownState
+
+
+class HealthCheckResponseData(BaseModel):
+    is_shutting_down: bool

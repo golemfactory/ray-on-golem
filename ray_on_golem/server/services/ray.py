@@ -73,8 +73,6 @@ class RayService:
 
         self._provider_config = provider_config
 
-        # TODO: CALL FUND with payment network and get yagna wallet address
-
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
         self._ssh_user = provider_config.ssh_user
