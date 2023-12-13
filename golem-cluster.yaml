@@ -45,16 +45,17 @@ provider:
 
       budget_control:
         per_cpu_expected_usage:
+          # Per cpu expected cost is calculated as a sum of:
+          # - start_price / cpu_count
+          # - env_per_hour_price * duration_hours / cpu_count
+          # - cpu_per_hour_price * duration_hours * cpu_load 
+        
           # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
           # If not provided, offers will be picked at random.
           cpu_load: 0.8
           duration_hours: 0.5 # 30 minutes
 
           # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
-          # Per cpu max cost is calculated as a sum of:
-          # - start_price / cpu_count
-          # - env_per_hour_price * duration_hours / cpu_count
-          # - cpu_per_hour_price * duration_hours * cpu_load 
           max_cost: 1.5
 
         # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
