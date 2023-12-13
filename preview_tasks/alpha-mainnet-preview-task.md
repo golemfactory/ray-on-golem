@@ -42,7 +42,7 @@ We also invite you to visit https://www.golem.network/, where you can find more 
 
 **Troubleshooting**
 
-Should anything goes wrong check out the [troubleshooting section](https://docs.golem.network/docs/creators/ray/troubleshooting). 
+Should anything go wrong, check out the [troubleshooting section](https://docs.golem.network/docs/creators/ray/troubleshooting) for a possible solution.
 If this doesn't help please reach out to us on [Discord: `#Ray on Golem` channel](https://discord.gg/golem). 
 Ideally, please also upload the [webserver debug logs](https://docs.golem.network/docs/creators/ray/troubleshooting#ray-on-golem-s-log-files).
 
