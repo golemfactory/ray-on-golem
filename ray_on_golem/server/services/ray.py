@@ -68,7 +68,9 @@ class RayService:
 
         logger.info("Stopping RayService done")
 
-    async def create_cluster(self, provider_config: ProviderConfigData) -> Tuple[bool, str, str]:
+    async def create_cluster(
+        self, provider_config: ProviderConfigData
+    ) -> Tuple[bool, str, str, Dict]:
         is_cluster_just_created = self._provider_config is None
 
         self._provider_config = provider_config
@@ -82,13 +84,15 @@ class RayService:
         with self._ssh_public_key_path.open() as f:
             self._ssh_public_key = f.readline().strip()
 
-        await self._yagna_service.run_payment_fund(self._provider_config.payment_network)
+        payment_status = await self._yagna_service.run_payment_fund(
+            self._provider_config.payment_network
+        )
         yagna_output = await self._yagna_service.fetch_payment_status(
             self._provider_config.payment_network
         )
         self._wallet_address = await self._yagna_service.fetch_wallet_address()
 
-        return is_cluster_just_created, self._wallet_address, yagna_output
+        return is_cluster_just_created, self._wallet_address, yagna_output, payment_status
 
     async def _destroy_nodes(self) -> None:
         async with self._nodes_lock:

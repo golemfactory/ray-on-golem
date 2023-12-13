@@ -30,12 +30,14 @@ async def create_cluster(request: web.Request) -> web.Response:
         is_cluster_just_created,
         wallet_address,
         yagna_payment_status_output,
+        yagna_payment_status,
     ) = await ray_service.create_cluster(provider_config=request_data)
 
     response_data = models.CreateClusterResponseData(
         is_cluster_just_created=is_cluster_just_created,
         wallet_address=wallet_address,
         yagna_payment_status_output=yagna_payment_status_output,
+        yagna_payment_status=yagna_payment_status,
     )
 
     return web.Response(text=response_data.json())
