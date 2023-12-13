@@ -51,7 +51,7 @@ Ideally, please also upload the [webserver debug logs](https://docs.golem.networ
 While going over the documentation consider its clarity, purpose, structure & completeness - we will be asking about this at the end.
 The direction we should take with the docs is an important aspect of the Preview Program for us.
 
-After you succeed in running the code on the mainnet please read two new articles. 
+After you succeed in running the code on the mainnet please read the new [budget control](https://docs.golem.network/docs/creators/ray/cluster-yaml#budget-control) and [accessing the Internet](https://docs.golem.network/docs/creators/ray/cluster-yaml#outbound) articles. 
 We're particularly interested in any feedback you may have on the usability of the mechanisms that we offer and present in our documentation for the work you usually do, or for any interesting projects that you have in mind.
 
 ### Acceptance criteria 
