@@ -37,7 +37,7 @@ class ManagerStackNodeConfigHelper:
         max_cost = per_cpu_expected_usage.max_cost
         if max_cost is not None:
             stack.extra_proposal_plugins[
-                f"Reject if per cpu expected cost exceeds {max_cost}"
+                f"Reject if per cpu expected cost exceeds `max_cost` = {max_cost}"
             ] = RejectIfCostsExceeds(max_cost, linear_per_cpu_average_cost)
             logger.debug("Budget control based on per cpu expected usage applied with max limits")
         else:
@@ -53,21 +53,21 @@ class ManagerStackNodeConfigHelper:
 
         if budget_control.max_start_price is not None:
             proposal_plugins[
-                f"Reject if start_price exceeds {budget_control.max_start_price}"
+                f"Reject if start_price exceeds `max_start_price` = {budget_control.max_start_price}"
             ] = RejectIfCostsExceeds(
                 budget_control.max_start_price, LinearCoeffsCost("price_initial")
             )
 
         if budget_control.max_cpu_per_hour_price is not None:
             proposal_plugins[
-                f"Reject if cpu_hour_price exceeds {budget_control.max_cpu_per_hour_price}"
+                f"Reject if cpu_hour_price exceeds `max_cpu_hour_price` = {budget_control.max_cpu_per_hour_price}"
             ] = RejectIfCostsExceeds(
                 budget_control.max_cpu_per_hour_price / 3600, LinearCoeffsCost("price_cpu_sec")
             )
 
         if budget_control.max_env_per_hour_price is not None:
             proposal_plugins[
-                f"Reject if env_per_hour_price exceeds {budget_control.max_env_per_hour_price}"
+                f"Reject if env_per_hour_price exceeds `max_env_per_hour` = {budget_control.max_env_per_hour_price}"
             ] = RejectIfCostsExceeds(
                 budget_control.max_env_per_hour_price / 3600,
                 LinearCoeffsCost("price_duration_sec"),
