@@ -67,7 +67,7 @@ class ManagerStackNodeConfigHelper:
 
         if budget_control.max_env_per_hour_price is not None:
             proposal_plugins[
-                f"Reject if env_per_hour_price exceeds `max_env_per_hour` = {budget_control.max_env_per_hour_price}"
+                f"Reject if env_per_hour_price exceeds `max_env_per_hour_price` = {budget_control.max_env_per_hour_price}"
             ] = RejectIfCostsExceeds(
                 budget_control.max_env_per_hour_price / 3600,
                 LinearCoeffsCost("price_duration_sec"),
