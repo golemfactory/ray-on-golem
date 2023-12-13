@@ -118,7 +118,7 @@ Congratulations!
 
 ## Limitations
 
-Current version is `pre-alpha` which means the happy path is working on **Ubuntu** on the Golem test network.
+Current version is `alpha` which means the happy path is working on **Ubuntu** on the Golem test and main networks.
 We have tested Ray on Golem on Ubuntu and on WSL, but it should work on other Linux distributions. At the moment, we don't support MacOS or bare Windows.
  
 We use this version to show the direction and get feedback.
