@@ -52,7 +52,7 @@ While going over the documentation consider its clarity, purpose, structure & co
 The direction we should take with the docs is an important aspect of the Preview Program for us.
 
 After you succeed in running the code on the mainnet please read two new articles. 
-While doing that consider additionally the potential usability of the presented mechanisms.
+We're particularly interested in any feedback you may have on the usability of the mechanisms that we offer and present in our documentation for the work you usually do, or for any interesting projects that you have in mind.
 
 ### Acceptance criteria 
 
