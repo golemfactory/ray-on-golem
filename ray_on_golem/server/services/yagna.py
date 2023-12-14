@@ -11,11 +11,14 @@ import aiohttp
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.settings import (
     LOGGING_YAGNA_PATH,
+    PAYMENT_NETWORK_MAINNET,
+    PAYMENT_NETWORK_POLYGON,
     RAY_ON_GOLEM_CHECK_DEADLINE,
     YAGNA_API_URL,
     YAGNA_APPKEY,
     YAGNA_APPNAME,
     YAGNA_CHECK_DEADLINE,
+    YAGNA_FUND_DEADLINE,
     YAGNA_START_DEADLINE,
 )
 from ray_on_golem.utils import get_last_lines_from_file, run_subprocess, run_subprocess_output
@@ -147,15 +150,17 @@ class YagnaService:
         logger.info("Stopping Yagna done")
 
     async def run_payment_fund(self, network: str) -> Dict:
-        for _ in range(5):
-            logger.debug(f"Preparing `{network}` funds...")
+        logger.debug("Preparing `%s` funds with deadline up to %s...", network, YAGNA_FUND_DEADLINE)
+
+        fund_deadline = datetime.now() + YAGNA_FUND_DEADLINE
+        check_seconds = int(YAGNA_CHECK_DEADLINE.total_seconds())
+        while datetime.now() < fund_deadline:
             try:
                 await run_subprocess_output(
                     self._yagna_path, "payment", "fund", "--network", network
                 )
-                # await asyncio.sleep(5)  # FIXME: Funds are sometime not available ASAP
             except RayOnGolemError as e:
-                logger.error(f"Preparing `{network}` funds failed with error: %s", e)
+                logger.error("Preparing `%s` funds failed with error: %s", network, e)
             else:
                 output = json.loads(
                     await run_subprocess_output(
@@ -163,14 +168,27 @@ class YagnaService:
                     )
                 )
 
-                logger.debug(
-                    f"Preparing `{network}` funds done with balance of %.2f %s",
-                    float(output["amount"]),
-                    output["token"],
-                )
-                return output
+                amount = float(output["amount"])
 
-        raise YagnaServiceError(f"Can't prepare `{network}` funds!")
+                if amount or network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON):
+                    logger.debug(
+                        "Preparing `%s` funds done with balance of %.2f %s",
+                        network,
+                        amount,
+                        output["token"],
+                    )
+                    return output
+                else:
+                    logger.debug(
+                        "Prepared funds seems not yet available, waiting additional `%s` seconds...",
+                        check_seconds,
+                    )
+
+            await asyncio.sleep(check_seconds)
+
+        raise YagnaServiceError(
+            f"Can't prepare `{network}` funds! Deadline of `{YAGNA_CHECK_DEADLINE}` reached."
+        )
 
     async def fetch_payment_status(self, network: str) -> str:
         output = await run_subprocess_output(

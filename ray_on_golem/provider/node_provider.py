@@ -17,6 +17,8 @@ from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
 from ray_on_golem.server.settings import (
     LOGGING_DEBUG_PATH,
+    PAYMENT_NETWORK_MAINNET,
+    PAYMENT_NETWORK_POLYGON,
     RAY_ON_GOLEM_CHECK_DEADLINE,
     RAY_ON_GOLEM_PATH,
     RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
@@ -31,9 +33,6 @@ from ray_on_golem.utils import (
 )
 
 LOG_GROUP = "Ray On Golem"
-
-PAYMENT_NETWORK_MAINNET = "mainnet"
-PAYMENT_NETWORK_POLYGON = "polygon"
 
 ONBOARDING_MESSAGE = {
     PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
