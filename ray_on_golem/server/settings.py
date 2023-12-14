@@ -94,6 +94,7 @@ YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
 YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
 YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
 YAGNA_START_DEADLINE = timedelta(minutes=2)
+YAGNA_FUND_DEADLINE = timedelta(minutes=2)
 YAGNA_CHECK_DEADLINE = timedelta(seconds=2)
 
 RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=5)
@@ -115,3 +116,6 @@ URL_TERMINATE_NODE = "/terminate"
 URL_GET_SSH_PROXY_COMMAND = "/ssh_proxy_command"
 URL_GET_OR_CREATE_DEFAULT_SSH_KEY = "/ger_or_create_default_ssh_key"
 URL_SELF_SHUTDOWN = "/self_shutdown"
+
+PAYMENT_NETWORK_MAINNET = "mainnet"
+PAYMENT_NETWORK_POLYGON = "polygon"
