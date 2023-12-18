@@ -1,7 +1,7 @@
 import argparse
 import math
 from datetime import datetime, timezone
-from typing import NamedTuple, Tuple
+from typing import NamedTuple, Optional, Tuple
 
 import ray
 from PIL import Image
@@ -65,6 +65,7 @@ def draw_mandelbrot(
     y_range: Tuple[float, float],
     max_iter: int,
     num_chunks: int = 1,
+    output_file: Optional[str] = None,
     use_ray: bool = True,
 ):
     chunks = list()
@@ -120,7 +121,7 @@ def draw_mandelbrot(
     img.show()
 
     current_time_str = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S%z")
-    filename = f"mandel-{size.x}x{size.y}-{current_time_str}.png"
+    filename = output_file or f"mandel-{size.x}x{size.y}-{current_time_str}.png"
     img.save(filename, "PNG")
 
     print(f"{datetime.now()}: saved as {filename}")
@@ -168,6 +169,13 @@ def argument_parser():
         default=16,
     )
     parser.add_argument(
+        "-f",
+        "--output-file",
+        help="name of file to save output into, defaults to predefined template",
+        type=str,
+        nargs="?",
+    )
+    parser.add_argument(
         "--ray-num-cpus",
         help="number of CPUs for ray to use",
         type=int,
@@ -205,6 +213,7 @@ draw_mandelbrot(
     ),
     max_iter=args.max_iterations,
     num_chunks=args.num_chunks,
+    output_file=args.output_file,
     use_ray=args.use_ray,
 )
 

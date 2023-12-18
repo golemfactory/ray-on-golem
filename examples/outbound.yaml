@@ -20,7 +20,6 @@ provider:
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
     payment_network: "goerli"
-    #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
@@ -34,7 +33,7 @@ provider:
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
         # If not provided demand will not use Computation Manifest
-        outbound_urls: ["https://pypi.dev.golem.network"]
+        outbound_urls: ["https://ipfs.io"]
 
         # Minimal values of parameters offered by Golem provider 
         min_mem_gib: 1
@@ -46,17 +45,16 @@ provider:
 
       budget_control:
         per_cpu_expected_usage:
-          # Per cpu expected cost is calculated as a sum of:
-          # - start_price / cpu_count
-          # - env_per_hour_price * duration_hours / cpu_count
-          # - cpu_per_hour_price * duration_hours * cpu_load 
-        
           # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
           # If not provided, offers will be picked at random.
           cpu_load: 0.8
           duration_hours: 0.5 # 30 minutes
 
           # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
+          # Max cost is calculated as a sum of:
+          # - start_price / duration / cpu count
+          # - (env_per_hour_price * duration ) / cpu count
+          # - cpu_per_hour_price / duration / cpu_load
           max_cost: 1.5
 
         # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
@@ -65,16 +63,12 @@ provider:
         # Amount of GLMs for CPU utilisation per hour which Golem provider offer will be rejected if exceeded.
         max_cpu_per_hour_price: 0.5
 
-        # Amount of GLMs for each hour that worker runs which Golem provider offer will be rejected if exceeded.
+        # Amount of GLMs for each second that worker runs which Golem provider offer will be rejected if exceeded.
         max_env_per_hour_price: 0.5
 
 # The files or directories to copy to the head and worker nodes
-# Remote workdir is /root/
 file_mounts: {
   # <remote_path>: <local_path>
-  # "/absolute/path/dir/": ".",
-  # "./relative/path/dir/": ".",
-  # "./relative/path/file.txt": "./file.txt"
 }
 
 # Tells the autoscaler the allowed node types and the resources they provide

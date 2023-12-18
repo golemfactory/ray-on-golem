@@ -4,18 +4,21 @@ import logging
 from asyncio.subprocess import Process
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import aiohttp
 
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.settings import (
     LOGGING_YAGNA_PATH,
+    PAYMENT_NETWORK_MAINNET,
+    PAYMENT_NETWORK_POLYGON,
     RAY_ON_GOLEM_CHECK_DEADLINE,
     YAGNA_API_URL,
     YAGNA_APPKEY,
     YAGNA_APPNAME,
     YAGNA_CHECK_DEADLINE,
+    YAGNA_FUND_DEADLINE,
     YAGNA_START_DEADLINE,
 )
 from ray_on_golem.utils import get_last_lines_from_file, run_subprocess, run_subprocess_output
@@ -42,7 +45,6 @@ class YagnaService:
             logger.info("Not starting Yagna, as it was started externally")
         else:
             await self._run_yagna()
-            await self._run_yagna_payment_fund()
 
         self.yagna_appkey = await self._get_or_create_yagna_appkey()
 
@@ -147,26 +149,61 @@ class YagnaService:
 
         logger.info("Stopping Yagna done")
 
-    async def _run_yagna_payment_fund(self) -> None:
-        for _ in range(5):
-            logger.debug("Preparing testnet fund...")
+    async def run_payment_fund(self, network: str) -> Dict:
+        logger.debug("Preparing `%s` funds with deadline up to %s...", network, YAGNA_FUND_DEADLINE)
+
+        fund_deadline = datetime.now() + YAGNA_FUND_DEADLINE
+        check_seconds = int(YAGNA_CHECK_DEADLINE.total_seconds())
+        while datetime.now() < fund_deadline:
             try:
-                await run_subprocess_output(self._yagna_path, "payment", "fund")
-                # await asyncio.sleep(5)  # FIXME: Funds are sometime not available ASAP
+                await run_subprocess_output(
+                    self._yagna_path, "payment", "fund", "--network", network
+                )
             except RayOnGolemError as e:
-                logger.error("Preparing testnet fund failed with error: %s", e)
+                logger.error("Preparing `%s` funds failed with error: %s", network, e)
             else:
                 output = json.loads(
-                    await run_subprocess_output(self._yagna_path, "payment", "status", "--json")
+                    await run_subprocess_output(
+                        self._yagna_path, "payment", "status", "--network", network, "--json"
+                    )
                 )
 
-                logger.debug(
-                    "Preparing testnet fund done with balance of %.2f tGLMs",
-                    float(output["amount"]),
-                )
-                return
+                amount = float(output["amount"])
 
-        raise YagnaServiceError("Can't prepare testnet fund!")
+                if amount or network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON):
+                    logger.debug(
+                        "Preparing `%s` funds done with balance of %.2f %s",
+                        network,
+                        amount,
+                        output["token"],
+                    )
+                    return output
+                else:
+                    logger.debug(
+                        "Prepared funds seems not yet available, waiting additional `%s` seconds...",
+                        check_seconds,
+                    )
+
+            await asyncio.sleep(check_seconds)
+
+        raise YagnaServiceError(
+            f"Can't prepare `{network}` funds! Deadline of `{YAGNA_CHECK_DEADLINE}` reached."
+        )
+
+    async def fetch_payment_status(self, network: str) -> str:
+        output = await run_subprocess_output(
+            self._yagna_path, "payment", "status", "--network", network
+        )
+        return output.decode()
+
+    async def fetch_wallet_address(self) -> str:
+        id_list = json.loads(await run_subprocess_output(self._yagna_path, "id", "list", "--json"))
+
+        for identity in id_list:
+            if identity["default"]:
+                return identity["address"]
+
+        raise YagnaServiceError(f"Default wallet not found for app_key `{self.yagna_appkey}`!")
 
     async def _get_or_create_yagna_appkey(self) -> str:
         if YAGNA_APPKEY:

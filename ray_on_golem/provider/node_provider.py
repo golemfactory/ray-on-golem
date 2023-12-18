@@ -17,8 +17,11 @@ from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
 from ray_on_golem.server.settings import (
     LOGGING_DEBUG_PATH,
+    PAYMENT_NETWORK_MAINNET,
+    PAYMENT_NETWORK_POLYGON,
     RAY_ON_GOLEM_CHECK_DEADLINE,
     RAY_ON_GOLEM_PATH,
+    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
     RAY_ON_GOLEM_START_DEADLINE,
     TMP_PATH,
 )
@@ -29,8 +32,14 @@ from ray_on_golem.utils import (
     prepare_tmp_dir,
 )
 
-logger = logging.getLogger(__name__)
 LOG_GROUP = "Ray On Golem"
+
+ONBOARDING_MESSAGE = {
+    PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
+    PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
+}
+
+logger = logging.getLogger(__name__)
 
 
 class GolemNodeProvider(NodeProvider):
@@ -48,7 +57,20 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters = {
             ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()
         }
-        self._ray_on_golem_client.create_cluster(provider_parameters)
+        self._payment_network = provider_parameters["payment_network"].lower().strip()
+
+        cluster_creation_response = self._ray_on_golem_client.create_cluster(provider_parameters)
+
+        self._wallet_address = cluster_creation_response.wallet_address
+        self._is_cluster_just_created = cluster_creation_response.is_cluster_just_created
+
+        self._print_mainnet_onboarding_message(
+            cluster_creation_response.yagna_payment_status_output
+        )
+
+        wallet_glm_amount = float(cluster_creation_response.yagna_payment_status.get("amount", "0"))
+        if not wallet_glm_amount:
+            cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -228,16 +250,20 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
         provider_parameters["_ssh_user"] = auth["ssh_user"]
 
-    @staticmethod
+    @classmethod
     def _start_webserver(
+        cls,
         ray_on_golem_client: RayOnGolemClient,
         port: int,
         registry_stats: bool,
     ) -> None:
         with cli_logger.group(LOG_GROUP):
-            if ray_on_golem_client.is_webserver_running():
+            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
+            if webserver_serviceable:
                 cli_logger.print("Not starting webserver, as it's already running")
                 return
+            elif webserver_serviceable is False:
+                cls._wait_for_shutdown(ray_on_golem_client)
 
             cli_logger.print(
                 "Starting webserver with deadline up to `{}`...", RAY_ON_GOLEM_START_DEADLINE
@@ -268,7 +294,7 @@ class GolemNodeProvider(NodeProvider):
                 try:
                     proc.communicate(timeout=check_seconds)
                 except subprocess.TimeoutExpired:
-                    if ray_on_golem_client.is_webserver_running():
+                    if ray_on_golem_client.is_webserver_serviceable():
                         cli_logger.print("Starting webserver done")
                         return
                 else:
@@ -293,8 +319,13 @@ class GolemNodeProvider(NodeProvider):
     @staticmethod
     def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:
         with cli_logger.group(LOG_GROUP):
-            if not ray_on_golem_client.is_webserver_running():
-                cli_logger.print("Not stopping webserver, as it's already not running")
+            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
+            if not webserver_serviceable:
+                if webserver_serviceable is None:
+                    cli_logger.print("Not stopping the webserver, as it's not running")
+                else:
+                    cli_logger.print("Not stopping the webserver, as it's already shutting down")
+
                 return
 
             cli_logger.print("Requesting webserver shutdown...")
@@ -309,3 +340,58 @@ class GolemNodeProvider(NodeProvider):
                 return
 
             cli_logger.print("Requesting webserver shutdown done, will stop soon")
+
+    @staticmethod
+    def _wait_for_shutdown(ray_on_golem_client: RayOnGolemClient) -> None:
+        cli_logger.print(
+            "Previous webserver instance is still shutting down, waiting with deadline up to `{}`...",
+            RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
+        )
+
+        wait_deadline = datetime.now() + RAY_ON_GOLEM_SHUTDOWN_DEADLINE
+        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
+
+        time.sleep(check_seconds)
+        while datetime.now() < wait_deadline:
+            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
+            if webserver_serviceable is None:
+                cli_logger.print("Previous webserver instance shutdown done")
+                return
+
+            cli_logger.print(
+                "Previous webserver instance is not yet shutdown, waiting additional `{}` seconds...",
+                check_seconds,
+            )
+            time.sleep(check_seconds)
+
+        cli_logger.abort(
+            "Previous webserver instance is still running! Deadline of `{}` reached.",
+            RAY_ON_GOLEM_START_DEADLINE,
+        )
+
+    def _print_mainnet_onboarding_message(self, yagna_payment_status_output: str) -> None:
+        if self._payment_network not in ONBOARDING_MESSAGE:
+            return
+
+        cli_logger.newline()
+
+        with cli_logger.indented():
+            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network))
+            cli_logger.print("Your wallet:")
+
+            with cli_logger.indented():
+                for line in yagna_payment_status_output.splitlines():
+                    cli_logger.print(line)
+
+            cli_logger.newline()
+            cli_logger.print(
+                "You can use the Golem Onboarding portal to top up: https://golemfactory.github.io"
+                f"/onboarding_production/?yagnaAddress={self._wallet_address}"
+                "\n\n"
+                "DISCLAIMER: Please keep in mind that in its current stage, the Onboarding Portal "
+                "is an EXPERIMENTAL product. Even though it is functional, "
+                "we do not recommend using it unless you wish to help us beta-test this feature. "
+                "You'll find more information on `#Payment UX` discord channel "
+                "https://discord.com/channels/684703559954333727/1136984764197380096"
+            )
+            cli_logger.newline()

@@ -4,7 +4,7 @@ from asyncio.subprocess import Process
 from contextlib import asynccontextmanager
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from golem.utils.asyncio import create_task_with_logging
 from golem.utils.logging import get_trace_id_name
@@ -15,6 +15,7 @@ from ray_on_golem.server.exceptions import NodeNotFound
 from ray_on_golem.server.models import Node, NodeData, NodeId, NodeState, ProviderConfigData, Tags
 from ray_on_golem.server.services.golem import GolemService
 from ray_on_golem.server.services.utils import get_ssh_command
+from ray_on_golem.server.services.yagna import YagnaService
 from ray_on_golem.utils import (
     are_dicts_equal,
     get_default_ssh_key_name,
@@ -30,12 +31,20 @@ class RayServiceError(RayOnGolemError):
 
 
 class RayService:
-    def __init__(self, ray_on_golem_port: int, golem_service: GolemService, tmp_path: Path):
+    def __init__(
+        self,
+        ray_on_golem_port: int,
+        golem_service: GolemService,
+        yagna_service: YagnaService,
+        tmp_path: Path,
+    ):
         self._ray_on_golem_port = ray_on_golem_port
         self._golem_service = golem_service
+        self._yagna_service = yagna_service
         self._tmp_path = tmp_path
 
         self._provider_config: Optional[ProviderConfigData] = None
+        self._wallet_address: Optional[str] = None
 
         self._nodes: Dict[NodeId, Node] = {}
         self._nodes_lock = asyncio.Lock()
@@ -57,10 +66,12 @@ class RayService:
 
         logger.info("Stopping RayService done")
 
-    async def create_cluster(self, provider_config: ProviderConfigData) -> None:
-        self._provider_config = provider_config
+    async def create_cluster(
+        self, provider_config: ProviderConfigData
+    ) -> Tuple[bool, str, str, Dict]:
+        is_cluster_just_created = self._provider_config is None
 
-        # TODO: CALL FUND with payment network and get yagna wallet address
+        self._provider_config = provider_config
 
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
@@ -68,6 +79,16 @@ class RayService:
 
         with self._ssh_public_key_path.open() as f:
             self._ssh_public_key = f.readline().strip()
+
+        payment_status = await self._yagna_service.run_payment_fund(
+            self._provider_config.payment_network
+        )
+        yagna_output = await self._yagna_service.fetch_payment_status(
+            self._provider_config.payment_network
+        )
+        self._wallet_address = await self._yagna_service.fetch_wallet_address()
+
+        return is_cluster_just_created, self._wallet_address, yagna_output, payment_status
 
     async def _destroy_nodes(self) -> None:
         async with self._nodes_lock:

@@ -92,6 +92,13 @@ class CreateClusterRequestData(ProviderConfigData):
     pass
 
 
+class CreateClusterResponseData(BaseModel):
+    is_cluster_just_created: bool
+    wallet_address: str
+    yagna_payment_status_output: str
+    yagna_payment_status: Dict
+
+
 class NonTerminatedNodesRequestData(BaseModel):
     tags: Tags
 
@@ -157,3 +164,7 @@ class SelfShutdownRequestData(BaseModel):
 
 class SelfShutdownResponseData(BaseModel):
     shutdown_state: ShutdownState
+
+
+class HealthCheckResponseData(BaseModel):
+    is_shutting_down: bool
