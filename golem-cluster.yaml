@@ -20,6 +20,7 @@ provider:
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
     payment_network: "goerli"
+    #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
@@ -28,7 +29,7 @@ provider:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.4.1-py3.10.13-ray2.7.1"
+        image_tag: "golem/ray-on-golem:0.5.0-py3.10.13-ray2.7.1"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
@@ -68,8 +69,12 @@ provider:
         max_env_per_hour_price: 0.5
 
 # The files or directories to copy to the head and worker nodes
+# Remote workdir is /root/
 file_mounts: {
   # <remote_path>: <local_path>
+  # "/absolute/path/dir/": ".",
+  # "./relative/path/dir/": ".",
+  # "./relative/path/file.txt": "./file.txt"
 }
 
 # Tells the autoscaler the allowed node types and the resources they provide
