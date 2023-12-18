@@ -20,6 +20,7 @@ provider:
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
     payment_network: "goerli"
+    #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
@@ -70,6 +71,7 @@ provider:
 # The files or directories to copy to the head and worker nodes
 file_mounts: {
   # <remote_path>: <local_path>
+  #"/data/": "."
 }
 
 # Tells the autoscaler the allowed node types and the resources they provide
