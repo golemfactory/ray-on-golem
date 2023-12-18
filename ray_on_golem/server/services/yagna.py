@@ -160,7 +160,17 @@ class YagnaService:
                     self._yagna_path, "payment", "fund", "--network", network
                 )
             except RayOnGolemError as e:
-                logger.error("Preparing `%s` funds failed with error: %s", network, e)
+                funds_status = json.loads(
+                    await run_subprocess_output(
+                        self._yagna_path, "payment", "status", "--network", network
+                    )
+                )
+                logger.error(
+                    "Preparing `%s` funds failed with error: %s, funds status: %s",
+                    network,
+                    e,
+                    funds_status
+                )
             else:
                 output = json.loads(
                     await run_subprocess_output(
