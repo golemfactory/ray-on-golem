@@ -7,10 +7,6 @@ on:
         description: Whether this run is a test build
         required: True
         type: boolean
-      ENV_PYTHON_VERSION:
-        description: Python version used in the build environment
-        required: True
-        type: string
       IMAGE_PYTHON_VERSION:
         description: Python version used in the GVMI image
         required: True
@@ -32,11 +28,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ inputs.ENV_PYTHON_VERSION }}
-
       - uses: Gr1N/setup-poetry@v8
 
       - name: Install requirements
