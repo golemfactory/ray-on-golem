@@ -17,7 +17,7 @@ requests = "^2"
 click = "^8"
 pydantic = "<2"
 websocat = "^1.12.0"
-golem-node = "0.12.3"
+golem-node = "0.14.0"
 
 setuptools = "*"
 
