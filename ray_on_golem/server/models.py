@@ -81,6 +81,7 @@ class NodeConfigData(BaseModel):
 
 class ProviderConfigData(BaseModel):
     payment_network: str
+    payment_driver: str
     total_budget: float
     node_config: NodeConfigData
     ssh_private_key: str

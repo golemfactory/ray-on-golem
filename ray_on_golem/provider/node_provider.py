@@ -45,7 +45,6 @@ logger = logging.getLogger(__name__)
 class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config: Dict[str, Any], cluster_name: str):
         super().__init__(provider_config, cluster_name)
-
         provider_parameters: Dict = provider_config["parameters"]
 
         self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
@@ -77,6 +76,8 @@ class GolemNodeProvider(NodeProvider):
         config = deepcopy(cluster_config)
 
         cls._apply_config_defaults(config)
+
+        raise Exception(config)
 
         provider_parameters = config["provider"]["parameters"]
         ray_on_golem_client = cls._get_ray_on_golem_client_instance(
@@ -231,13 +232,6 @@ class GolemNodeProvider(NodeProvider):
 
     @staticmethod
     def _apply_config_defaults(config: Dict[str, Any]) -> None:
-        provider_parameters: Dict = config["provider"]["parameters"]
-        provider_parameters.setdefault("webserver_port", 4578)
-        provider_parameters.setdefault("enable_registry_stats", True)
-        provider_parameters.setdefault("network", "goerli")
-        provider_parameters.setdefault("subnet_tag", "public")
-        provider_parameters.setdefault("budget_limit", 1)
-
         auth: Dict = config.setdefault("auth", {})
         auth.setdefault("ssh_user", "root")
 
@@ -245,6 +239,14 @@ class GolemNodeProvider(NodeProvider):
             auth["ssh_private_key"] = str(
                 TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
             )
+
+        provider_parameters: Dict = config["provider"]["parameters"]
+        provider_parameters.setdefault("webserver_port", 4578)
+        provider_parameters.setdefault("enable_registry_stats", True)
+        provider_parameters.setdefault("payment_network", "goerli")
+        provider_parameters.setdefault("payment_driver", "erc20")
+        provider_parameters.setdefault("subnet_tag", "public")
+        provider_parameters.setdefault("total_budget", 1.0)
 
         # copy ssh details to provider namespace for cluster creation in __init__
         provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
