@@ -195,7 +195,7 @@ class GolemService:
         await context.deploy(deploy_args, timeout=timedelta(minutes=5))
 
         await add_state_log("[5/9] Starting container...")
-        logger.info(f"Starting container on {provider_desc}, {ip=}, {activity=}")
+        logger.info(f"Starting a VM container on {provider_desc}, {ip=}, {activity=}")
         await context.start()
 
     async def _upload_node_configuration(
