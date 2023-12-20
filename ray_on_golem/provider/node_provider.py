@@ -53,10 +53,7 @@ class GolemNodeProvider(NodeProvider):
             provider_parameters["enable_registry_stats"],
         )
 
-        ssh_arg_mapping = {"_ssh_private_key": "ssh_private_key", "_ssh_user": "ssh_user"}
-        provider_parameters = {
-            ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()
-        }
+        provider_parameters = self._map_ssh_config(provider_parameters)
         self._payment_network = provider_parameters["payment_network"].lower().strip()
 
         cluster_creation_response = self._ray_on_golem_client.create_cluster(provider_parameters)
@@ -228,6 +225,13 @@ class GolemNodeProvider(NodeProvider):
 
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
         self._ray_on_golem_client.set_node_tags(node_id, tags)
+
+    @staticmethod
+    def _map_ssh_config(provider_parameters: Dict[str, Any]):
+        ssh_arg_mapping = {"_ssh_private_key": "ssh_private_key", "_ssh_user": "ssh_user"}
+        return {
+            ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()
+        }
 
     @staticmethod
     def _apply_config_defaults(config: Dict[str, Any]) -> None:

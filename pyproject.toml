@@ -45,6 +45,7 @@ autoflake = "^2.2.0"
 gvmkit-build = "^0.3.13"
 dpath = "^2.1.6"
 yamlpath = "^3.8.1"
+pytest = "^7.4.3"
 
 [build-system]
 requires = ["poetry-core"]
