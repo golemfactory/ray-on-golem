@@ -17,6 +17,8 @@ from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
 from ray_on_golem.server.settings import (
     LOGGING_DEBUG_PATH,
+    PAYMENT_DRIVER_ERC20,
+    PAYMENT_NETWORK_GOERLI,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
     RAY_ON_GOLEM_CHECK_DEADLINE,
@@ -37,6 +39,15 @@ LOG_GROUP = "Ray On Golem"
 ONBOARDING_MESSAGE = {
     PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
     PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
+}
+
+PROVIDER_DEFAULTS = {
+    "webserver_port": 4578,
+    "enable_registry_stats": True,
+    "payment_network": PAYMENT_NETWORK_GOERLI,
+    "payment_driver": PAYMENT_DRIVER_ERC20,
+    "subnet_tag": "public",
+    "total_budget": 1.0,
 }
 
 logger = logging.getLogger(__name__)
@@ -229,18 +240,13 @@ class GolemNodeProvider(NodeProvider):
     @staticmethod
     def _map_ssh_config(provider_parameters: Dict[str, Any]):
         ssh_arg_mapping = {"_ssh_private_key": "ssh_private_key", "_ssh_user": "ssh_user"}
-        return {
-            ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()
-        }
+        return {ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()}
 
     @staticmethod
     def _apply_config_defaults(config: Dict[str, Any]) -> None:
         provider_parameters: Dict = config["provider"]["parameters"]
-        provider_parameters.setdefault("webserver_port", 4578)
-        provider_parameters.setdefault("enable_registry_stats", True)
-        provider_parameters.setdefault("network", "goerli")
-        provider_parameters.setdefault("subnet_tag", "public")
-        provider_parameters.setdefault("budget_limit", 1)
+        for k, v in PROVIDER_DEFAULTS.items():
+            provider_parameters.setdefault(k, v)
 
         auth: Dict = config.setdefault("auth", {})
         auth.setdefault("ssh_user", "root")

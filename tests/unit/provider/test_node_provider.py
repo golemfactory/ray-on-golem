@@ -1,8 +1,8 @@
-import io
 from pathlib import Path
+from unittest import mock
+
 import pytest
 import yaml
-from unittest import mock
 
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.models import ProviderConfigData
@@ -35,7 +35,7 @@ def mock_path_open(monkeypatch):
         yaml.safe_load(open(ROOT_PATH / "golem-cluster.mini.yaml")),
         yaml.safe_load(open(ROOT_PATH / "golem-cluster.yaml")),
         CLUSTER_CONFIG_STUB,
-    )
+    ),
 )
 def test_node_provider_defaults(disable_webserver, mock_path_open, cluster_config):
     resolved_config = GolemNodeProvider.bootstrap_config(cluster_config)
