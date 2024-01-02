@@ -53,7 +53,7 @@ class GolemService:
         await self._golem.start()
 
         self._network = await self._golem.create_network(
-            "192.168.0.1/24"
+            "192.168.0.1/16"
         )  # will be retrieved from provider_config
         await self._golem.add_to_network(self._network)
 

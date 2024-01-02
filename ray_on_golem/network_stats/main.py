@@ -50,8 +50,7 @@ async def _network_stats(config: Dict, duration: int):
     provider_params = config["provider"]["parameters"]
 
     async with network_stats_service(
-        provider_params["enable_registry_stats"],
-        provider_params["payment_network"]
+        provider_params["enable_registry_stats"], provider_params["payment_network"]
     ) as stats_service:
         await stats_service.run(provider_params, duration)
 
