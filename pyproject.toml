@@ -59,7 +59,7 @@ _format_black = "black ."
 
 tests_unit = {cmd = "pytest -sv tests/unit", help = "Run unit tests"}
 
-checks = {sequence = ["check_codestyle", "check_license"], help = "Run all available code checks"}
+checks = {sequence = ["check_codestyle"], help = "Run all available code checks"}  # temporarily disabled `liccheck` because `websocat` has a broken license
 check_codestyle = {sequence = ["_check_codestyle_autoflake", "_check_codestyle_isort", "_check_codestyle_black"], help = "Run only code style checks"}
 _check_codestyle_autoflake = "autoflake --check-diff ."
 _check_codestyle_isort = "isort --check-only --diff ."
@@ -103,6 +103,7 @@ authorized_licenses = [
   "LGPL-3.0-or-later",
   "GNU Lesser General Public License v3 or later (LGPLv3+)",
   "GNU Lesser General Public License v3 (LGPLv3)",
+  "GNU General Public License v3 (GPLv3)",
   "GNU Library or Lesser General Public License (LGPL)",
   "Python Software Foundation",
   "ISC",
