@@ -1,6 +1,6 @@
-# Ray on Golem Alpha Mainnet Preview Program
+# Ray on Golem Mainnet Alpha MVP Preview Program
 
-Welcome to the Ray on Golem Alpha Mainnet Preview Program!
+Welcome to the Ray on Golem Mainnet Alpha MVP Preview Program!
 
 If you've ever tried scaling your Python code to process large data sets or solve complex computational tasks, you'll know that it may be challenging in various ways.
 With Ray on Golem, we're aiming to make this as straightforward as possible, and we invite you to help us make it happen.
