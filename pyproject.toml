@@ -45,6 +45,7 @@ autoflake = "^2.2.0"
 gvmkit-build = "^0.3.13"
 dpath = "^2.1.6"
 yamlpath = "^3.8.1"
+pytest = "^7.4.3"
 
 [build-system]
 requires = ["poetry-core"]
@@ -55,6 +56,14 @@ format = {sequence = ["_format_autoflake", "_format_isort", "_format_black"], he
 _format_autoflake = "autoflake ."
 _format_isort = "isort ."
 _format_black = "black ."
+
+tests_unit = {cmd = "pytest -sv tests/unit", help = "Run unit tests"}
+
+checks = {sequence = ["check_codestyle"], help = "Run all available code checks"}  # temporarily disabled `liccheck` because `websocat` has a broken license
+check_codestyle = {sequence = ["_check_codestyle_autoflake", "_check_codestyle_isort", "_check_codestyle_black"], help = "Run only code style checks"}
+_check_codestyle_autoflake = "autoflake --check-diff ."
+_check_codestyle_isort = "isort --check-only --diff ."
+_check_codestyle_black = "black --check --diff ."
 check_license = {sequence = ["_check_license_export", "_check_license_verify"], help = "Check license compatibility"}
 _check_license_export = "poetry export -f requirements.txt -o .requirements.txt"
 _check_license_verify = "liccheck -r .requirements.txt"
@@ -94,6 +103,7 @@ authorized_licenses = [
   "LGPL-3.0-or-later",
   "GNU Lesser General Public License v3 or later (LGPLv3+)",
   "GNU Lesser General Public License v3 (LGPLv3)",
+  "GNU General Public License v3 (GPLv3)",
   "GNU Library or Lesser General Public License (LGPL)",
   "Python Software Foundation",
   "ISC",
