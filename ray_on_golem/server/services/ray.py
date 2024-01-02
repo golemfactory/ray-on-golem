@@ -81,10 +81,12 @@ class RayService:
             self._ssh_public_key = f.readline().strip()
 
         payment_status = await self._yagna_service.run_payment_fund(
-            self._provider_config.payment_network
+            self._provider_config.payment_network,
+            self._provider_config.payment_driver,
         )
         yagna_output = await self._yagna_service.fetch_payment_status(
-            self._provider_config.payment_network
+            self._provider_config.payment_network,
+            self._provider_config.payment_driver,
         )
         self._wallet_address = await self._yagna_service.fetch_wallet_address()
 
