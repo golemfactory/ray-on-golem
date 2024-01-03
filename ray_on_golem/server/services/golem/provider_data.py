@@ -2,6 +2,9 @@ from typing import Dict, List, Set
 
 PROVIDERS_BLACKLIST: Dict[str, Set[str]] = {
     "polygon": {
+        "0xf460871f1741dd2eebfa115c3ddd8a1aaa7fa914",
+        "0xc3ba6bf1464d4e10ffd3ed8e01b38524520724a0",
+        "0x8842512ef4c35aba2ff2883d766c3382c50de990",
         "0xc04863f26dab1bb0d9ec35c793b01c6cc5e7a399",
         "0xfc88946eac7433315a82a0d83cef54493aa69948",
         "0xa272d86f5c0466783ecff3403786f42d18f3fc3b",
