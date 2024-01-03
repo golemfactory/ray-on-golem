@@ -76,7 +76,7 @@ class BudgetControlData(BaseModel):
 
 class NodeConfigData(BaseModel):
     demand: DemandConfigData = Field(default_factory=DemandConfigData)
-    budget_control: Optional[BudgetControlData] = None
+    budget_control: Optional[BudgetControlData] = Field(default_factory=BudgetControlData)
 
 
 class ProviderConfigData(BaseModel):
