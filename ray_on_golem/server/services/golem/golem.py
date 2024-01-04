@@ -53,7 +53,7 @@ class GolemService:
         await self._golem.start()
 
         self._network = await self._golem.create_network(
-            "192.168.0.1/24"
+            "192.168.0.1/16"
         )  # will be retrieved from provider_config
         await self._golem.add_to_network(self._network)
 
@@ -194,8 +194,8 @@ class GolemService:
         deploy_args = {"net": [self._network.deploy_args(ip)]}
         await context.deploy(deploy_args, timeout=timedelta(minutes=5))
 
-        await add_state_log("[5/9] Starting activity...")
-        logger.info(f"Starting activity on {provider_desc}, {ip=}, {activity=}")
+        await add_state_log("[5/9] Starting VM container...")
+        logger.info(f"Starting VM container on {provider_desc}, {ip=}, {activity=}")
         await context.start()
 
     async def _upload_node_configuration(

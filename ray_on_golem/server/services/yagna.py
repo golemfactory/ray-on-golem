@@ -149,7 +149,7 @@ class YagnaService:
 
         logger.info("Stopping Yagna done")
 
-    async def run_payment_fund(self, network: str) -> Dict:
+    async def run_payment_fund(self, network: str, driver: str) -> Dict:
         logger.debug("Preparing `%s` funds with deadline up to %s...", network, YAGNA_FUND_DEADLINE)
 
         fund_deadline = datetime.now() + YAGNA_FUND_DEADLINE
@@ -157,14 +157,27 @@ class YagnaService:
         while datetime.now() < fund_deadline:
             try:
                 await run_subprocess_output(
-                    self._yagna_path, "payment", "fund", "--network", network
+                    self._yagna_path,
+                    "payment",
+                    "fund",
+                    "--network",
+                    network,
+                    "--driver",
+                    driver,
                 )
             except RayOnGolemError as e:
                 logger.error("Preparing `%s` funds failed with error: %s", network, e)
             else:
                 output = json.loads(
                     await run_subprocess_output(
-                        self._yagna_path, "payment", "status", "--network", network, "--json"
+                        self._yagna_path,
+                        "payment",
+                        "status",
+                        "--network",
+                        network,
+                        "--driver",
+                        driver,
+                        "--json",
                     )
                 )
 
@@ -190,9 +203,9 @@ class YagnaService:
             f"Can't prepare `{network}` funds! Deadline of `{YAGNA_CHECK_DEADLINE}` reached."
         )
 
-    async def fetch_payment_status(self, network: str) -> str:
+    async def fetch_payment_status(self, network: str, driver: str) -> str:
         output = await run_subprocess_output(
-            self._yagna_path, "payment", "status", "--network", network
+            self._yagna_path, "payment", "status", "--network", network, "--driver", driver
         )
         return output.decode()
 

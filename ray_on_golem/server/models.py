@@ -76,11 +76,12 @@ class BudgetControlData(BaseModel):
 
 class NodeConfigData(BaseModel):
     demand: DemandConfigData = Field(default_factory=DemandConfigData)
-    budget_control: Optional[BudgetControlData] = None
+    budget_control: Optional[BudgetControlData] = Field(default_factory=BudgetControlData)
 
 
 class ProviderConfigData(BaseModel):
     payment_network: str
+    payment_driver: str
     total_budget: float
     node_config: NodeConfigData
     ssh_private_key: str

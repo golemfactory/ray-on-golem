@@ -51,20 +51,23 @@ async def _network_stats(config: Dict, duration: int):
 
     async with network_stats_service(
         provider_params["enable_registry_stats"],
-        provider_params["payment_network"]
+        provider_params["payment_network"],
+        provider_params["payment_driver"],
     ) as stats_service:
         await stats_service.run(provider_params, duration)
 
 
 @asynccontextmanager
-async def network_stats_service(registry_stats: bool, network: str) -> NetworkStatsService:
+async def network_stats_service(
+    registry_stats: bool, network: str, driver: str
+) -> NetworkStatsService:
     network_stats_service: NetworkStatsService = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
     )
 
     await yagna_service.init()
-    await yagna_service.run_payment_fund(network)
+    await yagna_service.run_payment_fund(network, driver)
 
     await network_stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
 
