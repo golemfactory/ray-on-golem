@@ -38,7 +38,7 @@ We also invite you to visit https://www.golem.network/, where you can find more 
 - Go through [budget control](https://docs.golem.network/docs/creators/ray/cluster-yaml#budget-control) and see if it sounds usable and understandable
 - Go through [accessing the Internet](https://docs.golem.network/docs/creators/ray/cluster-yaml#outbound) article and see if it sounds and understandable
 - Send us your wallet address (so we can see real GLMs), the console output of the code execution on the mainnet, and Ray on Golem debug log file.
-- Fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/UlpvzPrD) (wallet, the logs, and meaningful and thought-out feedback)
+- Fill out the [submission form](https://qkjx8blh5hm.typeform.com/to/hEW2Oti9) (wallet, the logs, and meaningful and thought-out feedback)
 
 **Troubleshooting**
 
@@ -67,7 +67,7 @@ At the same time, we don't want to waste your time on powering through the rough
 
 ### Fill out the submission form
 
-The final step is to submit your wallet address, the logs, and your feedback via the [submission form](todo).
+The final step is to submit your wallet address, the logs, and your feedback via the [submission form](https://qkjx8blh5hm.typeform.com/to/hEW2Oti9).
 
 Remember that your insights have the power to refine and propel Ray on Golem forward.
 Apart from the successful completion of the above task, the most attractive feedback for us would be your ideas for real-life Ray on Golem applications.
