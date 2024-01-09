@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ray-on-golem"
-version = "0.6.1a0"
+version = "0.6.1a1"
 description = "Golem Network integration with Ray"
 authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
@@ -31,6 +31,7 @@ aiohttp = "^3"
 requests = "^2"
 click = "^8"
 pydantic = "<2"
+toml = "^0.10.2"
 
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.main:main"
