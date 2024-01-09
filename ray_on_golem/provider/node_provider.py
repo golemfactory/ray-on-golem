@@ -33,8 +33,9 @@ from ray_on_golem.utils import (
     is_running_on_golem_network,
     prepare_tmp_dir,
 )
+from ray_on_golem.version import get_version
 
-LOG_GROUP = "Ray On Golem"
+LOG_GROUP = f"Ray On Golem {get_version()}"
 
 ONBOARDING_MESSAGE = {
     PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
