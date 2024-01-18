@@ -8,19 +8,21 @@ from pathlib import Path
 from typing import Awaitable, Callable, Dict, Optional, Tuple
 
 from golem.managers import (
-    AddChosenPaymentPlatform,
     BlacklistProviderIdPlugin,
     Buffer,
     DefaultAgreementManager,
     DefaultProposalManager,
     MapScore,
+    MidAgreementPaymentsNegotiator,
     NegotiatingPlugin,
     PayAllPaymentManager,
+    PaymentPlatformNegotiator,
     RefreshingDemandManager,
     ScoringBuffer,
     WorkContext,
 )
 from golem.node import GolemNode
+from golem.payload import PaymentInfo
 from golem.resources import Activity, Network, ProposalData
 from yarl import URL
 
@@ -120,9 +122,44 @@ class GolemService:
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
+        demand_lifetime = timedelta(hours=8)
 
         ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
+
+        proposal_negotiators = [PaymentPlatformNegotiator()]
+        if node_config.budget_control.payment_frequency_hours is not None:
+            logger.debug(
+                "Adding mid agreement payments based on given payment_frequency:"
+                f"{node_config.budget_control.payment_frequency_hours}"
+            )
+
+            payment_timeout_from = timedelta(
+                hours=node_config.budget_control.payment_frequency_hours.range_from
+            )
+            payment_timeout_to = timedelta(
+                hours=node_config.budget_control.payment_frequency_hours.range_to
+            )
+            debit_note_interval = timedelta(minutes=3)
+            debit_notes_accept_timeout = timedelta(minutes=4)
+
+            payloads.append(
+                PaymentInfo(
+                    debit_notes_accept_timeout=int(debit_notes_accept_timeout.total_seconds()),
+                    debit_notes_interval=int(debit_note_interval.total_seconds()),
+                    payment_timeout=int(payment_timeout_from.total_seconds()),
+                )
+            )
+            demand_lifetime = timedelta(days=365)
+
+            proposal_negotiators.append(
+                MidAgreementPaymentsNegotiator(
+                    min_debit_note_interval=debit_note_interval,
+                    requested_debit_note_interval=debit_note_interval,
+                    min_payment_timeout=payment_timeout_from,
+                    requested_payment_timeout=payment_timeout_to,
+                )
+            )
 
         stack.payment_manager = PayAllPaymentManager(
             self._golem, budget=total_budget, network=payment_network
@@ -131,7 +168,7 @@ class GolemService:
             self._golem,
             stack.payment_manager.get_allocation,
             payloads,
-            demand_lifetime=timedelta(hours=8),
+            demand_lifetime=demand_lifetime,
             subnet_tag=subnet_tag,
         )
         stack.proposal_manager = DefaultProposalManager(
@@ -153,7 +190,8 @@ class GolemService:
                     update_interval=timedelta(seconds=10),
                 ),
                 NegotiatingPlugin(
-                    proposal_negotiators=(AddChosenPaymentPlatform(),),
+                    proposal_negotiators=proposal_negotiators,
+                    proposal_response_timeout=timedelta(seconds=30),
                 ),
                 Buffer(min_size=0, max_size=4, fill_concurrency_size=4),
             ),

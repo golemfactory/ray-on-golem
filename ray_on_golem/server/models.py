@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from golem.resources import Activity
-from pydantic import AnyUrl, BaseModel, Field
+from pydantic import AnyUrl, BaseModel, Field, validator
 
 NodeId = str
 Tags = Dict[str, str]
@@ -66,12 +66,26 @@ class PerCpuExpectedUsageData(BaseModel):
     max_cost: Optional[float] = None
 
 
+class PaymentFrequency(BaseModel):
+    range_from: int
+    range_to: int = None
+
+    @validator("range_to", always=True, pre=True)
+    def validate_range_to(cls, value, values):
+        if value is not None:
+            return value
+        else:
+            return values["range_from"]
+
+
 class BudgetControlData(BaseModel):
     per_cpu_expected_usage: Optional[PerCpuExpectedUsageData] = None
 
     max_start_price: Optional[float] = None
     max_cpu_per_hour_price: Optional[float] = None
     max_env_per_hour_price: Optional[float] = None
+
+    payment_frequency_hours: Optional[PaymentFrequency] = None
 
 
 class NodeConfigData(BaseModel):
