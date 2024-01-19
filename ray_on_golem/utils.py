@@ -67,13 +67,6 @@ def raise_graceful_exit() -> None:
     raise GracefulExit()
 
 
-def rolloverLogFiles():
-    root_logger = logging.getLogger()
-
-    for handler in root_logger.handlers:
-        if isinstance(handler, RotatingFileHandler):
-            handler.doRollover()
-
 
 def get_last_lines_from_file(file_path: Path, max_lines: int) -> str:
     with file_path.open() as file:

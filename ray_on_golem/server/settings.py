@@ -4,6 +4,7 @@ from pathlib import Path
 
 from yarl import URL
 
+
 RAY_ON_GOLEM_PATH = Path(os.getenv("RAY_ON_GOLEM_PATH", "ray-on-golem"))
 YAGNA_PATH = Path(os.getenv("YAGNA_PATH", "yagna"))
 WEBSOCAT_PATH = Path(os.getenv("WEBSOCAT_PATH", "websocat"))
@@ -37,11 +38,11 @@ LOGGING_CONFIG = {
             "filters": ["add_trace_id"],
         },
         "file": {
-            "class": "logging.FileHandler",
+            "class": "ray_on_golem.log.ZippingRotatingFileHandler",
             "level": "INFO",
             "formatter": "compact",
             "filename": LOGGING_INFO_PATH,
-            "mode": "w",
+            "backupCount": 99,
         },
     },
     "root": {
