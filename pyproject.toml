@@ -10,7 +10,7 @@ packages = [{include = "ray_on_golem"}]
 python = "^3.8"
 ray = {version="^2.7.1", extras=["default"]}
 #golem-core = { path="../golem-core-python", develop=true }
-golem-core = { git="https://github.com/golemfactory/golem-core-python.git", branch="ld/mid-agreement-payments" }
+golem-core = { git="https://github.com/golemfactory/golem-core-python.git", branch="main" }
 # golem-core = "^0.3.2"
 aiohttp = "^3"
 requests = "^2"

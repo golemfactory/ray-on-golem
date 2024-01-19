@@ -68,11 +68,11 @@ provider:
         # Amount of GLMs for each hour that worker runs which Golem provider offer will be rejected if exceeded.
         max_env_per_hour_price: 0.5
 
-        # If not provided payment will be sent only after cluster is stooped. Not: cluster will then run for maximum of 8 hours
+        # If not provided payment will be sent only after cluster is stopped. Note: cluster will then run for maximum of 8 hours
         # Required for long running clusters
-        payment_frequency_hours:
-          range_from: 1
-          range_to: 12 # optional defaults to `range_from`
+        payment_interval_hours:
+          minimal: 1
+          optimal: 12 # optional defaults to `minimal`
 
 # The files or directories to copy to the head and worker nodes
 # Remote workdir is /root/

@@ -67,15 +67,15 @@ class PerCpuExpectedUsageData(BaseModel):
 
 
 class PaymentFrequency(BaseModel):
-    range_from: int
-    range_to: int = None
+    minimal: int
+    optimal: int = None
 
-    @validator("range_to", always=True, pre=True)
-    def validate_range_to(cls, value, values):
+    @validator("optimal", always=True, pre=True)
+    def validate_optimal(cls, value, values):
         if value is not None:
             return value
         else:
-            return values["range_from"]
+            return values["minimal"]
 
 
 class BudgetControlData(BaseModel):
@@ -85,7 +85,7 @@ class BudgetControlData(BaseModel):
     max_cpu_per_hour_price: Optional[float] = None
     max_env_per_hour_price: Optional[float] = None
 
-    payment_frequency_hours: Optional[PaymentFrequency] = None
+    payment_interval_hours: Optional[PaymentFrequency] = None
 
 
 class NodeConfigData(BaseModel):

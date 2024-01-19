@@ -35,6 +35,11 @@ from ray_on_golem.server.services.utils import get_ssh_command
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_DEMAND_LIFETIME = timedelta(hours=8)
+DEFAULT_LONG_RUNNING_DEMAND_LIFETIME = timedelta(days=365)
+DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
+DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
+
 
 class GolemService:
     def __init__(self, websocat_path: Path, registry_stats: bool):
@@ -122,42 +127,42 @@ class GolemService:
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
-        demand_lifetime = timedelta(hours=8)
+        demand_lifetime = DEFAULT_DEMAND_LIFETIME
 
         ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
         proposal_negotiators = [PaymentPlatformNegotiator()]
-        if node_config.budget_control.payment_frequency_hours is not None:
+        if node_config.budget_control.payment_interval_hours is not None:
             logger.debug(
-                "Adding mid agreement payments based on given payment_frequency:"
-                f"{node_config.budget_control.payment_frequency_hours}"
+                "Adding mid agreement payments based on given payment_interval:"
+                f"{node_config.budget_control.payment_interval_hours}"
             )
 
-            payment_timeout_from = timedelta(
-                hours=node_config.budget_control.payment_frequency_hours.range_from
+            minimal_payment_timeout = timedelta(
+                hours=node_config.budget_control.payment_interval_hours.minimal
             )
-            payment_timeout_to = timedelta(
-                hours=node_config.budget_control.payment_frequency_hours.range_to
+            optimal_payment_timeout = timedelta(
+                hours=node_config.budget_control.payment_interval_hours.optimal
             )
-            debit_note_interval = timedelta(minutes=3)
-            debit_notes_accept_timeout = timedelta(minutes=4)
 
             payloads.append(
                 PaymentInfo(
-                    debit_notes_accept_timeout=int(debit_notes_accept_timeout.total_seconds()),
-                    debit_notes_interval=int(debit_note_interval.total_seconds()),
-                    payment_timeout=int(payment_timeout_from.total_seconds()),
+                    debit_notes_accept_timeout=int(
+                        DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT.total_seconds()
+                    ),
+                    debit_notes_interval=int(DEFAULT_DEBIT_NOTE_INTERVAL.total_seconds()),
+                    payment_timeout=int(minimal_payment_timeout.total_seconds()),
                 )
             )
-            demand_lifetime = timedelta(days=365)
+            demand_lifetime = DEFAULT_LONG_RUNNING_DEMAND_LIFETIME
 
             proposal_negotiators.append(
                 MidAgreementPaymentsNegotiator(
-                    min_debit_note_interval=debit_note_interval,
-                    requested_debit_note_interval=debit_note_interval,
-                    min_payment_timeout=payment_timeout_from,
-                    requested_payment_timeout=payment_timeout_to,
+                    min_debit_note_interval=DEFAULT_DEBIT_NOTE_INTERVAL,
+                    optimal_debit_note_interval=DEFAULT_DEBIT_NOTE_INTERVAL,
+                    min_payment_timeout=minimal_payment_timeout,
+                    optimal_payment_timeout=optimal_payment_timeout,
                 )
             )
 
