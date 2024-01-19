@@ -39,6 +39,7 @@ DEFAULT_DEMAND_LIFETIME = timedelta(hours=8)
 DEFAULT_LONG_RUNNING_DEMAND_LIFETIME = timedelta(days=365)
 DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
 DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
+DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
 
 
 class GolemService:
@@ -196,7 +197,7 @@ class GolemService:
                 ),
                 NegotiatingPlugin(
                     proposal_negotiators=proposal_negotiators,
-                    proposal_response_timeout=timedelta(seconds=30),
+                    proposal_response_timeout=DEFAULT_PROPOSAL_RESPONSE_TIMEOUT,
                 ),
                 Buffer(min_size=0, max_size=4, fill_concurrency_size=4),
             ),
