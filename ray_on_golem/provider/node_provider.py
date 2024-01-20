@@ -13,11 +13,12 @@ from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
 from ray_on_golem.client.client import RayOnGolemClient
+from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
 from ray_on_golem.server.settings import (
-    LOGGING_DEBUG_PATH,
     LOGGING_BACKUP_COUNT,
+    LOGGING_DEBUG_PATH,
     PAYMENT_DRIVER_ERC20,
     PAYMENT_NETWORK_GOERLI,
     PAYMENT_NETWORK_MAINNET,
@@ -34,7 +35,6 @@ from ray_on_golem.utils import (
     is_running_on_golem_network,
     prepare_tmp_dir,
 )
-from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.version import get_version
 
 LOG_GROUP = f"Ray On Golem {get_version()}"
@@ -295,8 +295,7 @@ class GolemNodeProvider(NodeProvider):
             log_file_path = LOGGING_DEBUG_PATH
             prepare_tmp_dir()
             debug_logger = ZippingRotatingFileHandler(
-                log_file_path,
-                backupCount=LOGGING_BACKUP_COUNT
+                log_file_path, backupCount=LOGGING_BACKUP_COUNT
             )
             proc = subprocess.Popen(
                 args,

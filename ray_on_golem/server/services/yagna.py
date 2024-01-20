@@ -11,8 +11,8 @@ import aiohttp
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.server.settings import (
-    LOGGING_YAGNA_PATH,
     LOGGING_BACKUP_COUNT,
+    LOGGING_YAGNA_PATH,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
     RAY_ON_GOLEM_CHECK_DEADLINE,
@@ -89,13 +89,14 @@ class YagnaService:
         logger.info("Starting Yagna...")
 
         log_file_path = LOGGING_YAGNA_PATH
-        yagna_logger = ZippingRotatingFileHandler(
-            log_file_path,
-            backupCount=LOGGING_BACKUP_COUNT
-        )
+        yagna_logger = ZippingRotatingFileHandler(log_file_path, backupCount=LOGGING_BACKUP_COUNT)
 
         self._yagna_process = await run_subprocess(
-            self._yagna_path, "service", "run", stderr=yagna_logger.stream, stdout=yagna_logger.stream
+            self._yagna_path,
+            "service",
+            "run",
+            stderr=yagna_logger.stream,
+            stdout=yagna_logger.stream,
         )
 
         start_deadline = datetime.now() + YAGNA_START_DEADLINE
