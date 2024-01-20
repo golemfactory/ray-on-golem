@@ -12,6 +12,7 @@ TMP_PATH = Path("/tmp/ray_on_golem")
 LOGGING_INFO_PATH = TMP_PATH / "webserver.log"
 LOGGING_DEBUG_PATH = TMP_PATH / "webserver_debug.log"
 LOGGING_YAGNA_PATH = TMP_PATH / "yagna.log"
+LOGGING_BACKUP_COUNT = 99
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -42,7 +43,7 @@ LOGGING_CONFIG = {
             "level": "INFO",
             "formatter": "compact",
             "filename": LOGGING_INFO_PATH,
-            "backupCount": 99,
+            "backupCount": LOGGING_BACKUP_COUNT,
         },
     },
     "root": {

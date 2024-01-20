@@ -9,8 +9,11 @@ GZIP_EXTENSION = ".gz"
 class ZippingRotatingFileHandler(RotatingFileHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         # rollover on start, to ensure that a new logfile is initialized with each new logger
-        self.doRollover()
+        # unless we're starting for the very first time
+        if self.stream.tell():
+            self.doRollover()
 
     @staticmethod
     def namer(default_name: str):
