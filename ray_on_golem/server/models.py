@@ -66,9 +66,9 @@ class PerCpuExpectedUsageData(BaseModel):
     max_cost: Optional[float] = None
 
 
-class PaymentFrequency(BaseModel):
-    minimal: int
-    optimal: int = None
+class PaymentIntervalHours(BaseModel):
+    minimal: float
+    optimal: float = None
 
     @validator("optimal", always=True, pre=True)
     def validate_optimal(cls, value, values):
@@ -85,7 +85,7 @@ class BudgetControlData(BaseModel):
     max_cpu_per_hour_price: Optional[float] = None
     max_env_per_hour_price: Optional[float] = None
 
-    payment_interval_hours: Optional[PaymentFrequency] = None
+    payment_interval_hours: Optional[PaymentIntervalHours] = None
 
 
 class NodeConfigData(BaseModel):

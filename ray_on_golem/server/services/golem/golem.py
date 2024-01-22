@@ -136,8 +136,8 @@ class GolemService:
         proposal_negotiators = [PaymentPlatformNegotiator()]
         if node_config.budget_control.payment_interval_hours is not None:
             logger.debug(
-                "Adding mid agreement payments based on given payment_interval:"
-                f"{node_config.budget_control.payment_interval_hours}"
+                "Adding mid agreement payments based on given payment_interval: %s",
+                node_config.budget_control.payment_interval_hours,
             )
 
             minimal_payment_timeout = timedelta(
