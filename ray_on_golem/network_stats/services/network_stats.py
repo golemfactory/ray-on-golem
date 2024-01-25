@@ -6,12 +6,12 @@ from datetime import timedelta
 from typing import Dict, Optional, Sequence
 
 from golem.managers import (
-    AddChosenPaymentPlatform,
     BlacklistProviderIdPlugin,
     Buffer,
     DefaultProposalManager,
     NegotiatingPlugin,
     PayAllPaymentManager,
+    PaymentPlatformNegotiator,
     ProposalManagerPlugin,
     RefreshingDemandManager,
     ScoringBuffer,
@@ -99,7 +99,7 @@ class StatsPluginFactory:
 
     def create_negotiating_plugin(self) -> StatsNegotiatingPlugin:
         self._stats_negotiating_plugin = StatsNegotiatingPlugin(
-            proposal_negotiators=(AddChosenPaymentPlatform(),),
+            proposal_negotiators=(PaymentPlatformNegotiator(),),
         )
         return self._stats_negotiating_plugin
 

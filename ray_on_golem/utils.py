@@ -1,10 +1,8 @@
 import asyncio
 import hashlib
-import logging
 import os
 from asyncio.subprocess import Process
 from collections import deque
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Dict
 
@@ -65,14 +63,6 @@ def get_default_ssh_key_name(cluster_name: str) -> str:
 
 def raise_graceful_exit() -> None:
     raise GracefulExit()
-
-
-def rolloverLogFiles():
-    root_logger = logging.getLogger()
-
-    for handler in root_logger.handlers:
-        if isinstance(handler, RotatingFileHandler):
-            handler.doRollover()
 
 
 def get_last_lines_from_file(file_path: Path, max_lines: int) -> str:

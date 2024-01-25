@@ -9,7 +9,9 @@ from typing import Dict, Optional
 import aiohttp
 
 from ray_on_golem.exceptions import RayOnGolemError
+from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.server.settings import (
+    LOGGING_BACKUP_COUNT,
     LOGGING_YAGNA_PATH,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
@@ -86,9 +88,15 @@ class YagnaService:
     async def _run_yagna(self) -> None:
         logger.info("Starting Yagna...")
 
-        log_file = LOGGING_YAGNA_PATH.open("w")
+        log_file_path = LOGGING_YAGNA_PATH
+        yagna_logger = ZippingRotatingFileHandler(log_file_path, backupCount=LOGGING_BACKUP_COUNT)
+
         self._yagna_process = await run_subprocess(
-            self._yagna_path, "service", "run", stderr=log_file, stdout=log_file
+            self._yagna_path,
+            "service",
+            "run",
+            stderr=yagna_logger.stream,
+            stdout=yagna_logger.stream,
         )
 
         start_deadline = datetime.now() + YAGNA_START_DEADLINE
@@ -104,8 +112,8 @@ class YagnaService:
             else:
                 logger.error(
                     "Starting Yagna failed!\nShowing last 50 lines from `%s`:\n%s",
-                    LOGGING_YAGNA_PATH,
-                    get_last_lines_from_file(LOGGING_YAGNA_PATH, 50),
+                    log_file_path,
+                    get_last_lines_from_file(log_file_path, 50),
                 )
                 raise YagnaServiceError("Starting Yagna failed!")
 
@@ -117,8 +125,8 @@ class YagnaService:
         logger.error(
             "Starting Yagna failed! Deadline of `%s` reached.\nShowing last 50 lines from `%s`:\n%s",
             YAGNA_START_DEADLINE,
-            LOGGING_YAGNA_PATH,
-            get_last_lines_from_file(LOGGING_YAGNA_PATH, 50),
+            log_file_path,
+            get_last_lines_from_file(log_file_path, 50),
         )
         raise YagnaServiceError("Starting Yagna failed!")
 

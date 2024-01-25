@@ -13,9 +13,11 @@ from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
 from ray_on_golem.client.client import RayOnGolemClient
+from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
 from ray_on_golem.server.settings import (
+    LOGGING_BACKUP_COUNT,
     LOGGING_DEBUG_PATH,
     PAYMENT_DRIVER_ERC20,
     PAYMENT_NETWORK_GOERLI,
@@ -290,12 +292,15 @@ class GolemNodeProvider(NodeProvider):
 
             cli_logger.verbose("Webserver command: `{}`", " ".join([str(a) for a in args]))
 
+            log_file_path = LOGGING_DEBUG_PATH
             prepare_tmp_dir()
-            log_file = LOGGING_DEBUG_PATH.open("w")
+            debug_logger = ZippingRotatingFileHandler(
+                log_file_path, backupCount=LOGGING_BACKUP_COUNT
+            )
             proc = subprocess.Popen(
                 args,
-                stdout=log_file,
-                stderr=log_file,
+                stdout=debug_logger.stream,
+                stderr=debug_logger.stream,
                 start_new_session=True,
             )
 
@@ -311,8 +316,8 @@ class GolemNodeProvider(NodeProvider):
                 else:
                     cli_logger.abort(
                         "Starting webserver failed!\nShowing last 50 lines from `{}`:\n{}",
-                        LOGGING_DEBUG_PATH,
-                        get_last_lines_from_file(LOGGING_DEBUG_PATH, 50),
+                        log_file_path,
+                        get_last_lines_from_file(log_file_path, 50),
                     )
 
                 cli_logger.print(
@@ -323,8 +328,8 @@ class GolemNodeProvider(NodeProvider):
             cli_logger.abort(
                 "Starting webserver failed! Deadline of `{}` reached.\nShowing last 50 lines from `{}`:\n{}",
                 RAY_ON_GOLEM_START_DEADLINE,
-                LOGGING_DEBUG_PATH,
-                get_last_lines_from_file(LOGGING_DEBUG_PATH, 50),
+                log_file_path,
+                get_last_lines_from_file(log_file_path, 50),
             )
 
     @staticmethod
