@@ -25,7 +25,7 @@ def reject_if_shutting_down(func):
 
 # FIXME: This route should be a default root URL with basic server info instead of
 #  custom URL with custom payload
-@routes.get(settings.URL_HEALTH_CHECK)
+@routes.view(settings.URL_HEALTH_CHECK)
 async def health_check(request: web.Request) -> web.Response:
     response_data = models.HealthCheckResponseData(
         is_shutting_down=request.app.get("shutting_down", False)
@@ -206,6 +206,13 @@ async def get_or_create_ssh_key(request):
 
     response_data = models.GetOrCreateDefaultSshKeyResponseData(ssh_key_base64=ssh_key_base64)
 
+    return web.Response(text=response_data.json())
+
+
+@routes.view(settings.URL_GET_DATADIR)
+async def get_datadir(request):
+    ray_service: RayService = request.app["ray_service"]
+    response_data = models.GetDataDirectoryResponseData(datadir=ray_service.get_datadir())
     return web.Response(text=response_data.json())
 
 

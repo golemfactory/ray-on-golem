@@ -36,12 +36,12 @@ class RayService:
         ray_on_golem_port: int,
         golem_service: GolemService,
         yagna_service: YagnaService,
-        tmp_path: Path,
+        datadir: Path,
     ):
         self._ray_on_golem_port = ray_on_golem_port
         self._golem_service = golem_service
         self._yagna_service = yagna_service
-        self._tmp_path = tmp_path
+        self._datadir = datadir
 
         self._provider_config: Optional[ProviderConfigData] = None
         self._wallet_address: Optional[str] = None
@@ -235,7 +235,7 @@ class RayService:
             node.tags.update(tags)
 
     async def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
-        ssh_key_path = self._tmp_path / get_default_ssh_key_name(cluster_name)
+        ssh_key_path = self._datadir / get_default_ssh_key_name(cluster_name)
 
         if not ssh_key_path.exists():
             logger.info(f"Creating default ssh key for `{cluster_name}`...")
@@ -254,6 +254,9 @@ class RayService:
         # TODO: async file handling
         with ssh_key_path.open("r") as f:
             return str(f.read())
+
+    def get_datadir(self) -> Path:
+        return self._datadir
 
     @asynccontextmanager
     async def _get_node_context(self, node_id: NodeId) -> Iterator[Node]:

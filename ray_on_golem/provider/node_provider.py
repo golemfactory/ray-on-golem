@@ -1,4 +1,5 @@
 import logging
+import pathlib
 import subprocess
 import time
 from copy import deepcopy
@@ -18,22 +19,21 @@ from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
 from ray_on_golem.server.settings import (
     LOGGING_BACKUP_COUNT,
-    LOGGING_DEBUG_PATH,
     PAYMENT_DRIVER_ERC20,
     PAYMENT_NETWORK_GOERLI,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
+    TMP_PATH,
     RAY_ON_GOLEM_CHECK_DEADLINE,
     RAY_ON_GOLEM_PATH,
     RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
     RAY_ON_GOLEM_START_DEADLINE,
-    TMP_PATH,
+    get_log_path,
 )
 from ray_on_golem.utils import (
     get_default_ssh_key_name,
     get_last_lines_from_file,
     is_running_on_golem_network,
-    prepare_tmp_dir,
 )
 from ray_on_golem.version import get_version
 
@@ -46,6 +46,7 @@ ONBOARDING_MESSAGE = {
 
 PROVIDER_DEFAULTS = {
     "webserver_port": 4578,
+    "webserver_datadir": None,
     "enable_registry_stats": True,
     "payment_network": PAYMENT_NETWORK_GOERLI,
     "payment_driver": PAYMENT_DRIVER_ERC20,
@@ -53,18 +54,19 @@ PROVIDER_DEFAULTS = {
     "total_budget": 1.0,
 }
 
-logger = logging.getLogger(__name__)
-
 
 class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config: Dict[str, Any], cluster_name: str):
+        print("----------------------------------------------- GOLEM NODE PROVIDER INIT")
+        cli_logger.print("---------------------------------------------- GOLEM NODE PROVIDER INIT")
         super().__init__(provider_config, cluster_name)
 
         provider_parameters: Dict = provider_config["parameters"]
 
         self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
-            provider_parameters["webserver_port"],
-            provider_parameters["enable_registry_stats"],
+            webserver_port=provider_parameters["webserver_port"],
+            enable_registry_stats=provider_parameters["enable_registry_stats"],
+            datadir=provider_parameters["webserver_datadir"],
         )
 
         provider_parameters = self._map_ssh_config(provider_parameters)
@@ -85,14 +87,17 @@ class GolemNodeProvider(NodeProvider):
 
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+        print("--------------------------------------------- GOLEM NODE BOOTSTRAP CONFIG")
+        cli_logger.print("-------------------------------------------- GOLEM NODE BOOTSTRAP CONFIG")
         config = deepcopy(cluster_config)
 
         cls._apply_config_defaults(config)
 
         provider_parameters = config["provider"]["parameters"]
         ray_on_golem_client = cls._get_ray_on_golem_client_instance(
-            provider_parameters["webserver_port"],
-            provider_parameters["enable_registry_stats"],
+            webserver_port=provider_parameters["webserver_port"],
+            enable_registry_stats=provider_parameters["enable_registry_stats"],
+            datadir=provider_parameters["webserver_datadir"],
         )
         # TODO: SAVE wallet address
 
@@ -104,7 +109,6 @@ class GolemNodeProvider(NodeProvider):
                     config["cluster_name"]
                 )
 
-                # FIXME: mitigate double file writing on local machine as get_or_create_default_ssh_key creates the file
                 default_ssh_private_key.parent.mkdir(parents=True, exist_ok=True)
                 with default_ssh_private_key.open("w") as f:
                     f.write(ssh_key_base64)
@@ -118,11 +122,25 @@ class GolemNodeProvider(NodeProvider):
 
     @classmethod
     @lru_cache()
-    def _get_ray_on_golem_client_instance(cls, webserver_port: int, enable_registry_stats: bool):
+    def _get_ray_on_golem_client_instance(
+        cls,
+        webserver_port: int,
+        enable_registry_stats: bool,
+        datadir: Optional[str] = None,
+    ):
         ray_on_golem_client = RayOnGolemClient(webserver_port)
 
+        if datadir:
+            datadir = pathlib.Path(datadir)
+
         if not is_running_on_golem_network():
-            cls._start_webserver(ray_on_golem_client, webserver_port, enable_registry_stats)
+            # iow, the code is executed on a requestor agent and not inside the VM on a provider
+            cls._start_webserver(
+                ray_on_golem_client,
+                webserver_port,
+                enable_registry_stats,
+                datadir
+            )
 
         return ray_on_golem_client
 
@@ -269,10 +287,13 @@ class GolemNodeProvider(NodeProvider):
         ray_on_golem_client: RayOnGolemClient,
         port: int,
         registry_stats: bool,
+        datadir: Optional[pathlib.Path] = None,
     ) -> None:
         with cli_logger.group(LOG_GROUP):
             webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
             if webserver_serviceable:
+                if datadir:
+                    ray_on_golem_client
                 cli_logger.print("Not starting webserver, as it's already running")
                 return
             elif webserver_serviceable is False:
@@ -290,10 +311,12 @@ class GolemNodeProvider(NodeProvider):
                 "--self-shutdown",
             ]
 
+            if datadir:
+                args.extend(["--datadir", datadir])
+
             cli_logger.verbose("Webserver command: `{}`", " ".join([str(a) for a in args]))
 
-            log_file_path = LOGGING_DEBUG_PATH
-            prepare_tmp_dir()
+            log_file_path = get_log_path("webserver_debug", datadir)
             debug_logger = ZippingRotatingFileHandler(
                 log_file_path, backupCount=LOGGING_BACKUP_COUNT
             )

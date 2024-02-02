@@ -173,37 +173,34 @@ class RayOnGolemClient:
 
     def is_webserver_serviceable(self) -> Optional[bool]:
         try:
-            response = requests.get(
-                str(self._base_url / settings.URL_HEALTH_CHECK.lstrip("/")),
-                timeout=settings.RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds(),
+            response = self._make_request(
+                url=settings.URL_HEALTH_CHECK,
+                response_model=models.HealthCheckResponseData,
+                method="GET",
             )
-        except requests.ConnectionError:
+        except RayOnGolemClientError:
             return None
-        else:
-            if response.status_code != 200:
-                return None
 
-            try:
-                health_check = models.HealthCheckResponseData.parse_raw(response.text)
-            except ValidationError:
-                return None
-
-            return not health_check.is_shutting_down
+        return response.is_shutting_down
 
     def _make_request(
         self,
         *,
         url: str,
-        request_data: BaseModel,
         response_model: Type[TResponseModel],
-        error_message: str,
+        request_data: Optional[BaseModel] = None,
+        error_message: str = "",
+        method: str = "POST",
     ) -> TResponseModel:
-        response = self._session.post(
-            str(self._base_url / url.lstrip("/")), data=request_data.json()
+        response = self._session.request(
+            method, str(self._base_url / url.lstrip("/")),
+            data=request_data.json() if request_data else None,
         )
 
         if response.status_code != 200:
-            raise RayOnGolemClientError(f"{error_message}: {response.text}")
+            raise RayOnGolemClientError(
+                f"{error_message or f'Request failed: {url}'}: {response.text}"
+            )
 
         try:
             return response_model.parse_raw(response.text)

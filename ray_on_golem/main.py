@@ -2,7 +2,6 @@ import click
 
 from ray_on_golem.network_stats import main as network_stats
 from ray_on_golem.server import main as webserver
-from ray_on_golem.utils import prepare_tmp_dir
 from ray_on_golem.version import version
 
 
@@ -16,9 +15,8 @@ cli.add_command(version)
 cli.add_command(webserver)
 
 
-def main():
-    prepare_tmp_dir()
 
+def main():
     cli()
 
 

@@ -173,6 +173,10 @@ class GetOrCreateDefaultSshKeyResponseData(BaseModel):
     ssh_key_base64: str
 
 
+class GetDataDirectoryResponseData(BaseModel):
+    datadir: str
+
+
 class SelfShutdownRequestData(BaseModel):
     pass
 
