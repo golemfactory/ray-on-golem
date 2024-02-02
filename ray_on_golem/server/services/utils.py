@@ -13,6 +13,7 @@ def get_ssh_command(
             "ssh",
             "-o StrictHostKeyChecking=no",
             "-o UserKnownHostsFile=/dev/null",
+            "-o PasswordAuthentication=no",
             f"-o {quote(proxy_command_str)}",
             f"-i {quote(str(ssh_private_key_path))}" if ssh_private_key_path else "",
             quote(ssh_user_str),

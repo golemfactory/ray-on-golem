@@ -116,6 +116,13 @@ class GolemNodeProvider(NodeProvider):
 
         return config
 
+    @staticmethod
+    def fillout_available_node_types_resources(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+        cluster_config.pop("head_node")
+        cluster_config.pop("worker_nodes")
+
+        return cluster_config
+
     @classmethod
     @lru_cache()
     def _get_ray_on_golem_client_instance(cls, webserver_port: int, enable_registry_stats: bool):

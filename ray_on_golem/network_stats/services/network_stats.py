@@ -7,14 +7,14 @@ from typing import Dict, Optional, Sequence
 
 from golem.managers import (
     BlacklistProviderIdPlugin,
-    Buffer,
     DefaultProposalManager,
     NegotiatingPlugin,
     PayAllPaymentManager,
     PaymentPlatformNegotiator,
+    ProposalBuffer,
     ProposalManagerPlugin,
+    ProposalScoringBuffer,
     RefreshingDemandManager,
-    ScoringBuffer,
 )
 from golem.managers.base import ProposalNegotiator
 from golem.node import GolemNode
@@ -214,17 +214,17 @@ class NetworkStatsService:
 
         plugins.extend(
             [
-                ScoringBuffer(
+                ProposalScoringBuffer(
                     min_size=500,
                     max_size=1000,
                     fill_at_start=True,
                     proposal_scorers=(*stack.extra_proposal_scorers.values(),),
-                    update_interval=timedelta(seconds=10),
+                    scoring_debounce=timedelta(seconds=10),
                 ),
                 self._stats_plugin_factory.create_counter_plugin("Negotiation initialized"),
                 self._stats_plugin_factory.create_negotiating_plugin(),
                 self._stats_plugin_factory.create_counter_plugin("Negotiated successfully"),
-                Buffer(min_size=800, max_size=1000, fill_concurrency_size=16),
+                ProposalBuffer(min_size=800, max_size=1000, fill_concurrency_size=16),
             ]
         )
         stack.proposal_manager = DefaultProposalManager(
