@@ -23,7 +23,7 @@ provider:
     #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
-    total_budget: 5
+    total_budget: 500000
 
     node_config:
       # Parameters for golem demands (same for head and workers)
