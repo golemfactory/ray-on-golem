@@ -19,7 +19,7 @@ RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
 RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=30)
 RAY_ON_GOLEM_SHUTDOWN_DEADLINE = timedelta(seconds=30)
 
-URL_HEALTH_CHECK = "/health_check"
+URL_STATUS = "/"
 URL_CREATE_CLUSTER = "/create_cluster"
 URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
 URL_IS_RUNNING = "/is_running"
@@ -32,7 +32,6 @@ URL_REQUEST_NODES = "/request_nodes"
 URL_TERMINATE_NODE = "/terminate"
 URL_GET_SSH_PROXY_COMMAND = "/ssh_proxy_command"
 URL_GET_OR_CREATE_DEFAULT_SSH_KEY = "/ger_or_create_default_ssh_key"
-URL_GET_DATADIR = "/get_datadir"
 URL_SELF_SHUTDOWN = "/self_shutdown"
 
 PAYMENT_NETWORK_MAINNET = "mainnet"
@@ -40,17 +39,19 @@ PAYMENT_NETWORK_POLYGON = "polygon"
 PAYMENT_NETWORK_GOERLI = "goerli"
 PAYMENT_DRIVER_ERC20 = "erc20"
 
-APPLICATION_NAME = "ray_on_golem"
-APPLICATION_AUTHOR = "golemfactory"
-
 RAY_ON_GOLEM_PATH = Path(os.getenv("RAY_ON_GOLEM_PATH", "ray-on-golem"))
-DEFAULT_DATADIR = Path(
-    os.getenv("RAY_ON_GOLEM_DATADIR", appdirs.user_data_dir(APPLICATION_NAME, APPLICATION_AUTHOR))
-)
 YAGNA_PATH = Path(os.getenv("YAGNA_PATH", "yagna"))
 WEBSOCAT_PATH = Path(os.getenv("WEBSOCAT_PATH", "websocat"))
 TMP_PATH = Path("/tmp/ray_on_golem")
 LOGGING_BACKUP_COUNT = 99
+
+APPLICATION_NAME = "ray_on_golem"
+APPLICATION_AUTHOR = "golemfactory"
+
+DEFAULT_DATADIR = Path(
+    os.getenv("RAY_ON_GOLEM_DATADIR", appdirs.user_data_dir(APPLICATION_NAME, APPLICATION_AUTHOR))
+)
+
 
 LogTypes = Literal["webserver", "webserver_debug", "yagna"]
 

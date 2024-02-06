@@ -140,7 +140,8 @@ class GolemNodeProvider(NodeProvider):
                 ray_on_golem_client,
                 webserver_port,
                 enable_registry_stats,
-                datadir
+                datadir,
+                self_shutdown,
             )
 
         return ray_on_golem_client
@@ -292,14 +293,23 @@ class GolemNodeProvider(NodeProvider):
         self_shutdown: bool = True,
     ) -> None:
         with cli_logger.group(LOG_GROUP):
-            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
-            if webserver_serviceable:
-                if datadir:
-                    ray_on_golem_client
-                cli_logger.print("Not starting webserver, as it's already running")
-                return
-            elif webserver_serviceable is False:
-                cls._wait_for_shutdown(ray_on_golem_client)
+            webserver_status = ray_on_golem_client.get_webserver_status()
+            if webserver_status:
+                if webserver_status.shutting_down:
+                    cls._wait_for_shutdown(ray_on_golem_client)
+                else:
+                    cli_logger.print("Not starting webserver, as it's already running")
+                    if datadir and webserver_status.datadir != datadir:
+                        cli_logger.warning(
+                            "Specified data directory `{}` is different than webserver's: `{}`. "
+                            "Using the webserver setting.",
+                            datadir,
+                            webserver_status.datadir,
+                        )
+
+                    # if webserver_status.datadir != datadir:
+                    #     cli_logger.warning("Started webserver")
+                    return
 
             cli_logger.print(
                 "Starting webserver with deadline up to `{}`...", RAY_ON_GOLEM_START_DEADLINE

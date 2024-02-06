@@ -171,17 +171,19 @@ class RayOnGolemClient:
 
         return response.shutdown_state
 
-    def is_webserver_serviceable(self) -> Optional[bool]:
+    def get_webserver_status(self) -> Optional[models.WebserverStatus]:
         try:
-            response = self._make_request(
-                url=settings.URL_HEALTH_CHECK,
-                response_model=models.HealthCheckResponseData,
+            return self._make_request(
+                url=settings.URL_STATUS,
+                response_model=models.WebserverStatus,
                 method="GET",
             )
         except RayOnGolemClientError:
             return None
 
-        return response.is_shutting_down
+    def is_webserver_serviceable(self) -> Optional[bool]:
+        status = self.get_webserver_status()
+        return status.shutting_down if status else None
 
     def _make_request(
         self,

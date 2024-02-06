@@ -173,10 +173,6 @@ class GetOrCreateDefaultSshKeyResponseData(BaseModel):
     ssh_key_base64: str
 
 
-class GetDataDirectoryResponseData(BaseModel):
-    datadir: str
-
-
 class SelfShutdownRequestData(BaseModel):
     pass
 
@@ -187,3 +183,9 @@ class SelfShutdownResponseData(BaseModel):
 
 class HealthCheckResponseData(BaseModel):
     is_shutting_down: bool
+
+
+class WebserverStatus(BaseModel):
+    version: str
+    datadir: str
+    shutting_down: bool
