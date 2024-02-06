@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import datetime
 from functools import lru_cache
 from types import ModuleType
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ray.autoscaler._private.cli_logger import cli_logger
 from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
@@ -126,11 +126,12 @@ class GolemNodeProvider(NodeProvider):
         cls,
         webserver_port: int,
         enable_registry_stats: bool,
-        datadir: Optional[str] = None,
+        datadir: Optional[Union[str, pathlib.Path]] = None,
+        self_shutdown: bool = True,
     ):
         ray_on_golem_client = RayOnGolemClient(webserver_port)
 
-        if datadir:
+        if datadir and not isinstance(datadir, pathlib.Path):
             datadir = pathlib.Path(datadir)
 
         if not is_running_on_golem_network():
@@ -288,6 +289,7 @@ class GolemNodeProvider(NodeProvider):
         port: int,
         registry_stats: bool,
         datadir: Optional[pathlib.Path] = None,
+        self_shutdown: bool = True,
     ) -> None:
         with cli_logger.group(LOG_GROUP):
             webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
@@ -308,7 +310,7 @@ class GolemNodeProvider(NodeProvider):
                 "-p",
                 str(port),
                 "--registry-stats" if registry_stats else "--no-registry-stats",
-                "--self-shutdown",
+                "--self-shutdown" if self_shutdown else "--no-self-shutdown",
             ]
 
             if datadir:

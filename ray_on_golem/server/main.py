@@ -16,6 +16,7 @@ from ray_on_golem.server.settings import (
     get_logging_config,
 )
 from ray_on_golem.server.views import routes
+from ray_on_golem.provider.node_provider import GolemNodeProvider
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
     help="Port for Ray on Golem's webserver to listen on.",
 )
 @click.option(
-    "--self-shutdown",
+    "--self-shutdown/--no-self-shutdown",
     is_flag=True,
     help="Enable self-shutdown after last node termination.",
 )
@@ -166,8 +167,12 @@ async def ray_service_ctx(app: web.Application) -> None:
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-def start():
-    raise NotImplementedError()
+def start(port: int, registry_stats: bool, datadir: pathlib.Path):
+    GolemNodeProvider._get_ray_on_golem_client_instance(
+        webserver_port=port,
+        enable_registry_stats=registry_stats,
+        datadir=datadir,
+    )
 
 def stop():
     raise NotImplementedError()

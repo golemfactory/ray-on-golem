@@ -1,11 +1,44 @@
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Dict, Optional, Literal
+from typing import Optional, Literal
 
 import appdirs
 
 from yarl import URL
+
+YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
+YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
+YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
+YAGNA_START_DEADLINE = timedelta(minutes=2)
+YAGNA_FUND_DEADLINE = timedelta(minutes=2)
+YAGNA_CHECK_DEADLINE = timedelta(seconds=2)
+
+RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=5)
+RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
+RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=30)
+RAY_ON_GOLEM_SHUTDOWN_DEADLINE = timedelta(seconds=30)
+
+URL_HEALTH_CHECK = "/health_check"
+URL_CREATE_CLUSTER = "/create_cluster"
+URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
+URL_IS_RUNNING = "/is_running"
+URL_IS_TERMINATED = "/is_terminated"
+URL_NODE_TAGS = "/tags"
+URL_GET_CLUSTER_DATA = "/cluster_data"
+URL_INTERNAL_IP = "/internal_ip"
+URL_SET_NODE_TAGS = "/set_tags"
+URL_REQUEST_NODES = "/request_nodes"
+URL_TERMINATE_NODE = "/terminate"
+URL_GET_SSH_PROXY_COMMAND = "/ssh_proxy_command"
+URL_GET_OR_CREATE_DEFAULT_SSH_KEY = "/ger_or_create_default_ssh_key"
+URL_GET_DATADIR = "/get_datadir"
+URL_SELF_SHUTDOWN = "/self_shutdown"
+
+PAYMENT_NETWORK_MAINNET = "mainnet"
+PAYMENT_NETWORK_POLYGON = "polygon"
+PAYMENT_NETWORK_GOERLI = "goerli"
+PAYMENT_DRIVER_ERC20 = "erc20"
 
 APPLICATION_NAME = "ray_on_golem"
 APPLICATION_AUTHOR = "golemfactory"
@@ -112,36 +145,3 @@ def get_logging_config(datadir: Optional[Path] = None):
             },
         },
     }
-
-YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
-YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
-YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
-YAGNA_START_DEADLINE = timedelta(minutes=2)
-YAGNA_FUND_DEADLINE = timedelta(minutes=2)
-YAGNA_CHECK_DEADLINE = timedelta(seconds=2)
-
-RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=5)
-RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
-RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=30)
-RAY_ON_GOLEM_SHUTDOWN_DEADLINE = timedelta(seconds=30)
-
-URL_HEALTH_CHECK = "/health_check"
-URL_CREATE_CLUSTER = "/create_cluster"
-URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
-URL_IS_RUNNING = "/is_running"
-URL_IS_TERMINATED = "/is_terminated"
-URL_NODE_TAGS = "/tags"
-URL_GET_CLUSTER_DATA = "/cluster_data"
-URL_INTERNAL_IP = "/internal_ip"
-URL_SET_NODE_TAGS = "/set_tags"
-URL_REQUEST_NODES = "/request_nodes"
-URL_TERMINATE_NODE = "/terminate"
-URL_GET_SSH_PROXY_COMMAND = "/ssh_proxy_command"
-URL_GET_OR_CREATE_DEFAULT_SSH_KEY = "/ger_or_create_default_ssh_key"
-URL_GET_DATADIR = "/get_datadir"
-URL_SELF_SHUTDOWN = "/self_shutdown"
-
-PAYMENT_NETWORK_MAINNET = "mainnet"
-PAYMENT_NETWORK_POLYGON = "polygon"
-PAYMENT_NETWORK_GOERLI = "goerli"
-PAYMENT_DRIVER_ERC20 = "erc20"
