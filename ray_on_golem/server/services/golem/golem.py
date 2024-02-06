@@ -387,7 +387,12 @@ class GolemService:
         logger.info(f"Creating new activity...")
 
         await add_state_log("[1/9] Getting agreement...")
-        agreement = await stack.agreement_manager.get_agreement()
+
+        try:
+            agreement = await stack.agreement_manager.get_agreement()
+        except Exception as e:
+            logger.error(f"Creating new activity failed with `{e}`")
+            raise RuntimeError(e) from e
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
@@ -416,7 +421,8 @@ class GolemService:
             )
 
             await self._network.refresh_nodes()
-        except Exception:
+        except Exception as e:
+            logger.error(f"Creating new activity failed with `{e}`")
             await activity.destroy()
             raise
 

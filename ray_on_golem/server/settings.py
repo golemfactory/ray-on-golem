@@ -59,7 +59,7 @@ LOGGING_CONFIG = {
             "propagate": False,
         },
         "ray_on_golem": {
-            "level": "DEBUG",
+            "level": "INFO",
         },
         "golem": {
             "level": "INFO",

@@ -83,6 +83,13 @@ class GolemNodeProvider(NodeProvider):
         if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
+    @staticmethod
+    def fillout_available_node_types_resources(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+        cluster_config.pop("head_node", None)
+        cluster_config.pop("worker_nodes", None)
+
+        return cluster_config
+
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         config = deepcopy(cluster_config)
@@ -115,13 +122,6 @@ class GolemNodeProvider(NodeProvider):
         )
 
         return config
-
-    @staticmethod
-    def fillout_available_node_types_resources(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
-        cluster_config.pop("head_node")
-        cluster_config.pop("worker_nodes")
-
-        return cluster_config
 
     @classmethod
     @lru_cache()
@@ -199,6 +199,14 @@ class GolemNodeProvider(NodeProvider):
 
                 if all([node.state == NodeState.running for node in monitored_nodes.values()]):
                     cli_logger.success(f"All {count} requested nodes ready")
+
+                    return monitored_nodes
+                elif all([node.state == NodeState.terminated for node in monitored_nodes.values()]):
+                    cli_logger.abort("All node requests failed!")
+
+                    return {}
+                elif any([node.state == NodeState.terminated for node in monitored_nodes.values()]):
+                    cli_logger.warning("Some node requests failed!")
 
                     return monitored_nodes
 
