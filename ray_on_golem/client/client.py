@@ -364,7 +364,7 @@ class RayOnGolemClient:
 
     def is_webserver_serviceable(self) -> Optional[bool]:
         status = self.get_webserver_status()
-        return status.shutting_down if status else None
+        return not status.shutting_down if status else None
 
     def _make_request(
         self,
