@@ -1,47 +1,36 @@
-import logging
-import pathlib
-import subprocess
 import time
 from copy import deepcopy
 from datetime import datetime
-from functools import lru_cache
 from types import ModuleType
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional
 
-from ray.autoscaler._private.cli_logger import cli_logger
-from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
+from ray.autoscaler._private.cli_logger import cli_logger  # noqa
+from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system  # noqa
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
-from ray_on_golem.client.client import RayOnGolemClient
-from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
-from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
+from ray_on_golem.client import RayOnGolemClient
+from ray_on_golem.server.models import NodeData, NodeId, NodeState
 from ray_on_golem.server.settings import (
-    LOGGING_BACKUP_COUNT,
+    LOG_GROUP,
     PAYMENT_DRIVER_ERC20,
     PAYMENT_NETWORK_GOERLI,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
     TMP_PATH,
-    RAY_ON_GOLEM_CHECK_DEADLINE,
-    RAY_ON_GOLEM_PATH,
-    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
-    RAY_ON_GOLEM_START_DEADLINE,
-    get_log_path,
 )
 from ray_on_golem.utils import (
     get_default_ssh_key_name,
-    get_last_lines_from_file,
     is_running_on_golem_network,
 )
-from ray_on_golem.version import get_version
-
-LOG_GROUP = f"Ray On Golem {get_version()}"
 
 ONBOARDING_MESSAGE = {
-    PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
-    PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
+    PAYMENT_NETWORK_MAINNET:
+        "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
+    PAYMENT_NETWORK_POLYGON:
+        "Running Ray on Golem on the mainnet requires GLM and MATIC tokens "
+        "on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
 }
 
 PROVIDER_DEFAULTS = {
@@ -57,13 +46,11 @@ PROVIDER_DEFAULTS = {
 
 class GolemNodeProvider(NodeProvider):
     def __init__(self, provider_config: Dict[str, Any], cluster_name: str):
-        print("----------------------------------------------- GOLEM NODE PROVIDER INIT")
-        cli_logger.print("---------------------------------------------- GOLEM NODE PROVIDER INIT")
         super().__init__(provider_config, cluster_name)
 
         provider_parameters: Dict = provider_config["parameters"]
 
-        self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
+        self._ray_on_golem_client = RayOnGolemClient.get_instance(
             webserver_port=provider_parameters["webserver_port"],
             enable_registry_stats=provider_parameters["enable_registry_stats"],
             datadir=provider_parameters["webserver_datadir"],
@@ -87,14 +74,12 @@ class GolemNodeProvider(NodeProvider):
 
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
-        print("--------------------------------------------- GOLEM NODE BOOTSTRAP CONFIG")
-        cli_logger.print("-------------------------------------------- GOLEM NODE BOOTSTRAP CONFIG")
         config = deepcopy(cluster_config)
 
         cls._apply_config_defaults(config)
 
         provider_parameters = config["provider"]["parameters"]
-        ray_on_golem_client = cls._get_ray_on_golem_client_instance(
+        ray_on_golem_client = RayOnGolemClient.get_instance(
             webserver_port=provider_parameters["webserver_port"],
             enable_registry_stats=provider_parameters["enable_registry_stats"],
             datadir=provider_parameters["webserver_datadir"],
@@ -119,32 +104,6 @@ class GolemNodeProvider(NodeProvider):
         )
 
         return config
-
-    @classmethod
-    @lru_cache()
-    def _get_ray_on_golem_client_instance(
-        cls,
-        webserver_port: int,
-        enable_registry_stats: bool,
-        datadir: Optional[Union[str, pathlib.Path]] = None,
-        self_shutdown: bool = True,
-    ):
-        ray_on_golem_client = RayOnGolemClient(webserver_port)
-
-        if datadir and not isinstance(datadir, pathlib.Path):
-            datadir = pathlib.Path(datadir)
-
-        if not is_running_on_golem_network():
-            # iow, the code is executed on a requestor agent and not inside the VM on a provider
-            cls._start_webserver(
-                ray_on_golem_client,
-                webserver_port,
-                enable_registry_stats,
-                datadir,
-                self_shutdown,
-            )
-
-        return ray_on_golem_client
 
     def get_command_runner(
         self,
@@ -282,143 +241,6 @@ class GolemNodeProvider(NodeProvider):
         # copy ssh details to provider namespace for cluster creation in __init__
         provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
         provider_parameters["_ssh_user"] = auth["ssh_user"]
-
-    @classmethod
-    def _start_webserver(
-        cls,
-        ray_on_golem_client: RayOnGolemClient,
-        port: int,
-        registry_stats: bool,
-        datadir: Optional[pathlib.Path] = None,
-        self_shutdown: bool = True,
-    ) -> None:
-        with cli_logger.group(LOG_GROUP):
-            webserver_status = ray_on_golem_client.get_webserver_status()
-            if webserver_status:
-                if webserver_status.shutting_down:
-                    cls._wait_for_shutdown(ray_on_golem_client)
-                else:
-                    cli_logger.print("Not starting webserver, as it's already running")
-                    if datadir and webserver_status.datadir != datadir:
-                        cli_logger.warning(
-                            "Specified data directory `{}` is different than webserver's: `{}`. "
-                            "Using the webserver setting.",
-                            datadir,
-                            webserver_status.datadir,
-                        )
-
-                    # if webserver_status.datadir != datadir:
-                    #     cli_logger.warning("Started webserver")
-                    return
-
-            cli_logger.print(
-                "Starting webserver with deadline up to `{}`...", RAY_ON_GOLEM_START_DEADLINE
-            )
-            args = [
-                RAY_ON_GOLEM_PATH,
-                "webserver",
-                "-p",
-                str(port),
-                "--registry-stats" if registry_stats else "--no-registry-stats",
-                "--self-shutdown" if self_shutdown else "--no-self-shutdown",
-            ]
-
-            if datadir:
-                args.extend(["--datadir", datadir])
-
-            cli_logger.verbose("Webserver command: `{}`", " ".join([str(a) for a in args]))
-
-            log_file_path = get_log_path("webserver_debug", datadir)
-            debug_logger = ZippingRotatingFileHandler(
-                log_file_path, backupCount=LOGGING_BACKUP_COUNT
-            )
-            proc = subprocess.Popen(
-                args,
-                stdout=debug_logger.stream,
-                stderr=debug_logger.stream,
-                start_new_session=True,
-            )
-
-            start_deadline = datetime.now() + RAY_ON_GOLEM_START_DEADLINE
-            check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
-            while datetime.now() < start_deadline:
-                try:
-                    proc.communicate(timeout=check_seconds)
-                except subprocess.TimeoutExpired:
-                    if ray_on_golem_client.is_webserver_serviceable():
-                        cli_logger.print("Starting webserver done")
-                        return
-                else:
-                    cli_logger.abort(
-                        "Starting webserver failed!\nShowing last 50 lines from `{}`:\n{}",
-                        log_file_path,
-                        get_last_lines_from_file(log_file_path, 50),
-                    )
-
-                cli_logger.print(
-                    "Webserver is not yet running, waiting additional `{}` seconds...",
-                    check_seconds,
-                )
-
-            cli_logger.abort(
-                "Starting webserver failed! Deadline of `{}` reached.\nShowing last 50 lines from `{}`:\n{}",
-                RAY_ON_GOLEM_START_DEADLINE,
-                log_file_path,
-                get_last_lines_from_file(log_file_path, 50),
-            )
-
-    @staticmethod
-    def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:
-        with cli_logger.group(LOG_GROUP):
-            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
-            if not webserver_serviceable:
-                if webserver_serviceable is None:
-                    cli_logger.print("Not stopping the webserver, as it's not running")
-                else:
-                    cli_logger.print("Not stopping the webserver, as it's already shutting down")
-
-                return
-
-            cli_logger.print("Requesting webserver shutdown...")
-
-            shutdown_state = ray_on_golem_client.shutdown_webserver()
-
-            if shutdown_state == ShutdownState.NOT_ENABLED:
-                cli_logger.print("Not stopping webserver, as it was started externally")
-                return
-            elif shutdown_state == ShutdownState.CLUSTER_NOT_EMPTY:
-                cli_logger.print("Not stopping webserver, as the cluster is not empty")
-                return
-
-            cli_logger.print("Requesting webserver shutdown done, will stop soon")
-
-    @staticmethod
-    def _wait_for_shutdown(ray_on_golem_client: RayOnGolemClient) -> None:
-        cli_logger.print(
-            "Previous webserver instance is still shutting down, waiting with deadline up to `{}`...",
-            RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
-        )
-
-        wait_deadline = datetime.now() + RAY_ON_GOLEM_SHUTDOWN_DEADLINE
-        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
-
-        time.sleep(check_seconds)
-        while datetime.now() < wait_deadline:
-            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
-            if webserver_serviceable is None:
-                cli_logger.print("Previous webserver instance shutdown done")
-                return
-
-            cli_logger.print(
-                "Previous webserver instance is not yet shutdown, waiting additional `{}` seconds...",
-                check_seconds,
-            )
-            time.sleep(check_seconds)
-
-        cli_logger.abort(
-            "Previous webserver instance is still running! Deadline of `{}` reached.",
-            RAY_ON_GOLEM_START_DEADLINE,
-        )
 
     def _print_mainnet_onboarding_message(self, yagna_payment_status_output: str) -> None:
         if self._payment_network not in ONBOARDING_MESSAGE:

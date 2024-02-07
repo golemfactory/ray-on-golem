@@ -5,6 +5,7 @@ import pathlib
 import click
 from aiohttp import web
 
+from ray_on_golem.client import RayOnGolemClient
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
@@ -167,16 +168,30 @@ async def ray_service_ctx(app: web.Application) -> None:
     help="Enable collection of Golem Registry stats about resolved images.",
 )
 def start(port: int, registry_stats: bool, datadir: pathlib.Path):
-    from ray_on_golem.provider.node_provider import GolemNodeProvider
-
-    GolemNodeProvider._get_ray_on_golem_client_instance(
+    RayOnGolemClient.get_instance(
         webserver_port=port,
         enable_registry_stats=registry_stats,
         datadir=datadir,
     )
 
-def stop():
-    raise NotImplementedError()
+
+@click.command(
+    help="Stop Ray on Golem's webserver and the yagna daemon, if it was started by the webserver.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port for Ray on Golem's webserver to listen on.",
+)
+def stop(port):
+    RayOnGolemClient.get_instance(
+        webserver_port=port,
+        start_webserver=False,
+    )
+
 
 if __name__ == "__main__":
     main()
