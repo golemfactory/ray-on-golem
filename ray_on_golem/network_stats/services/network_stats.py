@@ -16,7 +16,7 @@ from golem.managers import (
     ProposalScoringBuffer,
     RefreshingDemandManager,
 )
-from golem.managers.base import ProposalNegotiator
+from golem.managers.base import ManagerPluginException, ProposalNegotiator
 from golem.node import GolemNode
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
@@ -75,9 +75,13 @@ class StatsNegotiatingPlugin(NegotiatingPlugin):
             )
         except ApiException as e:
             error_msg = re.sub(r"\[.*?\]", "[***]", str(e.body))
-            raise RuntimeError(f"Failed to send proposal response! {e.status}: {error_msg}") from e
+            raise ManagerPluginException(
+                f"Failed to send proposal response! {e.status}: {error_msg}"
+            ) from e
         except asyncio.TimeoutError as e:
-            raise RuntimeError(f"Failed to send proposal response! Request timed out") from e
+            raise ManagerPluginException(
+                f"Failed to send proposal response! Request timed out"
+            ) from e
 
 
 class StatsPluginFactory:

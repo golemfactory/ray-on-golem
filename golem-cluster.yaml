@@ -83,6 +83,11 @@ file_mounts: {
   # "./relative/path/file.txt": "./file.txt"
 }
 
+# Satisfy checks to disable warning about legacy fields at `ray up`.
+# This will be removed by ray-on-golem on the fly.
+head_node: True
+worker_nodes: True
+
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
   ray.head.default:
