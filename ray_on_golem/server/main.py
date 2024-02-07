@@ -176,7 +176,7 @@ def start(port: int, registry_stats: bool, datadir: pathlib.Path):
 
 
 @click.command(
-    help="Stop Ray on Golem's webserver and the yagna daemon, if it was started by the webserver.",
+    help="Stop Ray on Golem's webserver and the yagna daemon.",
     context_settings={"show_default": True},
 )
 @click.option(
