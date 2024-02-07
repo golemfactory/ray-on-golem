@@ -33,11 +33,13 @@ def json_response(model_obj: BaseModel) -> web.Response:
 @routes.view(settings.URL_STATUS)
 async def status(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
-    return json_response(models.WebserverStatus(
-        version=get_version(),
-        datadir=str(ray_service.get_datadir()),
-        shutting_down=request.app.get("shutting_down", False)
-    ))
+    return json_response(
+        models.WebserverStatus(
+            version=get_version(),
+            datadir=str(ray_service.get_datadir()),
+            shutting_down=request.app.get("shutting_down", False),
+        )
+    )
 
 
 @routes.post(settings.URL_CREATE_CLUSTER)
@@ -53,12 +55,14 @@ async def create_cluster(request: web.Request) -> web.Response:
         yagna_payment_status,
     ) = await ray_service.create_cluster(provider_config=request_data)
 
-    return json_response(models.CreateClusterResponseData(
-        is_cluster_just_created=is_cluster_just_created,
-        wallet_address=wallet_address,
-        yagna_payment_status_output=yagna_payment_status_output,
-        yagna_payment_status=yagna_payment_status,
-    ))
+    return json_response(
+        models.CreateClusterResponseData(
+            is_cluster_just_created=is_cluster_just_created,
+            wallet_address=wallet_address,
+            yagna_payment_status_output=yagna_payment_status_output,
+            yagna_payment_status=yagna_payment_status,
+        )
+    )
 
 
 @routes.post(settings.URL_NON_TERMINATED_NODES)

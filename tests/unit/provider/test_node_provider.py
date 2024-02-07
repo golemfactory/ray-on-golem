@@ -4,6 +4,7 @@ from unittest import mock
 import pytest
 import yaml
 
+from ray_on_golem.client import RayOnGolemClient
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.models import ProviderConfigData
 
@@ -21,7 +22,7 @@ CLUSTER_CONFIG_STUB = {
 
 @pytest.fixture
 def disable_webserver(monkeypatch):
-    monkeypatch.setattr(GolemNodeProvider, "_get_ray_on_golem_client_instance", mock.Mock())
+    monkeypatch.setattr(RayOnGolemClient, "get_instance", mock.Mock())
 
 
 @pytest.fixture

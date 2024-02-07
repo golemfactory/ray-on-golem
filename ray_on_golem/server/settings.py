@@ -1,11 +1,11 @@
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 import appdirs
-
 from yarl import URL
+
 from ray_on_golem.version import get_version
 
 LOG_GROUP = f"Ray On Golem {get_version()}"

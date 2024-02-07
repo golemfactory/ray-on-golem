@@ -1,7 +1,8 @@
 import click
 
 from ray_on_golem.network_stats import main as network_stats
-from ray_on_golem.server import main as webserver, start, stop
+from ray_on_golem.server import main as webserver
+from ray_on_golem.server import start, stop
 from ray_on_golem.version import version
 
 

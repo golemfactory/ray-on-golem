@@ -1,8 +1,8 @@
+import subprocess
+import time
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-import subprocess
-import time
 from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 import requests
@@ -22,12 +22,8 @@ from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
     RAY_ON_GOLEM_START_DEADLINE,
     get_log_path,
-
 )
-from ray_on_golem.utils import (
-    is_running_on_golem_network,
-    get_last_lines_from_file,
-)
+from ray_on_golem.utils import get_last_lines_from_file, is_running_on_golem_network
 
 TResponseModel = TypeVar("TResponseModel")
 
@@ -359,7 +355,7 @@ class RayOnGolemClient:
                 response_model=models.WebserverStatus,
                 method="GET",
             )
-        except RayOnGolemClientError:
+        except requests.exceptions.ConnectionError:
             return None
 
     def is_webserver_serviceable(self) -> Optional[bool]:
@@ -376,7 +372,8 @@ class RayOnGolemClient:
         method: str = "POST",
     ) -> TResponseModel:
         response = self._session.request(
-            method, str(self._base_url / url.lstrip("/")),
+            method,
+            str(self._base_url / url.lstrip("/")),
             data=request_data.json() if request_data else None,
         )
 

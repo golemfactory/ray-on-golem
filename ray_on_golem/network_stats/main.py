@@ -11,7 +11,7 @@ import yaml
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
-from ray_on_golem.server.settings import get_logging_config, DEFAULT_DATADIR, YAGNA_PATH
+from ray_on_golem.server.settings import DEFAULT_DATADIR, YAGNA_PATH, get_logging_config
 
 
 @click.command(
@@ -38,7 +38,7 @@ from ray_on_golem.server.settings import get_logging_config, DEFAULT_DATADIR, YA
     "--datadir",
     type=pathlib.Path,
     help=f"Ray on Golem's data directory. [default: {DEFAULT_DATADIR}"
-         " (unless `webserver_datadir` is defined in the cluster config file)]",
+    " (unless `webserver_datadir` is defined in the cluster config file)]",
 )
 def main(
     cluster_config_file: str,
@@ -72,7 +72,10 @@ async def _network_stats(provider_params: Dict, duration: int, datadir: Optional
 
 @asynccontextmanager
 async def network_stats_service(
-    registry_stats: bool, network: str, driver: str, datadir: Optional[pathlib.Path],
+    registry_stats: bool,
+    network: str,
+    driver: str,
+    datadir: Optional[pathlib.Path],
 ) -> NetworkStatsService:
     network_stats_service: NetworkStatsService = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(

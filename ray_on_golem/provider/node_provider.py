@@ -9,8 +9,8 @@ from ray.autoscaler._private.event_system import CreateClusterEvent, global_even
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
-from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.client import RayOnGolemClient
+from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState
 from ray_on_golem.server.settings import (
     LOG_GROUP,
@@ -20,17 +20,12 @@ from ray_on_golem.server.settings import (
     PAYMENT_NETWORK_POLYGON,
     TMP_PATH,
 )
-from ray_on_golem.utils import (
-    get_default_ssh_key_name,
-    is_running_on_golem_network,
-)
+from ray_on_golem.utils import get_default_ssh_key_name, is_running_on_golem_network
 
 ONBOARDING_MESSAGE = {
-    PAYMENT_NETWORK_MAINNET:
-        "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
-    PAYMENT_NETWORK_POLYGON:
-        "Running Ray on Golem on the mainnet requires GLM and MATIC tokens "
-        "on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
+    PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
+    PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens "
+    "on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
 }
 
 PROVIDER_DEFAULTS = {
@@ -194,7 +189,7 @@ class GolemNodeProvider(NodeProvider):
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         terminated_nodes = self._ray_on_golem_client.terminate_node(node_id)
 
-        self._stop_webserver(self._ray_on_golem_client)
+        self._ray_on_golem_client.stop_webserver()
 
         return terminated_nodes
 

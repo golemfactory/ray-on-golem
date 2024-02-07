@@ -1,11 +1,11 @@
 import logging
 import logging.config
 import pathlib
+from typing import Optional
 
 import click
 from aiohttp import web
 
-from ray_on_golem.client import RayOnGolemClient
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
@@ -167,7 +167,14 @@ async def ray_service_ctx(app: web.Application) -> None:
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-def start(port: int, registry_stats: bool, datadir: pathlib.Path):
+@click.option(
+    "--datadir",
+    type=pathlib.Path,
+    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
+)
+def start(port: int, registry_stats: bool, datadir: Optional[pathlib.Path] = None):
+    from ray_on_golem.client import RayOnGolemClient
+
     RayOnGolemClient.get_instance(
         webserver_port=port,
         enable_registry_stats=registry_stats,
@@ -187,10 +194,13 @@ def start(port: int, registry_stats: bool, datadir: pathlib.Path):
     help="Port for Ray on Golem's webserver to listen on.",
 )
 def stop(port):
-    RayOnGolemClient.get_instance(
+    from ray_on_golem.client import RayOnGolemClient
+
+    client = RayOnGolemClient.get_instance(
         webserver_port=port,
         start_webserver=False,
     )
+    client.stop_webserver()
 
 
 if __name__ == "__main__":
