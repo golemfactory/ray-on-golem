@@ -22,7 +22,7 @@ CLUSTER_CONFIG_STUB = {
 
 @pytest.fixture
 def disable_webserver(monkeypatch):
-    monkeypatch.setattr(RayOnGolemClient, "get_instance", mock.Mock())
+    monkeypatch.setattr(RayOnGolemClient, "start_webserver", mock.Mock())
 
 
 @pytest.fixture

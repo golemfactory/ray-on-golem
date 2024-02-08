@@ -1,6 +1,6 @@
 import logging
 import logging.config
-import pathlib
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -45,11 +45,11 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     "--datadir",
-    type=pathlib.Path,
+    type=Path,
     default=DEFAULT_DATADIR,
     help="Ray on Golem's data directory.",
 )
-def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: pathlib.Path):
+def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
     logging.config.dictConfig(get_logging_config(datadir))
 
     app = create_application(port, self_shutdown, registry_stats, get_datadir(datadir))
@@ -73,7 +73,7 @@ def create_application(
     port: int,
     self_shutdown: bool,
     registry_stats: bool,
-    datadir: pathlib.Path,
+    datadir: Path,
 ) -> web.Application:
     app = web.Application(
         middlewares=[
@@ -169,16 +169,17 @@ async def ray_service_ctx(app: web.Application) -> None:
 )
 @click.option(
     "--datadir",
-    type=pathlib.Path,
+    type=Path,
     help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
 )
-def start(port: int, registry_stats: bool, datadir: Optional[pathlib.Path] = None):
+def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     from ray_on_golem.client import RayOnGolemClient
 
-    RayOnGolemClient.get_instance(
-        webserver_port=port,
-        enable_registry_stats=registry_stats,
+    client = RayOnGolemClient(port)
+    client.start_webserver(
+        registry_stats=registry_stats,
         datadir=datadir,
+        self_shutdown=False,
     )
 
 
@@ -196,10 +197,7 @@ def start(port: int, registry_stats: bool, datadir: Optional[pathlib.Path] = Non
 def stop(port):
     from ray_on_golem.client import RayOnGolemClient
 
-    client = RayOnGolemClient.get_instance(
-        webserver_port=port,
-        start_webserver=False,
-    )
+    client = RayOnGolemClient(port)
     client.stop_webserver()
 
 

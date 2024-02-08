@@ -1,9 +1,8 @@
 import subprocess
 import time
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -23,47 +22,19 @@ from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_START_DEADLINE,
     get_log_path,
 )
-from ray_on_golem.utils import get_last_lines_from_file, is_running_on_golem_network
+from ray_on_golem.utils import get_last_lines_from_file
 
 TResponseModel = TypeVar("TResponseModel")
 
 
 class RayOnGolemClient:
     def __init__(self, port: int) -> None:
-        self._base_url = URL("http://127.0.0.1").with_port(port)
-
+        self.port = port
+        self._base_url = URL("http://127.0.0.1").with_port(self.port)
         self._session = requests.Session()
-
-    @classmethod
-    @lru_cache()
-    def get_instance(
-        cls,
-        webserver_port: int,
-        enable_registry_stats: bool = True,
-        datadir: Optional[Union[str, Path]] = None,
-        self_shutdown: bool = True,
-        start_webserver: bool = True,
-    ) -> "RayOnGolemClient":
-        client = RayOnGolemClient(webserver_port)
-
-        if datadir and not isinstance(datadir, Path):
-            datadir = Path(datadir)
-
-        # consider starting the webserver only if this code is executed
-        # on a requestor agent and not inside the VM on a provider
-        if not is_running_on_golem_network() and start_webserver:
-            client.start_webserver(
-                webserver_port,
-                enable_registry_stats,
-                datadir,
-                self_shutdown,
-            )
-
-        return client
 
     def start_webserver(
         self,
-        port: int,
         registry_stats: bool,
         datadir: Optional[Path] = None,
         self_shutdown: bool = True,
@@ -91,7 +62,7 @@ class RayOnGolemClient:
                 RAY_ON_GOLEM_PATH,
                 "webserver",
                 "-p",
-                str(port),
+                str(self.port),
                 "--registry-stats" if registry_stats else "--no-registry-stats",
                 "--self-shutdown" if self_shutdown else "--no-self-shutdown",
             ]
@@ -355,7 +326,7 @@ class RayOnGolemClient:
                 response_model=models.WebserverStatus,
                 method="GET",
             )
-        except requests.exceptions.ConnectionError:
+        except requests.ConnectionError:
             return None
 
     def is_webserver_serviceable(self) -> Optional[bool]:

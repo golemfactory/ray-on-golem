@@ -2,6 +2,8 @@ import os
 import time
 from copy import deepcopy
 from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -46,9 +48,9 @@ class GolemNodeProvider(NodeProvider):
 
         provider_parameters: Dict = provider_config["parameters"]
 
-        self._ray_on_golem_client = RayOnGolemClient.get_instance(
-            webserver_port=provider_parameters["webserver_port"],
-            enable_registry_stats=provider_parameters["enable_registry_stats"],
+        self._ray_on_golem_client = self._ensure_webserver_and_get_client(
+            port=provider_parameters["webserver_port"],
+            registry_stats=provider_parameters["enable_registry_stats"],
             datadir=provider_parameters["webserver_datadir"],
         )
 
@@ -69,15 +71,35 @@ class GolemNodeProvider(NodeProvider):
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
     @classmethod
+    @lru_cache()
+    def _ensure_webserver_and_get_client(
+        cls,
+        port: int,
+        registry_stats: bool = True,
+        datadir: Optional[str] = None,
+    ) -> RayOnGolemClient:
+        if datadir:
+            datadir = Path(datadir)
+
+        client = RayOnGolemClient(port)
+
+        # consider starting the webserver only if this code is executed
+        # on a requestor agent and not inside the VM on a provider
+        if not is_running_on_golem_network():
+            client.start_webserver(registry_stats, datadir, self_shutdown=True)
+
+        return client
+
+    @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         config = deepcopy(cluster_config)
 
         cls._apply_config_defaults(config)
 
         provider_parameters = config["provider"]["parameters"]
-        ray_on_golem_client = RayOnGolemClient.get_instance(
-            webserver_port=provider_parameters["webserver_port"],
-            enable_registry_stats=provider_parameters["enable_registry_stats"],
+        ray_on_golem_client = cls._ensure_webserver_and_get_client(
+            port=provider_parameters["webserver_port"],
+            registry_stats=provider_parameters["enable_registry_stats"],
             datadir=provider_parameters["webserver_datadir"],
         )
         # TODO: SAVE wallet address
