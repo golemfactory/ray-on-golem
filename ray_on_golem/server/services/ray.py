@@ -234,8 +234,9 @@ class RayService:
         async with self._get_node_context(node_id) as node:  # type: Node
             node.tags.update(tags)
 
-    async def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
+    async def get_or_create_default_ssh_key(self, cluster_name: str) -> Tuple[str, str]:
         ssh_key_path = self._datadir / get_default_ssh_key_name(cluster_name)
+        ssk_public_key_path = ssh_key_path.with_suffix(".pub")
 
         if not ssh_key_path.exists():
             logger.info(f"Creating default ssh key for `{cluster_name}`...")
@@ -252,8 +253,8 @@ class RayService:
             )
 
         # TODO: async file handling
-        with ssh_key_path.open("r") as f:
-            return str(f.read())
+        with ssh_key_path.open("r") as priv_f, ssk_public_key_path.open("r") as pub_f:
+            return str(priv_f.read()), str(pub_f.read())
 
     def get_datadir(self) -> Path:
         return self._datadir

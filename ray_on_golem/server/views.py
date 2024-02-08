@@ -188,11 +188,16 @@ async def get_or_create_ssh_key(request):
 
     request_data = models.GetOrCreateDefaultSshKeyRequestData.parse_raw(await request.text())
 
-    ssh_key_base64 = await ray_service.get_or_create_default_ssh_key(
+    priv, pub = await ray_service.get_or_create_default_ssh_key(
         cluster_name=request_data.cluster_name
     )
 
-    return json_response(models.GetOrCreateDefaultSshKeyResponseData(ssh_key_base64=ssh_key_base64))
+    return json_response(
+        models.GetOrCreateDefaultSshKeyResponseData(
+            ssh_private_key_base64=priv,
+            ssh_public_key_base64=pub,
+        )
+    )
 
 
 @routes.post(settings.URL_SELF_SHUTDOWN)

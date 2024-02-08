@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -75,7 +75,7 @@ class RayOnGolemClient:
                     self.wait_for_shutdown()
                 else:
                     cli_logger.print("Not starting webserver, as it's already running")
-                    if datadir and webserver_status.datadir != datadir:
+                    if datadir and webserver_status.datadir != str(datadir):
                         cli_logger.warning(
                             "Specified data directory `{}` is different than webserver's: `{}`. "
                             "Using the webserver setting.",
@@ -326,7 +326,7 @@ class RayOnGolemClient:
 
         return response.ssh_proxy_command
 
-    def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
+    def get_or_create_default_ssh_key(self, cluster_name: str) -> Tuple[str, str]:
         response = self._make_request(
             url=settings.URL_GET_OR_CREATE_DEFAULT_SSH_KEY,
             request_data=models.GetOrCreateDefaultSshKeyRequestData(
@@ -336,7 +336,7 @@ class RayOnGolemClient:
             error_message="Couldn't get or create default ssh key",
         )
 
-        return response.ssh_key_base64
+        return response.ssh_private_key_base64, response.ssh_public_key_base64
 
     def shutdown_webserver(self) -> models.ShutdownState:
         response = self._make_request(

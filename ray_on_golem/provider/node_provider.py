@@ -1,3 +1,4 @@
+import os
 import time
 from copy import deepcopy
 from datetime import datetime
@@ -85,13 +86,19 @@ class GolemNodeProvider(NodeProvider):
         default_ssh_private_key = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
         if auth["ssh_private_key"] == str(default_ssh_private_key):
             if not default_ssh_private_key.exists():
-                ssh_key_base64 = ray_on_golem_client.get_or_create_default_ssh_key(
+                priv_base64, pub_base64 = ray_on_golem_client.get_or_create_default_ssh_key(
                     config["cluster_name"]
                 )
 
                 default_ssh_private_key.parent.mkdir(parents=True, exist_ok=True)
+                pub_key_path = default_ssh_private_key.with_suffix(".pub")
                 with default_ssh_private_key.open("w") as f:
-                    f.write(ssh_key_base64)
+                    f.write(priv_base64)
+
+                os.chmod(default_ssh_private_key, 0o600)
+
+                with pub_key_path.open("w") as f:
+                    f.write(pub_base64)
 
         global_event_system.execute_callback(
             CreateClusterEvent.ssh_keypair_downloaded,
