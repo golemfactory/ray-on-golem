@@ -216,9 +216,7 @@ class GolemService:
         return stack
 
     async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
-        await proposal.get_data()
-
-        return proposal.get_expiration_date() - datetime.now(timezone.utc)
+        return await proposal.get_expiration_date() - datetime.now(timezone.utc)
 
     def _score_with_provider_data(
         self, proposal_data: ProposalData, payment_network: str
