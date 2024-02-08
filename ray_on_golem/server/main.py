@@ -174,9 +174,11 @@ async def ray_service_ctx(app: web.Application) -> None:
 )
 def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
 
-    client = RayOnGolemClient(port)
-    client.start_webserver(
+    ctl = RayOnGolemCtl(RayOnGolemClient(port), RayOnGolemCtlConsoleLogger())
+    ctl.start_webserver(
         registry_stats=registry_stats,
         datadir=datadir,
         self_shutdown=False,
@@ -196,9 +198,11 @@ def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
 )
 def stop(port):
     from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
 
-    client = RayOnGolemClient(port)
-    client.stop_webserver()
+    ctl = RayOnGolemCtl(RayOnGolemClient(port), RayOnGolemCtlConsoleLogger())
+    ctl.stop_webserver()
 
 
 if __name__ == "__main__":

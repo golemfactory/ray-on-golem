@@ -13,10 +13,11 @@ from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
 from ray_on_golem.client import RayOnGolemClient
+from ray_on_golem.ctl import RayOnGolemCtl
+from ray_on_golem.provider.log import NodeProviderCliLogger
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState
 from ray_on_golem.server.settings import (
-    LOG_GROUP,
     PAYMENT_DRIVER_ERC20,
     PAYMENT_NETWORK_GOERLI,
     PAYMENT_NETWORK_MAINNET,
@@ -24,6 +25,10 @@ from ray_on_golem.server.settings import (
     TMP_PATH,
 )
 from ray_on_golem.utils import get_default_ssh_key_name, is_running_on_golem_network
+from ray_on_golem.version import get_version
+
+LOG_GROUP = f"Ray On Golem {get_version()}"
+
 
 ONBOARDING_MESSAGE = {
     PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
@@ -82,11 +87,13 @@ class GolemNodeProvider(NodeProvider):
             datadir = Path(datadir)
 
         client = RayOnGolemClient(port)
+        ctl = RayOnGolemCtl(client, NodeProviderCliLogger())
 
         # consider starting the webserver only if this code is executed
         # on a requestor agent and not inside the VM on a provider
         if not is_running_on_golem_network():
-            client.start_webserver(registry_stats, datadir, self_shutdown=True)
+            with cli_logger.group(LOG_GROUP):
+                ctl.start_webserver(registry_stats, datadir, self_shutdown=True)
 
         return client
 
@@ -217,8 +224,8 @@ class GolemNodeProvider(NodeProvider):
 
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         terminated_nodes = self._ray_on_golem_client.terminate_node(node_id)
-
-        self._ray_on_golem_client.stop_webserver()
+        with cli_logger.group(LOG_GROUP):
+            RayOnGolemCtl(self._ray_on_golem_client, NodeProviderCliLogger()).stop_webserver()
 
         return terminated_nodes
 

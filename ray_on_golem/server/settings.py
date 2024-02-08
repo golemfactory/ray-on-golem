@@ -6,10 +6,6 @@ from typing import Literal, Optional
 import appdirs
 from yarl import URL
 
-from ray_on_golem.version import get_version
-
-LOG_GROUP = f"Ray On Golem {get_version()}"
-
 YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
 YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
 YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
