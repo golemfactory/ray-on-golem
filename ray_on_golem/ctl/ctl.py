@@ -104,7 +104,9 @@ class RayOnGolemCtl:
             if webserver_serviceable is None:
                 self._output_logger.info("Not stopping the webserver, as it's not running")
             else:
-                self._output_logger.info("Not stopping the webserver, as it's already shutting down")
+                self._output_logger.info(
+                    "Not stopping the webserver, as it's already shutting down"
+                )
 
             return
 
