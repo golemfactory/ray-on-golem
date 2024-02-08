@@ -7,16 +7,16 @@ from typing import Dict, Optional, Sequence
 
 from golem.managers import (
     BlacklistProviderIdPlugin,
-    Buffer,
     DefaultProposalManager,
     NegotiatingPlugin,
     PayAllPaymentManager,
     PaymentPlatformNegotiator,
+    ProposalBuffer,
     ProposalManagerPlugin,
+    ProposalScoringBuffer,
     RefreshingDemandManager,
-    ScoringBuffer,
 )
-from golem.managers.base import ProposalNegotiator
+from golem.managers.base import ManagerPluginException, ProposalNegotiator
 from golem.node import GolemNode
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
@@ -75,9 +75,13 @@ class StatsNegotiatingPlugin(NegotiatingPlugin):
             )
         except ApiException as e:
             error_msg = re.sub(r"\[.*?\]", "[***]", str(e.body))
-            raise RuntimeError(f"Failed to send proposal response! {e.status}: {error_msg}") from e
+            raise ManagerPluginException(
+                f"Failed to send proposal response! {e.status}: {error_msg}"
+            ) from e
         except asyncio.TimeoutError as e:
-            raise RuntimeError(f"Failed to send proposal response! Request timed out") from e
+            raise ManagerPluginException(
+                f"Failed to send proposal response! Request timed out"
+            ) from e
 
 
 class StatsPluginFactory:
@@ -214,17 +218,17 @@ class NetworkStatsService:
 
         plugins.extend(
             [
-                ScoringBuffer(
+                ProposalScoringBuffer(
                     min_size=500,
                     max_size=1000,
                     fill_at_start=True,
                     proposal_scorers=(*stack.extra_proposal_scorers.values(),),
-                    update_interval=timedelta(seconds=10),
+                    scoring_debounce=timedelta(seconds=10),
                 ),
                 self._stats_plugin_factory.create_counter_plugin("Negotiation initialized"),
                 self._stats_plugin_factory.create_negotiating_plugin(),
                 self._stats_plugin_factory.create_counter_plugin("Negotiated successfully"),
-                Buffer(min_size=800, max_size=1000, fill_concurrency_size=16),
+                ProposalBuffer(min_size=800, max_size=1000, fill_concurrency_size=16),
             ]
         )
         stack.proposal_manager = DefaultProposalManager(

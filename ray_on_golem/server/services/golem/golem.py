@@ -2,14 +2,14 @@ import asyncio
 import hashlib
 import logging
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, Optional, Tuple
 
+from golem.exceptions import GolemException
 from golem.managers import (
     BlacklistProviderIdPlugin,
-    Buffer,
     DefaultAgreementManager,
     DefaultProposalManager,
     MapScore,
@@ -17,13 +17,14 @@ from golem.managers import (
     NegotiatingPlugin,
     PayAllPaymentManager,
     PaymentPlatformNegotiator,
+    ProposalBuffer,
+    ProposalScoringBuffer,
     RefreshingDemandManager,
-    ScoringBuffer,
     WorkContext,
 )
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
-from golem.resources import Activity, Network, ProposalData
+from golem.resources import Activity, Network, Proposal, ProposalData
 from yarl import URL
 
 from ray_on_golem.server.models import NodeConfigData
@@ -183,7 +184,7 @@ class GolemService:
             plugins=(
                 BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
                 *stack.extra_proposal_plugins.values(),
-                ScoringBuffer(
+                ProposalScoringBuffer(
                     min_size=50,
                     max_size=1000,
                     fill_at_start=True,
@@ -193,13 +194,19 @@ class GolemService:
                             partial(self._score_with_provider_data, payment_network=payment_network)
                         ),
                     ),
-                    update_interval=timedelta(seconds=10),
+                    scoring_debounce=timedelta(seconds=10),
+                    get_expiration_func=self._get_proposal_expiration,
                 ),
                 NegotiatingPlugin(
                     proposal_negotiators=proposal_negotiators,
                     proposal_response_timeout=DEFAULT_PROPOSAL_RESPONSE_TIMEOUT,
                 ),
-                Buffer(min_size=0, max_size=4, fill_concurrency_size=4),
+                ProposalBuffer(
+                    min_size=0,
+                    max_size=4,
+                    fill_concurrency_size=4,
+                    get_expiration_func=self._get_proposal_expiration,
+                ),
             ),
         )
         stack.agreement_manager = DefaultAgreementManager(
@@ -207,6 +214,9 @@ class GolemService:
         )
 
         return stack
+
+    async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
+        return await proposal.get_expiration_date() - datetime.now(timezone.utc)
 
     def _score_with_provider_data(
         self, proposal_data: ProposalData, payment_network: str
@@ -357,11 +367,13 @@ class GolemService:
                     ssh_private_key_path,
                     add_state_log=add_state_log,
                 )
-            except RuntimeError:
+
+            # TODO: Consider explicit "retryable" and "non-retryable" exceptions
+            except GolemException:
                 raise
-            except Exception:
+            except Exception as e:
                 msg = "Failed to create activity, retrying"
-                await add_state_log(msg)
+                await add_state_log(f"{msg}: {e}")
                 logger.warning(msg, exc_info=True)
 
     async def _create_activity(
@@ -376,7 +388,12 @@ class GolemService:
         logger.info(f"Creating new activity...")
 
         await add_state_log("[1/9] Getting agreement...")
-        agreement = await stack.agreement_manager.get_agreement()
+
+        try:
+            agreement = await stack.agreement_manager.get_agreement()
+        except Exception as e:
+            logger.error(f"Creating new activity failed with `{e}`")
+            raise GolemException(e) from e
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
@@ -405,7 +422,8 @@ class GolemService:
             )
 
             await self._network.refresh_nodes()
-        except Exception:
+        except Exception as e:
+            logger.error(f"Creating new activity failed with `{e}`")
             await activity.destroy()
             raise
 

@@ -6,7 +6,8 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from golem.utils.asyncio import create_task_with_logging
+from golem.exceptions import GolemException
+from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
 from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
 
@@ -50,6 +51,8 @@ class RayService:
         self._nodes_lock = asyncio.Lock()
         self._nodes_id_counter = 0
 
+        self._create_node_tasks: List[asyncio.Task] = []
+
         self._head_node_to_webserver_tunnel_process: Optional[Process] = None
         self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
 
@@ -62,6 +65,7 @@ class RayService:
         logger.info("Stopping RayService...")
 
         await self._stop_head_node_to_webserver_tunnel()
+        await self._stop_create_node_tasks()
         await self._destroy_nodes()
 
         logger.info("Stopping RayService done")
@@ -131,9 +135,11 @@ class RayService:
                     tags=tags,
                 )
 
-                create_task_with_logging(
-                    self._create_node(node_id),
-                    trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
+                self._create_node_tasks.append(
+                    create_task_with_logging(
+                        self._create_node(node_id),
+                        trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
+                    )
                 )
 
         logger.info(f"Requested {count} nodes")
@@ -142,28 +148,37 @@ class RayService:
         return created_node_ids
 
     async def _create_node(self, node_id: NodeId) -> None:
-        activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
-            node_config=self._provider_config.node_config,
-            public_ssh_key=self._ssh_public_key,
-            ssh_user=self._ssh_user,
-            ssh_private_key_path=self._ssh_private_key_path,
-            total_budget=self._provider_config.total_budget,
-            payment_network=self._provider_config.payment_network,
-            subnet_tag=self._provider_config.subnet_tag,
-            add_state_log=partial(self._add_node_state_log, node_id),
-        )
+        try:
+            activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
+                node_config=self._provider_config.node_config,
+                public_ssh_key=self._ssh_public_key,
+                ssh_user=self._ssh_user,
+                ssh_private_key_path=self._ssh_private_key_path,
+                total_budget=self._provider_config.total_budget,
+                payment_network=self._provider_config.payment_network,
+                subnet_tag=self._provider_config.subnet_tag,
+                add_state_log=partial(self._add_node_state_log, node_id),
+            )
 
-        self._print_ssh_command(ip, ssh_proxy_command, self._ssh_user, self._ssh_private_key_path)
+            self._print_ssh_command(
+                ip, ssh_proxy_command, self._ssh_user, self._ssh_private_key_path
+            )
 
-        async with self._get_node_context(node_id) as node:  # type: Node
-            node.state = NodeState.running
-            node.internal_ip = ip
-            node.ssh_proxy_command = ssh_proxy_command
-            node.activity = activity
+            async with self._get_node_context(node_id) as node:  # type: Node
+                node.state = NodeState.running
+                node.internal_ip = ip
+                node.ssh_proxy_command = ssh_proxy_command
+                node.activity = activity
 
-        # TODO: check if node is a head node
-        if not self._is_head_node_to_webserver_tunnel_running():
-            await self._start_head_node_to_webserver_tunnel()
+            # TODO: check if node is a head node
+            if not self._is_head_node_to_webserver_tunnel_running():
+                await self._start_head_node_to_webserver_tunnel()
+        except GolemException as e:
+            async with self._get_node_context(node_id) as node:  # type: Node
+                node.state = NodeState.terminated
+                node.state_log.append(f"Failed to create activity: {e}")
+        finally:
+            self._create_node_tasks.remove(asyncio.current_task())
 
     async def _add_node_state_log(self, node_id: NodeId, log_entry: str) -> None:
         async with self._get_node_context(node_id) as node:  # type: Node
@@ -337,3 +352,16 @@ class RayService:
         self._head_node_to_webserver_tunnel_process = None
 
         logger.info("Stopping head node to webserver tunnel done")
+
+    async def _stop_create_node_tasks(self) -> None:
+        task_count = len(self._create_node_tasks)
+        if not task_count:
+            logger.info("Not canceling pending node creation tasks, as no tasks are pending")
+            return
+
+        logger.info("Canceling %d pending node creation tasks...", task_count)
+
+        await ensure_cancelled_many(self._create_node_tasks)
+        self._create_node_tasks.clear()
+
+        logger.info("Canceling %d pending node creation tasks done", task_count)
