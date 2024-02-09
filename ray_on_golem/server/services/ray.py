@@ -175,7 +175,7 @@ class RayService:
         return node_id
 
     async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
-        logger.info(f"Terminating `{node_id}` node...")
+        logger.info("Terminating node: %s", node_id)
 
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminating
@@ -187,7 +187,7 @@ class RayService:
             node.state = NodeState.terminated
             node.activity = None
 
-            logger.info(f"Terminating `{node_id}` node done")
+            logger.info(f"Terminating node `%s` done", node_id)
 
             return {node.node_id: node.dict(exclude={"activity"})}
 

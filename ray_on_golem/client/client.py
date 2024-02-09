@@ -49,13 +49,14 @@ class RayOnGolemClient:
         return response.requested_nodes
 
     def terminate_node(self, node_id: models.NodeId) -> Dict[models.NodeId, Dict]:
+        logger.info(f"Terminating node %s", node_id)
         response = self._make_request(
             url=settings.URL_TERMINATE_NODE,
             request_data=models.SingleNodeRequestData(
                 node_id=node_id,
             ),
             response_model=models.TerminateNodeResponseData,
-            error_message="Couldn't terminate node",
+            error_message=f"Couldn't terminate node {node_id}",
         )
 
         return response.terminated_nodes
