@@ -98,7 +98,10 @@ class RayOnGolemCtl:
             f"`{log_file_path}`:\n{get_last_lines_from_file(log_file_path, 50)}"
         )
 
-    def stop_webserver(self) -> None:
+    def stop_webserver(self,
+        ignore_self_shutdown: bool = False,
+        force_shutdown: bool = False
+   ) -> None:
         webserver_serviceable = self._client.is_webserver_serviceable()
         if not webserver_serviceable:
             if webserver_serviceable is None:

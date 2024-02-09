@@ -173,11 +173,18 @@ class RayOnGolemClient:
 
         return response.ssh_private_key_base64, response.ssh_public_key_base64
 
-    def shutdown_webserver(self) -> models.ShutdownState:
+    def shutdown_webserver(
+        self,
+        ignore_self_shutdown: bool = False,
+        force_shutdown: bool = False,
+    ) -> models.ShutdownState:
         response = self._make_request(
-            url=settings.URL_SELF_SHUTDOWN,
-            request_data=models.SelfShutdownRequestData(),
-            response_model=models.SelfShutdownResponseData,
+            url=settings.URL_SHUTDOWN,
+            request_data=models.ShutdownRequestData(
+                ignore_self_shutdown=ignore_self_shutdown,
+                force_shutdown=force_shutdown,
+            ),
+            response_model=models.ShutdownResponseData,
             error_message="Couldn't send a self-shutdown request",
         )
 
