@@ -4,6 +4,7 @@ from unittest import mock
 import pytest
 import yaml
 
+from ray_on_golem.ctl.ctl import RayOnGolemCtl
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.models import ProviderConfigData
 
@@ -21,12 +22,13 @@ CLUSTER_CONFIG_STUB = {
 
 @pytest.fixture
 def disable_webserver(monkeypatch):
-    monkeypatch.setattr(GolemNodeProvider, "_get_ray_on_golem_client_instance", mock.Mock())
+    monkeypatch.setattr(RayOnGolemCtl, "start_webserver", mock.Mock())
 
 
 @pytest.fixture
-def mock_path_open(monkeypatch):
+def patch_path(monkeypatch):
     monkeypatch.setattr(Path, "open", mock.MagicMock())
+    monkeypatch.setattr(Path, "exists", mock.Mock(return_value=True))
 
 
 @pytest.mark.parametrize(
@@ -37,7 +39,7 @@ def mock_path_open(monkeypatch):
         CLUSTER_CONFIG_STUB,
     ),
 )
-def test_node_provider_defaults(disable_webserver, mock_path_open, cluster_config):
+def test_node_provider_defaults(disable_webserver, patch_path, cluster_config):
     resolved_config = GolemNodeProvider.bootstrap_config(cluster_config)
 
     provider_params = resolved_config["provider"]["parameters"]

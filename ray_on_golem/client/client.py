@@ -1,7 +1,9 @@
-from typing import Any, Dict, List, Optional, Type, TypeVar
+import logging
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 import requests
 from pydantic import BaseModel, ValidationError
+from ray.autoscaler._private.cli_logger import cli_logger  # noqa
 from yarl import URL
 
 from ray_on_golem.client.exceptions import RayOnGolemClientError, RayOnGolemClientValidationError
@@ -10,11 +12,13 @@ from ray_on_golem.server.models import CreateClusterResponseData
 
 TResponseModel = TypeVar("TResponseModel")
 
+logger = logging.getLogger(__name__)
+
 
 class RayOnGolemClient:
     def __init__(self, port: int) -> None:
-        self._base_url = URL("http://127.0.0.1").with_port(port)
-
+        self.port = port
+        self._base_url = URL("http://127.0.0.1").with_port(self.port)
         self._session = requests.Session()
 
     def create_cluster(
@@ -45,14 +49,22 @@ class RayOnGolemClient:
         return response.requested_nodes
 
     def terminate_node(self, node_id: models.NodeId) -> Dict[models.NodeId, Dict]:
-        response = self._make_request(
-            url=settings.URL_TERMINATE_NODE,
-            request_data=models.SingleNodeRequestData(
-                node_id=node_id,
-            ),
-            response_model=models.TerminateNodeResponseData,
-            error_message="Couldn't terminate node",
-        )
+        logger.info(f"Terminating node %s", node_id)
+        try:
+            response = self._make_request(
+                url=settings.URL_TERMINATE_NODE,
+                request_data=models.SingleNodeRequestData(
+                    node_id=node_id,
+                ),
+                response_model=models.TerminateNodeResponseData,
+                error_message=f"Couldn't terminate node {node_id}",
+            )
+        except RayOnGolemClientError as e:
+            if e.error_code == 400:
+                logger.error(str(e))
+                return {}
+            else:
+                raise
 
         return response.terminated_nodes
 
@@ -149,7 +161,7 @@ class RayOnGolemClient:
 
         return response.ssh_proxy_command
 
-    def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
+    def get_or_create_default_ssh_key(self, cluster_name: str) -> Tuple[str, str]:
         response = self._make_request(
             url=settings.URL_GET_OR_CREATE_DEFAULT_SSH_KEY,
             request_data=models.GetOrCreateDefaultSshKeyRequestData(
@@ -159,7 +171,7 @@ class RayOnGolemClient:
             error_message="Couldn't get or create default ssh key",
         )
 
-        return response.ssh_key_base64
+        return response.ssh_private_key_base64, response.ssh_public_key_base64
 
     def shutdown_webserver(self) -> models.ShutdownState:
         response = self._make_request(
@@ -171,39 +183,40 @@ class RayOnGolemClient:
 
         return response.shutdown_state
 
-    def is_webserver_serviceable(self) -> Optional[bool]:
+    def get_webserver_status(self) -> Optional[models.WebserverStatus]:
         try:
-            response = requests.get(
-                str(self._base_url / settings.URL_HEALTH_CHECK.lstrip("/")),
-                timeout=settings.RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds(),
+            return self._make_request(
+                url=settings.URL_STATUS,
+                response_model=models.WebserverStatus,
+                method="GET",
             )
         except requests.ConnectionError:
             return None
-        else:
-            if response.status_code != 200:
-                return None
 
-            try:
-                health_check = models.HealthCheckResponseData.parse_raw(response.text)
-            except ValidationError:
-                return None
-
-            return not health_check.is_shutting_down
+    def is_webserver_serviceable(self) -> Optional[bool]:
+        status = self.get_webserver_status()
+        return not status.shutting_down if status else None
 
     def _make_request(
         self,
         *,
         url: str,
-        request_data: BaseModel,
         response_model: Type[TResponseModel],
-        error_message: str,
+        request_data: Optional[BaseModel] = None,
+        error_message: str = "",
+        method: str = "POST",
     ) -> TResponseModel:
-        response = self._session.post(
-            str(self._base_url / url.lstrip("/")), data=request_data.json()
+        response = self._session.request(
+            method,
+            str(self._base_url / url.lstrip("/")),
+            data=request_data.json() if request_data else None,
         )
 
         if response.status_code != 200:
-            raise RayOnGolemClientError(f"{error_message}: {response.text}")
+            raise RayOnGolemClientError(
+                f"{error_message or f'Request failed: {url}'}: {response.text}",
+                error_code=response.status_code,
+            )
 
         try:
             return response_model.parse_raw(response.text)

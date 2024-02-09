@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import logging.config
+import pathlib
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Dict, Optional
 
 import click
 import yaml
@@ -10,8 +11,7 @@ import yaml
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
-from ray_on_golem.server.settings import LOGGING_CONFIG, YAGNA_PATH
-from ray_on_golem.utils import prepare_tmp_dir
+from ray_on_golem.server.settings import DEFAULT_DATADIR, YAGNA_PATH, get_logging_config
 
 
 @click.command(
@@ -34,36 +34,53 @@ from ray_on_golem.utils import prepare_tmp_dir
     default=False,
     help="Enable verbose logging.",
 )
-def main(cluster_config_file: str, duration: int, enable_logging: bool):
-    if enable_logging:
-        logging.config.dictConfig(LOGGING_CONFIG)
-
+@click.option(
+    "--datadir",
+    type=pathlib.Path,
+    help=f"Ray on Golem's data directory. [default: {DEFAULT_DATADIR}"
+    " (unless `webserver_datadir` is defined in the cluster config file)]",
+)
+def main(
+    cluster_config_file: str,
+    duration: int,
+    enable_logging: bool,
+    datadir: Optional[pathlib.Path],
+):
     with open(cluster_config_file) as file:
         config = yaml.safe_load(file.read())
 
     GolemNodeProvider._apply_config_defaults(config)
-
-    asyncio.run(_network_stats(config, duration))
-
-
-async def _network_stats(config: Dict, duration: int):
     provider_params = config["provider"]["parameters"]
 
+    datadir = datadir or provider_params["webserver_datadir"]
+
+    if enable_logging:
+        logging.config.dictConfig(get_logging_config(datadir=datadir))
+
+    asyncio.run(_network_stats(provider_params, duration, datadir))
+
+
+async def _network_stats(provider_params: Dict, duration: int, datadir: Optional[pathlib.Path]):
     async with network_stats_service(
         provider_params["enable_registry_stats"],
         provider_params["payment_network"],
         provider_params["payment_driver"],
+        datadir,
     ) as stats_service:
         await stats_service.run(provider_params, duration)
 
 
 @asynccontextmanager
 async def network_stats_service(
-    registry_stats: bool, network: str, driver: str
+    registry_stats: bool,
+    network: str,
+    driver: str,
+    datadir: Optional[pathlib.Path],
 ) -> NetworkStatsService:
     network_stats_service: NetworkStatsService = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
+        datadir=datadir,
     )
 
     await yagna_service.init()
@@ -78,5 +95,4 @@ async def network_stats_service(
 
 
 if __name__ == "__main__":
-    prepare_tmp_dir()
     main()

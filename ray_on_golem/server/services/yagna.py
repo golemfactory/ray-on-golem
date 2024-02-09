@@ -12,7 +12,6 @@ from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.server.settings import (
     LOGGING_BACKUP_COUNT,
-    LOGGING_YAGNA_PATH,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
     RAY_ON_GOLEM_CHECK_DEADLINE,
@@ -22,6 +21,7 @@ from ray_on_golem.server.settings import (
     YAGNA_CHECK_DEADLINE,
     YAGNA_FUND_DEADLINE,
     YAGNA_START_DEADLINE,
+    get_log_path,
 )
 from ray_on_golem.utils import get_last_lines_from_file, run_subprocess, run_subprocess_output
 
@@ -33,12 +33,13 @@ class YagnaServiceError(RayOnGolemError):
 
 
 class YagnaService:
-    def __init__(self, yagna_path: Path):
+    def __init__(self, yagna_path: Path, datadir: Path):
         self._yagna_path = yagna_path
 
         self.yagna_appkey: Optional[str] = None
         self._yagna_process: Optional[Process] = None
         self._yagna_early_exit_task: Optional[asyncio.Task] = None
+        self._datadir = datadir
 
     async def init(self) -> None:
         logger.info("Starting YagnaService...")
@@ -88,7 +89,7 @@ class YagnaService:
     async def _run_yagna(self) -> None:
         logger.info("Starting Yagna...")
 
-        log_file_path = LOGGING_YAGNA_PATH
+        log_file_path = get_log_path("yagna", self._datadir)
         yagna_logger = ZippingRotatingFileHandler(log_file_path, backupCount=LOGGING_BACKUP_COUNT)
 
         self._yagna_process = await run_subprocess(

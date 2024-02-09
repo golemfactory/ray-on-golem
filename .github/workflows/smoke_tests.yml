@@ -40,7 +40,7 @@ jobs:
 
       - name: Check node creation in logs
         continue-on-error: true
-        run: poetry run python tests/smoke.py /tmp/ray_on_golem/webserver_debug.log
+        run: poetry run python tests/smoke.py ~/.local/share/ray_on_golem/
 
       - name: Collects logs
         if: always()
@@ -48,5 +48,5 @@ jobs:
         with:
           name: logs
           path: |
-            /tmp/ray_on_golem/webserver_debug.log
-            /tmp/ray_on_golem/yagna.log
+            /home/runner/.local/share/ray_on_golem/webserver_debug.log
+            /home/runner/.local/share/ray_on_golem/yagna.log

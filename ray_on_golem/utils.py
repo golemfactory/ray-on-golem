@@ -9,7 +9,6 @@ from typing import Dict
 from aiohttp.web_runner import GracefulExit
 
 from ray_on_golem.exceptions import RayOnGolemError
-from ray_on_golem.server.settings import TMP_PATH
 
 
 async def run_subprocess(
@@ -54,6 +53,7 @@ def are_dicts_equal(dict1: Dict, dict2: Dict) -> bool:
 
 
 def is_running_on_golem_network() -> bool:
+    """Detect if this code is being executed inside a VM on a provider node."""
     return os.getenv("ON_GOLEM_NETWORK") is not None
 
 
@@ -68,10 +68,3 @@ def raise_graceful_exit() -> None:
 def get_last_lines_from_file(file_path: Path, max_lines: int) -> str:
     with file_path.open() as file:
         return "".join(deque(file, max_lines))
-
-
-def prepare_tmp_dir():
-    try:
-        TMP_PATH.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        pass

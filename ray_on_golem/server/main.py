@@ -1,5 +1,7 @@
 import logging
 import logging.config
+from pathlib import Path
+from typing import Optional
 
 import click
 from aiohttp import web
@@ -7,14 +9,14 @@ from aiohttp import web
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
-    LOGGING_CONFIG,
+    DEFAULT_DATADIR,
     RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
-    TMP_PATH,
     WEBSOCAT_PATH,
     YAGNA_PATH,
+    get_datadir,
+    get_logging_config,
 )
 from ray_on_golem.server.views import routes
-from ray_on_golem.utils import prepare_tmp_dir
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,7 @@ logger = logging.getLogger(__name__)
     help="Port for Ray on Golem's webserver to listen on.",
 )
 @click.option(
-    "--self-shutdown",
+    "--self-shutdown/--no-self-shutdown",
     is_flag=True,
     help="Enable self-shutdown after last node termination.",
 )
@@ -41,10 +43,16 @@ logger = logging.getLogger(__name__)
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-def main(port: int, self_shutdown: bool, registry_stats: bool):
-    logging.config.dictConfig(LOGGING_CONFIG)
+@click.option(
+    "--datadir",
+    type=Path,
+    default=DEFAULT_DATADIR,
+    help="Ray on Golem's data directory.",
+)
+def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
+    logging.config.dictConfig(get_logging_config(datadir))
 
-    app = create_application(port, self_shutdown, registry_stats)
+    app = create_application(port, self_shutdown, registry_stats, get_datadir(datadir))
 
     logger.info(f"Starting server... {port=}, {self_shutdown=}, {registry_stats=}")
 
@@ -61,7 +69,12 @@ def main(port: int, self_shutdown: bool, registry_stats: bool):
         logger.info("Stopping server done, bye!")
 
 
-def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> web.Application:
+def create_application(
+    port: int,
+    self_shutdown: bool,
+    registry_stats: bool,
+    datadir: Path,
+) -> web.Application:
     app = web.Application(
         middlewares=[
             trace_id_middleware,
@@ -75,6 +88,7 @@ def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> 
 
     app["yagna_service"] = YagnaService(
         yagna_path=YAGNA_PATH,
+        datadir=datadir,
     )
 
     app["golem_service"] = GolemService(
@@ -86,7 +100,7 @@ def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> 
         ray_on_golem_port=port,
         golem_service=app["golem_service"],
         yagna_service=app["yagna_service"],
-        tmp_path=TMP_PATH,
+        datadir=datadir,
     )
 
     app.add_routes(routes)
@@ -137,6 +151,59 @@ async def ray_service_ctx(app: web.Application) -> None:
     await ray_service.shutdown()
 
 
+@click.command(
+    help="Start Ray on Golem's webserver and the yagna daemon.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port for Ray on Golem's webserver to listen on.",
+)
+@click.option(
+    "--registry-stats/--no-registry-stats",
+    default=True,
+    help="Enable collection of Golem Registry stats about resolved images.",
+)
+@click.option(
+    "--datadir",
+    type=Path,
+    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
+)
+def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
+    from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
+
+    ctl = RayOnGolemCtl(RayOnGolemClient(port), RayOnGolemCtlConsoleLogger())
+    ctl.start_webserver(
+        registry_stats=registry_stats,
+        datadir=datadir,
+        self_shutdown=False,
+    )
+
+
+@click.command(
+    help="Stop Ray on Golem's webserver and the yagna daemon.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port for Ray on Golem's webserver to listen on.",
+)
+def stop(port):
+    from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
+
+    ctl = RayOnGolemCtl(RayOnGolemClient(port), RayOnGolemCtlConsoleLogger())
+    ctl.stop_webserver()
+
+
 if __name__ == "__main__":
-    prepare_tmp_dir()
     main()

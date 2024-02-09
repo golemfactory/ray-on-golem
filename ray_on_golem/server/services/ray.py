@@ -37,12 +37,12 @@ class RayService:
         ray_on_golem_port: int,
         golem_service: GolemService,
         yagna_service: YagnaService,
-        tmp_path: Path,
+        datadir: Path,
     ):
         self._ray_on_golem_port = ray_on_golem_port
         self._golem_service = golem_service
         self._yagna_service = yagna_service
-        self._tmp_path = tmp_path
+        self._datadir = datadir
 
         self._provider_config: Optional[ProviderConfigData] = None
         self._wallet_address: Optional[str] = None
@@ -190,7 +190,7 @@ class RayService:
         return node_id
 
     async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
-        logger.info(f"Terminating `{node_id}` node...")
+        logger.info("Terminating node: %s", node_id)
 
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminating
@@ -202,7 +202,7 @@ class RayService:
             node.state = NodeState.terminated
             node.activity = None
 
-            logger.info(f"Terminating `{node_id}` node done")
+            logger.info(f"Terminating node `%s` done", node_id)
 
             return {node.node_id: node.dict(exclude={"activity"})}
 
@@ -249,8 +249,9 @@ class RayService:
         async with self._get_node_context(node_id) as node:  # type: Node
             node.tags.update(tags)
 
-    async def get_or_create_default_ssh_key(self, cluster_name: str) -> str:
-        ssh_key_path = self._tmp_path / get_default_ssh_key_name(cluster_name)
+    async def get_or_create_default_ssh_key(self, cluster_name: str) -> Tuple[str, str]:
+        ssh_key_path = self._datadir / get_default_ssh_key_name(cluster_name)
+        ssk_public_key_path = ssh_key_path.with_suffix(".pub")
 
         if not ssh_key_path.exists():
             logger.info(f"Creating default ssh key for `{cluster_name}`...")
@@ -267,8 +268,11 @@ class RayService:
             )
 
         # TODO: async file handling
-        with ssh_key_path.open("r") as f:
-            return str(f.read())
+        with ssh_key_path.open("r") as priv_f, ssk_public_key_path.open("r") as pub_f:
+            return str(priv_f.read()), str(pub_f.read())
+
+    def get_datadir(self) -> Path:
+        return self._datadir
 
     @asynccontextmanager
     async def _get_node_context(self, node_id: NodeId) -> Iterator[Node]:
