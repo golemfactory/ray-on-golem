@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 import requests
@@ -10,6 +11,8 @@ from ray_on_golem.server import models, settings
 from ray_on_golem.server.models import CreateClusterResponseData
 
 TResponseModel = TypeVar("TResponseModel")
+
+logger = logging.getLogger(__name__)
 
 
 class RayOnGolemClient:
@@ -203,7 +206,8 @@ class RayOnGolemClient:
 
         if response.status_code != 200:
             raise RayOnGolemClientError(
-                f"{error_message or f'Request failed: {url}'}: {response.text}"
+                f"{error_message or f'Request failed: {url}'}: {response.text}",
+                error_code=response.status_code,
             )
 
         try:
