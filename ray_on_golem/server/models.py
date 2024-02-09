@@ -192,3 +192,4 @@ class WebserverStatus(BaseModel):
     version: str
     datadir: str
     shutting_down: bool
+    self_shutdown: bool

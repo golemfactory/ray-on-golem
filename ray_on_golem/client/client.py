@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class RayOnGolemClient:
     def __init__(self, port: int) -> None:
         self.port = port
-        self._base_url = URL("http://127.0.0.1").with_port(self.port)
+        self.base_url = URL("http://127.0.0.1").with_port(self.port)
         self._session = requests.Session()
 
     def create_cluster(
@@ -215,7 +215,7 @@ class RayOnGolemClient:
     ) -> TResponseModel:
         response = self._session.request(
             method,
-            str(self._base_url / url.lstrip("/")),
+            str(self.base_url / url.lstrip("/")),
             data=request_data.json() if request_data else None,
         )
 

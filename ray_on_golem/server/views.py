@@ -38,6 +38,7 @@ async def status(request: web.Request) -> web.Response:
             version=get_version(),
             datadir=str(ray_service.get_datadir()),
             shutting_down=request.app.get("shutting_down", False),
+            self_shutdown=request.app.get("self_shutdown"),
         )
     )
 
@@ -206,7 +207,7 @@ async def self_shutdown(request):
 
     shutdown_request = models.ShutdownRequestData.parse_raw(await request.text())
 
-    if not shutdown_request.ignore_self_shutdown and not request.app["self_shutdown"]:
+    if not (shutdown_request.ignore_self_shutdown or request.app["self_shutdown"]):
         shutdown_state = ShutdownState.NOT_ENABLED
     elif await ray_service.get_non_terminated_nodes_ids():
         if shutdown_request.force_shutdown:
@@ -218,7 +219,11 @@ async def self_shutdown(request):
 
     if shutdown_state in (ShutdownState.WILL_SHUTDOWN, ShutdownState.FORCED_SHUTDOWN):
         shutdown_seconds = int(settings.RAY_ON_GOLEM_SHUTDOWN_DELAY.total_seconds())
-        logger.info(f"Received a self-shutdown request, exiting in {shutdown_seconds} seconds...")
+        logger.info(
+            "Received a %sself-shutdown request, exiting in %s seconds...",
+            "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+            shutdown_seconds,
+        )
         loop = asyncio.get_event_loop()
         loop.call_later(shutdown_seconds, raise_graceful_exit)
         request.app["shutting_down"] = True
