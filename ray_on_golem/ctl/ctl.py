@@ -111,7 +111,7 @@ class RayOnGolemCtl:
 
         self._output_logger.info(
             "{verb} webserver shutdown...".format(
-                verb='Requesting' if not force_shutdown else 'Forcing'
+                verb="Requesting" if not force_shutdown else "Forcing"
             )
         )
 

@@ -202,7 +202,7 @@ async def get_or_create_ssh_key(request):
 
 
 @routes.post(settings.URL_SHUTDOWN)
-async def self_shutdown(request):
+async def shutdown(request):
     ray_service: RayService = request.app["ray_service"]
 
     shutdown_request = models.ShutdownRequestData.parse_raw(await request.text())
