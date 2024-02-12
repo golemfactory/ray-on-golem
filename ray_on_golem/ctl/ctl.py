@@ -110,7 +110,9 @@ class RayOnGolemCtl:
             return
 
         self._output_logger.info(
-            f"{'Requesting' if not force_shutdown else 'Forcing' } webserver shutdown..."
+            "{verb} webserver shutdown...".format(
+                verb='Requesting' if not force_shutdown else 'Forcing'
+            )
         )
 
         shutdown_state = self._client.shutdown_webserver(
