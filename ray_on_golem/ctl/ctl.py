@@ -37,7 +37,7 @@ class RayOnGolemCtl:
             if webserver_status.shutting_down:
                 self.wait_for_shutdown()
             else:
-                self._output_logger.info("Not starting webserver, as it's already running")
+                self._output_logger.info("Not starting the webserver, as it's already running")
                 if datadir and webserver_status.datadir != str(datadir):
                     self._output_logger.warning(
                         f"Specified data directory `{datadir}` "
@@ -46,9 +46,8 @@ class RayOnGolemCtl:
                     )
                 return
 
-        self._output_logger.info(
-            f"Starting webserver with deadline up to `{RAY_ON_GOLEM_START_DEADLINE}`..."
-        )
+        self._output_logger.info(f"Starting webserver on {self._client.base_url}...")
+        self._output_logger.verbose(f"Webserver startup timeout: `{RAY_ON_GOLEM_START_DEADLINE}`.")
         args = [
             RAY_ON_GOLEM_PATH,
             "webserver",
@@ -98,30 +97,38 @@ class RayOnGolemCtl:
             f"`{log_file_path}`:\n{get_last_lines_from_file(log_file_path, 50)}"
         )
 
-    def stop_webserver(self) -> None:
+    def stop_webserver(
+        self, ignore_self_shutdown: bool = False, force_shutdown: bool = False
+    ) -> Optional[ShutdownState]:
         webserver_serviceable = self._client.is_webserver_serviceable()
         if not webserver_serviceable:
             if webserver_serviceable is None:
-                self._output_logger.info("Not stopping the webserver, as it's not running")
+                self._output_logger.info(f"No webserver found on: {self._client.base_url}.")
             else:
-                self._output_logger.info(
-                    "Not stopping the webserver, as it's already shutting down"
-                )
+                self._output_logger.info("The webserver is already shutting down.")
 
             return
 
-        self._output_logger.info("Requesting webserver shutdown...")
+        self._output_logger.info(
+            "{verb} webserver shutdown...".format(
+                verb="Requesting" if not force_shutdown else "Forcing"
+            )
+        )
 
-        shutdown_state = self._client.shutdown_webserver()
+        shutdown_state = self._client.shutdown_webserver(
+            ignore_self_shutdown=ignore_self_shutdown, force_shutdown=force_shutdown
+        )
 
         if shutdown_state == ShutdownState.NOT_ENABLED:
-            self._output_logger.info("Not stopping webserver, as it was started externally")
-            return
+            self._output_logger.info("Cannot stop the webserver, as it was started externally.")
         elif shutdown_state == ShutdownState.CLUSTER_NOT_EMPTY:
-            self._output_logger.info("Not stopping webserver, as the cluster is not empty")
-            return
+            self._output_logger.info("Cannot stop the webserver, as the cluster is not empty.")
+        elif shutdown_state == ShutdownState.FORCED_SHUTDOWN:
+            self._output_logger.info("Force-shutdown requested, will stop soon.")
+        else:
+            self._output_logger.info("Webserver shutdown requested, will stop soon.")
 
-        self._output_logger.info("Requesting webserver shutdown done, will stop soon")
+        return shutdown_state
 
     def wait_for_shutdown(self) -> None:
         self._output_logger.info(

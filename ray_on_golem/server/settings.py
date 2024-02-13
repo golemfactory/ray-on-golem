@@ -31,7 +31,7 @@ URL_REQUEST_NODES = "/request_nodes"
 URL_TERMINATE_NODE = "/terminate"
 URL_GET_SSH_PROXY_COMMAND = "/ssh_proxy_command"
 URL_GET_OR_CREATE_DEFAULT_SSH_KEY = "/ger_or_create_default_ssh_key"
-URL_SELF_SHUTDOWN = "/self_shutdown"
+URL_SHUTDOWN = "/shutdown"
 
 PAYMENT_NETWORK_MAINNET = "mainnet"
 PAYMENT_NETWORK_POLYGON = "polygon"

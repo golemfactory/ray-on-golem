@@ -196,13 +196,26 @@ def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     default=4578,
     help="Port for Ray on Golem's webserver to listen on.",
 )
-def stop(port):
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Force the shutdown even if the webserver contains active nodes.",
+)
+def stop(port, force):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl
     from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
+    from ray_on_golem.server.models import ShutdownState
 
     ctl = RayOnGolemCtl(RayOnGolemClient(port), RayOnGolemCtlConsoleLogger())
-    ctl.stop_webserver()
+    shutdown_state = ctl.stop_webserver(ignore_self_shutdown=True)
+    if shutdown_state == ShutdownState.CLUSTER_NOT_EMPTY:
+        if force or click.confirm("Force the shutdown?"):
+            shutdown_state = ctl.stop_webserver(
+                ignore_self_shutdown=True,
+                force_shutdown=True,
+            )
 
 
 if __name__ == "__main__":

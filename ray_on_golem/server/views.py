@@ -38,6 +38,7 @@ async def status(request: web.Request) -> web.Response:
             version=get_version(),
             datadir=str(ray_service.get_datadir()),
             shutting_down=request.app.get("shutting_down", False),
+            self_shutdown=request.app.get("self_shutdown"),
         )
     )
 
@@ -200,24 +201,31 @@ async def get_or_create_ssh_key(request):
     )
 
 
-@routes.post(settings.URL_SELF_SHUTDOWN)
-async def self_shutdown(request):
+@routes.post(settings.URL_SHUTDOWN)
+async def shutdown(request):
     ray_service: RayService = request.app["ray_service"]
 
-    models.SelfShutdownRequestData.parse_raw(await request.text())
+    shutdown_request = models.ShutdownRequestData.parse_raw(await request.text())
 
-    if not request.app["self_shutdown"]:
+    if not (shutdown_request.ignore_self_shutdown or request.app["self_shutdown"]):
         shutdown_state = ShutdownState.NOT_ENABLED
     elif await ray_service.get_non_terminated_nodes_ids():
-        shutdown_state = ShutdownState.CLUSTER_NOT_EMPTY
+        if shutdown_request.force_shutdown:
+            shutdown_state = ShutdownState.FORCED_SHUTDOWN
+        else:
+            shutdown_state = ShutdownState.CLUSTER_NOT_EMPTY
     else:
         shutdown_state = ShutdownState.WILL_SHUTDOWN
 
-    if shutdown_state == ShutdownState.WILL_SHUTDOWN:
+    if shutdown_state in (ShutdownState.WILL_SHUTDOWN, ShutdownState.FORCED_SHUTDOWN):
         shutdown_seconds = int(settings.RAY_ON_GOLEM_SHUTDOWN_DELAY.total_seconds())
-        logger.info(f"Received a self-shutdown request, exiting in {shutdown_seconds} seconds...")
+        logger.info(
+            "Received a %sself-shutdown request, exiting in %s seconds...",
+            "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+            shutdown_seconds,
+        )
         loop = asyncio.get_event_loop()
         loop.call_later(shutdown_seconds, raise_graceful_exit)
         request.app["shutting_down"] = True
 
-    return json_response(models.SelfShutdownResponseData(shutdown_state=shutdown_state))
+    return json_response(models.ShutdownResponseData(shutdown_state=shutdown_state))

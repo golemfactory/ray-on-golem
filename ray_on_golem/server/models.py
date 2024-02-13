@@ -18,6 +18,7 @@ class NodeState(Enum):
 class ShutdownState(Enum):
     NOT_ENABLED = "not_enabled"
     CLUSTER_NOT_EMPTY = "cluster_not_empty"
+    FORCED_SHUTDOWN = "forced_shutdown"
     WILL_SHUTDOWN = "will_shutdown"
 
 
@@ -174,11 +175,12 @@ class GetOrCreateDefaultSshKeyResponseData(BaseModel):
     ssh_public_key_base64: str
 
 
-class SelfShutdownRequestData(BaseModel):
-    pass
+class ShutdownRequestData(BaseModel):
+    ignore_self_shutdown: bool = False
+    force_shutdown: bool = False
 
 
-class SelfShutdownResponseData(BaseModel):
+class ShutdownResponseData(BaseModel):
     shutdown_state: ShutdownState
 
 
@@ -190,3 +192,4 @@ class WebserverStatus(BaseModel):
     version: str
     datadir: str
     shutting_down: bool
+    self_shutdown: bool

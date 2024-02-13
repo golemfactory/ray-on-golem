@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class RayOnGolemClient:
     def __init__(self, port: int) -> None:
         self.port = port
-        self._base_url = URL("http://127.0.0.1").with_port(self.port)
+        self.base_url = URL("http://127.0.0.1").with_port(self.port)
         self._session = requests.Session()
 
     def create_cluster(
@@ -173,11 +173,18 @@ class RayOnGolemClient:
 
         return response.ssh_private_key_base64, response.ssh_public_key_base64
 
-    def shutdown_webserver(self) -> models.ShutdownState:
+    def shutdown_webserver(
+        self,
+        ignore_self_shutdown: bool = False,
+        force_shutdown: bool = False,
+    ) -> models.ShutdownState:
         response = self._make_request(
-            url=settings.URL_SELF_SHUTDOWN,
-            request_data=models.SelfShutdownRequestData(),
-            response_model=models.SelfShutdownResponseData,
+            url=settings.URL_SHUTDOWN,
+            request_data=models.ShutdownRequestData(
+                ignore_self_shutdown=ignore_self_shutdown,
+                force_shutdown=force_shutdown,
+            ),
+            response_model=models.ShutdownResponseData,
             error_message="Couldn't send a self-shutdown request",
         )
 
@@ -208,7 +215,7 @@ class RayOnGolemClient:
     ) -> TResponseModel:
         response = self._session.request(
             method,
-            str(self._base_url / url.lstrip("/")),
+            str(self.base_url / url.lstrip("/")),
             data=request_data.json() if request_data else None,
         )
 
