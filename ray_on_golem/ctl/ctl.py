@@ -199,7 +199,7 @@ class RayOnGolemCtl:
                 if cnt:
                     # only mention stopping if any process had been running
                     self._output_logger.info(f"{webserver.capitalize()} stopped.")
-                    self._clear_pid()
+                    self.clear_pid()
                 return
 
             if not cnt:
@@ -221,7 +221,7 @@ class RayOnGolemCtl:
         with self._get_pidfile().open("w") as pidf:
             pidf.write(str(pid))
 
-    def _clear_pid(self):
+    def clear_pid(self):
         try:
             self._get_pidfile().unlink()
         except FileNotFoundError:

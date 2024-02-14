@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+import psutil
 from aiohttp import web
 
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
@@ -250,7 +251,12 @@ def stop(port, force, kill, datadir):
     proc = ctl.get_process_info()
     if proc:
         if kill or click.confirm("Terminate the webserver process?"):
-            proc.kill()
+            try:
+                proc.kill()
+            except psutil.NoSuchProcess:
+                pass
+            ctl.clear_pid()
+            click.echo("Process terminated.")
         else:
             click.echo("The webserver is still running...")
 
