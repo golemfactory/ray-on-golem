@@ -15,16 +15,13 @@ async def run_subprocess(
     *args,
     stderr=asyncio.subprocess.DEVNULL,
     stdout=asyncio.subprocess.DEVNULL,
-    disable_signal_propagation=False,
+    detach=False,
 ) -> Process:
-    # If the process lifetime will be fully managed, we need to disable signal propagation from
-    # parent to child process https://stackoverflow.com/a/5446982/1993670
-    kwargs = {"preexec_fn": os.setpgrp} if disable_signal_propagation else {}
     process = await asyncio.create_subprocess_exec(
         *args,
         stderr=stderr,
         stdout=stdout,
-        **kwargs,
+        start_new_session=detach,
     )
 
     return process
