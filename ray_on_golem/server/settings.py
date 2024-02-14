@@ -9,14 +9,27 @@ from yarl import URL
 YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
 YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
 YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
-YAGNA_START_DEADLINE = timedelta(minutes=2)
-YAGNA_FUND_DEADLINE = timedelta(minutes=2)
-YAGNA_CHECK_DEADLINE = timedelta(seconds=2)
+YAGNA_START_TIMEOUT = timedelta(minutes=2)
+YAGNA_FUND_TIMEOUT = timedelta(minutes=2)
+YAGNA_CHECK_INTERVAL = timedelta(seconds=2)
 
-RAY_ON_GOLEM_START_DEADLINE = timedelta(minutes=5)
-RAY_ON_GOLEM_CHECK_DEADLINE = timedelta(seconds=2)
+# how long will we wait until we raise an error on webserver startup
+RAY_ON_GOLEM_START_TIMEOUT = timedelta(minutes=5)
+
+# how often the startup/shutdown status is checked
+RAY_ON_GOLEM_CHECK_INTERVAL = timedelta(seconds=2)
+
+# how long a shutdown request will wait until the webserver shutdown is initiated
 RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=30)
-RAY_ON_GOLEM_SHUTDOWN_DEADLINE = timedelta(seconds=30)
+
+# how long we wait for the webserver shutdown to complete
+RAY_ON_GOLEM_SHUTDOWN_TIMEOUT = timedelta(seconds=60)
+
+# how long we wait for the webserver process to exit
+RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
+
+RAY_ON_GOLEM_PID_FILENAME = "ray_on_golem.pid"
+
 
 URL_STATUS = "/"
 URL_CREATE_CLUSTER = "/create_cluster"

@@ -94,13 +94,13 @@ class GolemNodeProvider(NodeProvider):
             datadir = Path(datadir)
 
         client = RayOnGolemClient(port)
-        ctl = RayOnGolemCtl(client, NodeProviderCliLogger())
+        ctl = RayOnGolemCtl(client=client, output_logger=NodeProviderCliLogger(), datadir=datadir)
 
         # consider starting the webserver only if this code is executed
         # on a requestor agent and not inside the VM on a provider
         if not is_running_on_golem_network():
             with cli_logger.group(LOG_GROUP):
-                ctl.start_webserver(registry_stats, datadir, self_shutdown=True)
+                ctl.start_webserver(registry_stats, self_shutdown=True)
 
         return client
 

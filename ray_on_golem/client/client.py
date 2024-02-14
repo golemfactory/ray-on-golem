@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 import requests
@@ -175,6 +176,7 @@ class RayOnGolemClient:
 
     def shutdown_webserver(
         self,
+        shutdown_delay: timedelta,
         ignore_self_shutdown: bool = False,
         force_shutdown: bool = False,
     ) -> models.ShutdownState:
@@ -183,6 +185,7 @@ class RayOnGolemClient:
             request_data=models.ShutdownRequestData(
                 ignore_self_shutdown=ignore_self_shutdown,
                 force_shutdown=force_shutdown,
+                shutdown_delay=int(shutdown_delay.total_seconds()),
             ),
             response_model=models.ShutdownResponseData,
             error_message="Couldn't send a self-shutdown request",

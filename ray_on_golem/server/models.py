@@ -178,6 +178,7 @@ class GetOrCreateDefaultSshKeyResponseData(BaseModel):
 class ShutdownRequestData(BaseModel):
     ignore_self_shutdown: bool = False
     force_shutdown: bool = False
+    shutdown_delay: Optional[int] = None
 
 
 class ShutdownResponseData(BaseModel):

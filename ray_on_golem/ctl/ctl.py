@@ -1,17 +1,23 @@
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
+
+import psutil
 
 from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.server.models import ShutdownState
 from ray_on_golem.server.settings import (
     LOGGING_BACKUP_COUNT,
-    RAY_ON_GOLEM_CHECK_DEADLINE,
+    RAY_ON_GOLEM_CHECK_INTERVAL,
     RAY_ON_GOLEM_PATH,
-    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
-    RAY_ON_GOLEM_START_DEADLINE,
+    RAY_ON_GOLEM_PID_FILENAME,
+    RAY_ON_GOLEM_SHUTDOWN_DELAY,
+    RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
+    RAY_ON_GOLEM_START_TIMEOUT,
+    RAY_ON_GOLEM_STOP_TIMEOUT,
+    get_datadir,
     get_log_path,
 )
 from ray_on_golem.utils import get_last_lines_from_file
@@ -22,32 +28,37 @@ if TYPE_CHECKING:
 
 
 class RayOnGolemCtl:
-    def __init__(self, client: "RayOnGolemClient", output_logger: "RayOnGolemCtlLogger"):
+    def __init__(
+        self,
+        client: "RayOnGolemClient",
+        output_logger: "RayOnGolemCtlLogger",
+        datadir: Optional[Path] = None,
+    ):
         self._client = client
         self._output_logger = output_logger
+        self._datadir = datadir
 
     def start_webserver(
         self,
         registry_stats: bool,
-        datadir: Optional[Path] = None,
         self_shutdown: bool = True,
     ) -> None:
         webserver_status = self._client.get_webserver_status()
         if webserver_status:
             if webserver_status.shutting_down:
-                self.wait_for_shutdown()
+                self.wait_for_stop()
             else:
                 self._output_logger.info("Not starting the webserver, as it's already running")
-                if datadir and webserver_status.datadir != str(datadir):
+                if self._datadir and webserver_status.datadir != str(self._datadir):
                     self._output_logger.warning(
-                        f"Specified data directory `{datadir}` "
+                        f"Specified data directory `{self._datadir}` "
                         f"is different than webserver's: `{webserver_status.datadir}`. "
                         "Using the webserver setting."
                     )
                 return
 
         self._output_logger.info(f"Starting webserver on {self._client.base_url}...")
-        self._output_logger.verbose(f"Webserver startup timeout: `{RAY_ON_GOLEM_START_DEADLINE}`.")
+        self._output_logger.verbose(f"Webserver startup timeout: `{RAY_ON_GOLEM_START_TIMEOUT}`.")
         args = [
             RAY_ON_GOLEM_PATH,
             "webserver",
@@ -57,12 +68,12 @@ class RayOnGolemCtl:
             "--self-shutdown" if self_shutdown else "--no-self-shutdown",
         ]
 
-        if datadir:
-            args.extend(["--datadir", datadir])
+        if self._datadir:
+            args.extend(["--datadir", self._datadir])
 
         self._output_logger.verbose(f"Webserver command: `{' '.join([str(a) for a in args])}`")
 
-        log_file_path = get_log_path("webserver_debug", datadir)
+        log_file_path = get_log_path("webserver_debug", self._datadir)
         debug_logger = ZippingRotatingFileHandler(log_file_path, backupCount=LOGGING_BACKUP_COUNT)
         proc = subprocess.Popen(
             args,
@@ -70,9 +81,10 @@ class RayOnGolemCtl:
             stderr=debug_logger.stream,
             start_new_session=True,
         )
+        self._save_pid(proc.pid)
 
-        start_deadline = datetime.now() + RAY_ON_GOLEM_START_DEADLINE
-        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
+        start_deadline = datetime.now() + RAY_ON_GOLEM_START_TIMEOUT
+        check_seconds = int(RAY_ON_GOLEM_CHECK_INTERVAL.total_seconds())
         while datetime.now() < start_deadline:
             try:
                 proc.communicate(timeout=check_seconds)
@@ -92,13 +104,16 @@ class RayOnGolemCtl:
             )
 
         self._output_logger.error(
-            f"Starting webserver failed! Deadline of `{RAY_ON_GOLEM_START_DEADLINE}` reached.\n"
+            f"Starting webserver failed! Timeout of `{RAY_ON_GOLEM_START_TIMEOUT}` reached.\n"
             "Showing last 50 lines from "
             f"`{log_file_path}`:\n{get_last_lines_from_file(log_file_path, 50)}"
         )
 
     def stop_webserver(
-        self, ignore_self_shutdown: bool = False, force_shutdown: bool = False
+        self,
+        ignore_self_shutdown: bool = False,
+        force_shutdown: bool = False,
+        shutdown_delay: timedelta = RAY_ON_GOLEM_SHUTDOWN_DELAY,
     ) -> Optional[ShutdownState]:
         webserver_serviceable = self._client.is_webserver_serviceable()
         if not webserver_serviceable:
@@ -116,7 +131,9 @@ class RayOnGolemCtl:
         )
 
         shutdown_state = self._client.shutdown_webserver(
-            ignore_self_shutdown=ignore_self_shutdown, force_shutdown=force_shutdown
+            ignore_self_shutdown=ignore_self_shutdown,
+            force_shutdown=force_shutdown,
+            shutdown_delay=shutdown_delay,
         )
 
         if shutdown_state == ShutdownState.NOT_ENABLED:
@@ -130,29 +147,92 @@ class RayOnGolemCtl:
 
         return shutdown_state
 
-    def wait_for_shutdown(self) -> None:
+    def wait_for_stop(
+        self,
+        starting_up=True,
+        shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
+        stop_timeout=RAY_ON_GOLEM_STOP_TIMEOUT,
+    ):
+        self._wait_for_shutdown(starting_up=starting_up, timeout=shutdown_timeout)
+        self._wait_for_process_stop(starting_up=starting_up, timeout=stop_timeout)
+
+    def _wait_for_shutdown(
+        self,
+        starting_up: bool,
+        timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
+    ) -> None:
+        webserver = "Previous webserver instance" if starting_up else "Webserver"
+        if self._client.is_webserver_serviceable() is None:
+            return
+
         self._output_logger.info(
-            "Previous webserver instance is still shutting down, "
-            f"waiting with deadline up to `{RAY_ON_GOLEM_SHUTDOWN_DEADLINE}`...",
+            f"{webserver} is still shutting down, "
+            f"waiting up to {int(timeout.total_seconds())} seconds ...",
         )
 
-        wait_deadline = datetime.now() + RAY_ON_GOLEM_SHUTDOWN_DEADLINE
-        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
+        wait_deadline = datetime.now() + timeout
+        check_seconds = int(RAY_ON_GOLEM_CHECK_INTERVAL.total_seconds())
 
-        time.sleep(check_seconds)
         while datetime.now() < wait_deadline:
+            time.sleep(check_seconds)
             webserver_serviceable = self._client.is_webserver_serviceable()
             if webserver_serviceable is None:
-                self._output_logger.info("Previous webserver instance shutdown done")
+                self._output_logger.info(f"{webserver} shutdown completed.")
                 return
 
-            self._output_logger.info(
-                "Previous webserver instance is not yet shutdown, "
-                f"waiting additional `{check_seconds}` seconds..."
+            self._output_logger.verbose(
+                f"{webserver} is still running, " f"waiting additional `{check_seconds}` seconds..."
             )
+
+        self._output_logger.error(f"Shutdown timeout of {timeout} reached.")
+
+    def _wait_for_process_stop(self, starting_up=True, timeout=RAY_ON_GOLEM_STOP_TIMEOUT):
+        wait_deadline = datetime.now() + timeout
+        check_seconds = int(RAY_ON_GOLEM_CHECK_INTERVAL.total_seconds())
+        cnt = 0
+        webserver = "previous webserver process" if starting_up else "webserver process"
+
+        while datetime.now() < wait_deadline:
+            proc = self.get_process_info()
+
+            if not proc:
+                if cnt:
+                    # only mention stopping if any process had been running
+                    self._output_logger.info(f"{webserver.capitalize()} stopped.")
+                    self._clear_pid()
+                return
+
+            if not cnt:
+                self._output_logger.info(
+                    f"Waiting {int(timeout.total_seconds())} seconds for the {webserver} to stop."
+                )
+            else:
+                self._output_logger.verbose(f"Waiting additional `{check_seconds}`...")
+
+            cnt += 1
             time.sleep(check_seconds)
 
-        self._output_logger.error(
-            "Previous webserver instance is still running! "
-            f"Deadline of `{RAY_ON_GOLEM_START_DEADLINE}` reached."
-        )
+        self._output_logger.error(f"{webserver.capitalize()} stop timeout of {timeout} reached.")
+
+    def _get_pidfile(self) -> Path:
+        return get_datadir(self._datadir) / RAY_ON_GOLEM_PID_FILENAME
+
+    def _save_pid(self, pid: int):
+        with self._get_pidfile().open("w") as pidf:
+            pidf.write(str(pid))
+
+    def _clear_pid(self):
+        try:
+            self._get_pidfile().unlink()
+        except FileNotFoundError:
+            pass
+
+    def get_process_info(self) -> Optional[psutil.Process]:
+        try:
+            pidfile_path = self._get_pidfile()
+            with pidfile_path.open("r") as pidf:
+                process = psutil.Process(int(pidf.read()))
+                if pidfile_path.stat().st_mtime >= process.create_time():
+                    return process
+        except (FileNotFoundError, ValueError, psutil.NoSuchProcess):
+            return None

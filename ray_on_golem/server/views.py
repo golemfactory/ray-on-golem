@@ -218,12 +218,18 @@ async def shutdown(request):
         shutdown_state = ShutdownState.WILL_SHUTDOWN
 
     if shutdown_state in (ShutdownState.WILL_SHUTDOWN, ShutdownState.FORCED_SHUTDOWN):
-        shutdown_seconds = int(settings.RAY_ON_GOLEM_SHUTDOWN_DELAY.total_seconds())
-        logger.info(
-            "Received a %sself-shutdown request, exiting in %s seconds...",
-            "forced " if ShutdownState.FORCED_SHUTDOWN else "",
-            shutdown_seconds,
-        )
+        shutdown_seconds = shutdown_request.shutdown_delay
+        if shutdown_seconds:
+            logger.info(
+                "Received a %sself-shutdown request, exiting in %s seconds...",
+                "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+                shutdown_seconds,
+            )
+        else:
+            logger.info(
+                "Initiating a %sshutdown immediately...",
+                "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+            )
         loop = asyncio.get_event_loop()
         loop.call_later(shutdown_seconds, raise_graceful_exit)
         request.app["shutting_down"] = True
