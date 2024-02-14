@@ -12,22 +12,23 @@ from ray_on_golem.exceptions import RayOnGolemError
 
 
 async def run_subprocess(
-    *args, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL
+    *args,
+    stderr=asyncio.subprocess.DEVNULL,
+    stdout=asyncio.subprocess.DEVNULL,
+    detach=False,
 ) -> Process:
     process = await asyncio.create_subprocess_exec(
         *args,
         stderr=stderr,
         stdout=stdout,
-        # As this process lifetime will be fully managed, we need to disable signal propagation
-        # from parent to child process https://stackoverflow.com/a/5446982/1993670
-        preexec_fn=os.setpgrp,
+        start_new_session=detach,
     )
 
     return process
 
 
 async def run_subprocess_output(*args) -> bytes:
-    process = await asyncio.create_subprocess_exec(
+    process = await run_subprocess(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
