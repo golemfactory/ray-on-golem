@@ -98,6 +98,7 @@ class YagnaService:
             "run",
             stderr=yagna_logger.stream,
             stdout=yagna_logger.stream,
+            detach=True,
         )
 
         start_deadline = datetime.now() + YAGNA_START_TIMEOUT

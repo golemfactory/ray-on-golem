@@ -19,6 +19,7 @@ from golem.managers import (
     PaymentPlatformNegotiator,
     ProposalBuffer,
     ProposalScoringBuffer,
+    RandomScore,
     RefreshingDemandManager,
     WorkContext,
 )
@@ -193,6 +194,7 @@ class GolemService:
                         MapScore(
                             partial(self._score_with_provider_data, payment_network=payment_network)
                         ),
+                        (0.1, RandomScore()),
                     ),
                     scoring_debounce=timedelta(seconds=10),
                     get_expiration_func=self._get_proposal_expiration,
