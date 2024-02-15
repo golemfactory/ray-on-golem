@@ -246,8 +246,8 @@ def stop(port, force, kill, datadir):
     except RayOnGolemCtlError as e:
         click.echo(e)
 
-    proc = ctl.get_process_info()
-    if not proc:
+    process = ctl.get_process_info()
+    if not process:
         click.echo("Shutdown completed.")
         return
 
@@ -256,7 +256,7 @@ def stop(port, force, kill, datadir):
         return
 
     try:
-        proc.kill()
+        process.kill()
     except psutil.NoSuchProcess:
         pass
     ctl.clear_pid()

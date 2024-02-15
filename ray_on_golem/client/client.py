@@ -80,18 +80,15 @@ class RayOnGolemClient:
         return response.cluster_data
 
     def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
-        try:
-            response = self._make_request(
-                url=settings.URL_NON_TERMINATED_NODES,
-                request_data=models.NonTerminatedNodesRequestData(
-                    tags=tag_filters,
-                ),
-                response_model=models.NonTerminatedNodesResponseData,
-                error_message="Couldn't get non terminated nodes",
-            )
-            return response.nodes_ids
-        except RayOnGolemClientError:
-            return list()
+        response = self._make_request(
+            url=settings.URL_NON_TERMINATED_NODES,
+            request_data=models.NonTerminatedNodesRequestData(
+                tags=tag_filters,
+            ),
+            response_model=models.NonTerminatedNodesResponseData,
+            error_message="Couldn't get non terminated nodes",
+        )
+        return response.nodes_ids
 
     def is_running(self, node_id: models.NodeId) -> bool:
         response = self._make_request(
@@ -225,10 +222,7 @@ class RayOnGolemClient:
                 data=request_data.json() if request_data else None,
             )
         except requests.ConnectionError as e:
-            raise RayOnGolemClientError(
-                f"{error_message or f'Connection failed: {url}'}: {e}",
-                error_code=None,
-            )
+            raise RayOnGolemClientError(f"{error_message or f'Connection failed: {url}'}: {e}")
 
         if response.status_code != 200:
             raise RayOnGolemClientError(

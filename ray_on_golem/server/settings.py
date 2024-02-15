@@ -20,7 +20,7 @@ RAY_ON_GOLEM_START_TIMEOUT = timedelta(minutes=5)
 RAY_ON_GOLEM_CHECK_INTERVAL = timedelta(seconds=2)
 
 # how long a shutdown request will wait until the webserver shutdown is initiated
-RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=30)
+RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=60)
 
 # how long we wait for the webserver shutdown to complete
 RAY_ON_GOLEM_SHUTDOWN_TIMEOUT = timedelta(seconds=60)

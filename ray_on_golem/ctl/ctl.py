@@ -150,17 +150,13 @@ class RayOnGolemCtl:
     def wait_for_stop(
         self,
         starting_up=True,
-        shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
-        stop_timeout=RAY_ON_GOLEM_STOP_TIMEOUT,
+        shutdown_timeout: timedelta = RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
+        stop_timeout: timedelta = RAY_ON_GOLEM_STOP_TIMEOUT,
     ):
         self._wait_for_shutdown(starting_up=starting_up, timeout=shutdown_timeout)
         self._wait_for_process_stop(starting_up=starting_up, timeout=stop_timeout)
 
-    def _wait_for_shutdown(
-        self,
-        starting_up: bool,
-        timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
-    ) -> None:
+    def _wait_for_shutdown(self, starting_up: bool, timeout: timedelta) -> None:
         webserver = "Previous webserver instance" if starting_up else "Webserver"
         if self._client.is_webserver_serviceable() is None:
             return
@@ -181,12 +177,12 @@ class RayOnGolemCtl:
                 return
 
             self._output_logger.verbose(
-                f"{webserver} is still running, " f"waiting additional `{check_seconds}` seconds..."
+                f"{webserver} is still running, waiting additional `{check_seconds}` seconds..."
             )
 
         self._output_logger.error(f"Shutdown timeout of {timeout} reached.")
 
-    def _wait_for_process_stop(self, starting_up=True, timeout=RAY_ON_GOLEM_STOP_TIMEOUT):
+    def _wait_for_process_stop(self, starting_up: bool, timeout: timedelta):
         wait_deadline = datetime.now() + timeout
         check_seconds = int(RAY_ON_GOLEM_CHECK_INTERVAL.total_seconds())
         cnt = 0
