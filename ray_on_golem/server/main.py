@@ -242,9 +242,7 @@ def stop(port, force, kill, datadir):
             return
 
     try:
-        ctl.wait_for_stop(
-            starting_up=False,
-        )
+        ctl.wait_for_stop(starting_up=False)
     except RayOnGolemCtlError as e:
         click.echo(e)
 
