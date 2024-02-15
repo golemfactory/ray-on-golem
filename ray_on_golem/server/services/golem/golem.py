@@ -16,6 +16,7 @@ from golem.managers import (
     MidAgreementPaymentsNegotiator,
     NegotiatingPlugin,
     PayAllPaymentManager,
+    PaymentManager,
     PaymentPlatformNegotiator,
     ProposalBuffer,
     ProposalScoringBuffer,
@@ -54,6 +55,8 @@ class GolemService:
         self._yagna_appkey: Optional[str] = None
         self._stacks: Dict[str, ManagerStack] = {}
         self._stacks_locks = defaultdict(asyncio.Lock)
+        self._activities: Dict[str, Tuple[Activity, str]] = {}
+        self._payment_manager: Optional[PaymentManager] = None
 
     async def init(self, yagna_appkey: str) -> None:
         logger.info("Starting GolemService...")
@@ -76,6 +79,10 @@ class GolemService:
             *[self._remove_stack(stack_hash) for stack_hash in self._stacks.keys()]
         )
 
+        if self._payment_manager:
+            await self._payment_manager.stop()
+            self._payment_manager = None
+
         await self._golem.aclose()
         self._golem = None
 
@@ -83,36 +90,38 @@ class GolemService:
 
     # TODO: Remove stack when last activity was terminated instead of relying on self shutdown
     async def _remove_stack(self, stack_hash: str) -> None:
+        logger.info(f"Removing stack `{stack_hash}`...")
+
         async with self._stacks_locks[stack_hash]:
-            # FIXME make sure to terminate running activities
             await self._stacks[stack_hash].stop()
 
             del self._stacks[stack_hash]
             del self._stacks_locks[stack_hash]
+
+        logger.info(f"Removing stack `{stack_hash}` done")
 
     async def _get_or_create_stack_from_node_config(
         self,
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
-        subnet_tag: str,
-    ) -> ManagerStack:
+    ) -> Tuple[str, ManagerStack]:
         stack_hash = self._get_hash_from_node_config(node_config)
 
         async with self._stacks_locks[stack_hash]:
             stack = self._stacks.get(stack_hash)
             if stack is None:
                 logger.info(
-                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}, {subnet_tag=}"
+                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}"
                 )
                 self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, total_budget, payment_network, subnet_tag
+                    node_config, total_budget, payment_network
                 )
                 await stack.start()
 
                 logger.info(f"Creating new stack `{stack_hash}` done")
 
-            return stack
+            return stack_hash, stack
 
     @staticmethod
     def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
@@ -123,8 +132,13 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
-        subnet_tag: str,
     ) -> ManagerStack:
+        if not self._payment_manager:
+            self._payment_manager = PayAllPaymentManager(
+                self._golem, budget=total_budget, network=payment_network
+            )
+            await self._payment_manager.start()
+
         stack = ManagerStack()
 
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
@@ -169,15 +183,12 @@ class GolemService:
                 )
             )
 
-        stack.payment_manager = PayAllPaymentManager(
-            self._golem, budget=total_budget, network=payment_network
-        )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
-            stack.payment_manager.get_allocation,
+            self._payment_manager.get_allocation,
             payloads,
             demand_lifetime=demand_lifetime,
-            subnet_tag=subnet_tag,
+            subnet_tag=node_config.subnet_tag,
         )
         stack.proposal_manager = DefaultProposalManager(
             self._golem,
@@ -353,16 +364,15 @@ class GolemService:
         ssh_private_key_path: Path,
         total_budget: float,
         payment_network: str,
-        subnet_tag: str,
         add_state_log: Callable[[str], Awaitable[None]],
-    ) -> Tuple[Activity, str, str]:
-        stack = await self._get_or_create_stack_from_node_config(
-            node_config, total_budget, payment_network, subnet_tag
+    ) -> Tuple[str, str, str]:
+        stack_hash, stack = await self._get_or_create_stack_from_node_config(
+            node_config, total_budget, payment_network
         )
 
         while True:
             try:
-                return await self._create_activity(
+                activity, ip, ssh_proxy_command = await self._create_activity(
                     stack,
                     public_ssh_key,
                     ssh_user,
@@ -377,6 +387,10 @@ class GolemService:
                 msg = "Failed to create activity, retrying"
                 await add_state_log(f"{msg}: {e}")
                 logger.warning(msg, exc_info=True)
+            else:
+                self._activities[activity.id] = (activity, stack_hash)
+
+                return activity.id, ip, ssh_proxy_command
 
     async def _create_activity(
         self,
@@ -400,7 +414,7 @@ class GolemService:
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
         await add_state_log(f"[2/9] Creating activity on provider: {provider_desc}...")
-        activity = await agreement.create_activity()
+        activity: Activity = await agreement.create_activity()
         try:
             await add_state_log("[3/9] Adding activity to internal VPN...")
             ip = await self._network.create_node(activity.parent.parent.data.issuer_id)
@@ -436,6 +450,19 @@ class GolemService:
         )
 
         return activity, ip, ssh_proxy_command
+
+    async def destroy_activity(self, activity_id: str) -> None:
+        logger.info(f"Destroying activity `{activity_id}`...")
+
+        activity, stack_hash = self._activities.pop(activity_id)
+
+        await activity.destroy()
+
+        if stack_hash not in {v[1] for v in self._activities.values()}:
+            logger.info(f"Stack `{stack_hash}` is not longer used by any activity, removing")
+            await self._remove_stack(stack_hash)
+
+        logger.info(f"Destroying activity `{activity_id}` done")
 
     def _get_connection_uri(self, ip: str) -> URL:
         network_url = URL(self._network.node._api_config.net_url)

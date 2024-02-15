@@ -25,6 +25,7 @@ provider:
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
 
+    # Common parameters for all node types. Can be overriden in available_node_types
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
@@ -100,7 +101,9 @@ available_node_types:
     # The node type's CPU and GPU resources
     resources: {}
 
-    node_config: {} # TODO: Demand description here
+    # Additional parameters specific for this node type added on top of node_config from provider.parameters.node_config
+    node_config: {}
+
   ray.worker.default:
     min_workers: 1
     max_workers: 10

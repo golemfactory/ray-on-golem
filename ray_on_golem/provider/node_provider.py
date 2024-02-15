@@ -7,8 +7,9 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable, List, Optional
 
-from ray.autoscaler._private.cli_logger import cli_logger  # noqa
-from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system  # noqa
+import dpath.util
+from ray.autoscaler._private.cli_logger import cli_logger
+from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
@@ -42,7 +43,9 @@ PROVIDER_DEFAULTS = {
     "enable_registry_stats": True,
     "payment_network": PAYMENT_NETWORK_GOERLI,
     "payment_driver": PAYMENT_DRIVER_ERC20,
-    "subnet_tag": "public",
+    "node_config": {
+        "subnet_tag": "public",
+    },
     "total_budget": 1.0,
 }
 
@@ -241,11 +244,7 @@ class GolemNodeProvider(NodeProvider):
                 cli_logger.labeled_value(node.node_id, log, no_format=True)
 
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
-        terminated_nodes = self._ray_on_golem_client.terminate_node(node_id)
-        with cli_logger.group(LOG_GROUP):
-            RayOnGolemCtl(self._ray_on_golem_client, NodeProviderCliLogger()).stop_webserver()
-
-        return terminated_nodes
+        return self._ray_on_golem_client.terminate_node(node_id)
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
         return self._ray_on_golem_client.non_terminated_nodes(tag_filters)
@@ -275,9 +274,23 @@ class GolemNodeProvider(NodeProvider):
 
     @staticmethod
     def _apply_config_defaults(config: Dict[str, Any]) -> None:
-        provider_parameters: Dict = config["provider"]["parameters"]
-        for k, v in PROVIDER_DEFAULTS.items():
-            provider_parameters.setdefault(k, v)
+        provider_parameters: Dict = deepcopy(PROVIDER_DEFAULTS)
+
+        dpath.util.merge(
+            provider_parameters,
+            config["provider"]["parameters"],
+        )
+
+        config["provider"]["parameters"] = provider_parameters
+
+        for node_type in config.get("available_node_types", {}).values():
+            node_config = deepcopy(config["provider"]["parameters"]["node_config"])
+            dpath.util.merge(
+                node_config,
+                node_type["node_config"],
+            )
+
+            node_type["node_config"] = node_config
 
         auth: Dict = config.setdefault("auth", {})
         auth.setdefault("ssh_user", "root")
