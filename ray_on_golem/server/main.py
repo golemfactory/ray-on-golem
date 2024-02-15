@@ -247,16 +247,20 @@ def stop(port, force, kill, datadir):
         click.echo(e)
 
     proc = ctl.get_process_info()
-    if proc:
-        if kill or click.confirm("Terminate the webserver process?"):
-            try:
-                proc.kill()
-            except psutil.NoSuchProcess:
-                pass
-            ctl.clear_pid()
-            click.echo("Process terminated.")
-        else:
-            click.echo("The webserver is still running...")
+    if not proc:
+        click.echo("Shutdown completed.")
+        return
+
+    if not (kill or click.confirm("Terminate the webserver process?")):
+        click.echo("The webserver is still running...")
+        return
+
+    try:
+        proc.kill()
+    except psutil.NoSuchProcess:
+        pass
+    ctl.clear_pid()
+    click.echo("Process terminated.")
 
 
 if __name__ == "__main__":
