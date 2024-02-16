@@ -27,8 +27,8 @@ COPY pyproject.toml README.md /app/
 COPY ray_on_golem/__init__.py /app/ray_on_golem/__init__.py
 
 RUN pip install poetry && \
-	poetry config virtualenvs.create false && \
-	poetry install --no-interaction --no-ansi --only ray
+	poetry config virtualenvs.create false
+RUN poetry install --no-interaction --no-ansi --only ray
 
 RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 RUN pip install pillow
