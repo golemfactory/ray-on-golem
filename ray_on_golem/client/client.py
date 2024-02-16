@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 import requests
@@ -87,7 +88,6 @@ class RayOnGolemClient:
             response_model=models.NonTerminatedNodesResponseData,
             error_message="Couldn't get non terminated nodes",
         )
-
         return response.nodes_ids
 
     def is_running(self, node_id: models.NodeId) -> bool:
@@ -175,6 +175,7 @@ class RayOnGolemClient:
 
     def shutdown_webserver(
         self,
+        shutdown_delay: timedelta,
         ignore_self_shutdown: bool = False,
         force_shutdown: bool = False,
     ) -> models.ShutdownState:
@@ -183,6 +184,7 @@ class RayOnGolemClient:
             request_data=models.ShutdownRequestData(
                 ignore_self_shutdown=ignore_self_shutdown,
                 force_shutdown=force_shutdown,
+                shutdown_delay=int(shutdown_delay.total_seconds()),
             ),
             response_model=models.ShutdownResponseData,
             error_message="Couldn't send a self-shutdown request",
@@ -197,7 +199,7 @@ class RayOnGolemClient:
                 response_model=models.WebserverStatus,
                 method="GET",
             )
-        except requests.ConnectionError:
+        except RayOnGolemClientError:
             return None
 
     def is_webserver_serviceable(self) -> Optional[bool]:
@@ -213,11 +215,14 @@ class RayOnGolemClient:
         error_message: str = "",
         method: str = "POST",
     ) -> TResponseModel:
-        response = self._session.request(
-            method,
-            str(self.base_url / url.lstrip("/")),
-            data=request_data.json() if request_data else None,
-        )
+        try:
+            response = self._session.request(
+                method,
+                str(self.base_url / url.lstrip("/")),
+                data=request_data.json() if request_data else None,
+            )
+        except requests.ConnectionError as e:
+            raise RayOnGolemClientError(f"{error_message or f'Connection failed: {url}'}: {e}")
 
         if response.status_code != 200:
             raise RayOnGolemClientError(

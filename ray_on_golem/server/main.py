@@ -1,16 +1,18 @@
 import logging
 import logging.config
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
 import click
+import psutil
 from aiohttp import web
 
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
     DEFAULT_DATADIR,
-    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
+    RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
     WEBSOCAT_PATH,
     YAGNA_PATH,
     get_datadir,
@@ -61,7 +63,7 @@ def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
             app,
             port=app["port"],
             print=None,
-            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
+            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT.total_seconds(),
         )
     except Exception:
         logger.info("Server unexpectedly died, bye!")
@@ -119,7 +121,7 @@ async def startup_print(app: web.Application) -> None:
 
 async def shutdown_print(app: web.Application) -> None:
     print("")  # explicit new line to console to visually better handle ^C
-    logger.info("Stopping server gracefully, forcing after `%s`...", RAY_ON_GOLEM_SHUTDOWN_DEADLINE)
+    logger.info("Stopping server gracefully, forcing after `%s`...", RAY_ON_GOLEM_SHUTDOWN_TIMEOUT)
 
 
 async def yagna_service_ctx(app: web.Application) -> None:
@@ -177,10 +179,13 @@ def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     from ray_on_golem.ctl import RayOnGolemCtl
     from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
 
-    ctl = RayOnGolemCtl(RayOnGolemClient(port), RayOnGolemCtlConsoleLogger())
+    ctl = RayOnGolemCtl(
+        client=RayOnGolemClient(port),
+        output_logger=RayOnGolemCtlConsoleLogger(),
+        datadir=datadir,
+    )
     ctl.start_webserver(
         registry_stats=registry_stats,
-        datadir=datadir,
         self_shutdown=False,
     )
 
@@ -202,20 +207,60 @@ def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     is_flag=True,
     help="Force the shutdown even if the webserver contains active nodes.",
 )
-def stop(port, force):
+@click.option(
+    "-k",
+    "--kill",
+    is_flag=True,
+    help="Kill the process if it fails to exit after shutdown.",
+)
+@click.option(
+    "--datadir",
+    type=Path,
+    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
+)
+def stop(port, force, kill, datadir):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl
-    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger, RayOnGolemCtlError
     from ray_on_golem.server.models import ShutdownState
 
-    ctl = RayOnGolemCtl(RayOnGolemClient(port), RayOnGolemCtlConsoleLogger())
-    shutdown_state = ctl.stop_webserver(ignore_self_shutdown=True)
+    ctl = RayOnGolemCtl(
+        client=RayOnGolemClient(port), output_logger=RayOnGolemCtlConsoleLogger(), datadir=datadir
+    )
+
+    shutdown_state = ctl.stop_webserver(
+        ignore_self_shutdown=True, shutdown_delay=timedelta(seconds=0)
+    )
+
     if shutdown_state == ShutdownState.CLUSTER_NOT_EMPTY:
         if force or click.confirm("Force the shutdown?"):
-            shutdown_state = ctl.stop_webserver(
-                ignore_self_shutdown=True,
-                force_shutdown=True,
+            ctl.stop_webserver(
+                ignore_self_shutdown=True, force_shutdown=True, shutdown_delay=timedelta(seconds=0)
             )
+        else:
+            click.echo("Shutdown cancelled.")
+            return
+
+    try:
+        ctl.wait_for_stop(starting_up=False)
+    except RayOnGolemCtlError as e:
+        click.echo(e)
+
+    process = ctl.get_process_info()
+    if not process:
+        click.echo("Shutdown completed.")
+        return
+
+    if not (kill or click.confirm("Terminate the webserver process?")):
+        click.echo("The webserver is still running...")
+        return
+
+    try:
+        process.kill()
+    except psutil.NoSuchProcess:
+        pass
+    ctl.clear_pid()
+    click.echo("Process terminated.")
 
 
 if __name__ == "__main__":
