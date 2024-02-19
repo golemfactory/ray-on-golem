@@ -16,6 +16,7 @@ provider:
         image_tag: "blueshade/ray-on-golem:0.8.0-dev-py3.10.13-ray2.9.2"
         outbound_urls: ["https://pypi.dev.golem.network"]
         runtime: "vm-nvidia"
+    subnet_tag: "ray"
 
 file_mounts: {
   # <remote_path>: <local_path>

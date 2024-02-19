@@ -130,6 +130,7 @@ class GolemService:
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
+        logger.debug("Payloads: %s", payloads)
         demand_lifetime = DEFAULT_DEMAND_LIFETIME
 
         ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
