@@ -59,6 +59,7 @@ class DemandConfigData(BaseModel):
     min_cpu_threads: int = 0
     min_storage_gib: float = 0.0
     max_cpu_threads: Optional[int] = None
+    runtime: str = "vm"
 
 
 class PerCpuExpectedUsageData(BaseModel):
