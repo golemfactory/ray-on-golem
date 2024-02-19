@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import AnyUrl, BaseModel, Field, validator
 
+from golem.resources import Activity
+
 NodeId = str
 Tags = Dict[str, str]
 
@@ -31,7 +33,10 @@ class NodeData(BaseModel):
 
 
 class Node(NodeData):
-    activity_id: Optional[str] = None
+    activity: Optional[Activity] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class SingleNodeRequestData(BaseModel):

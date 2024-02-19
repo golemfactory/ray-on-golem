@@ -113,9 +113,9 @@ class RayService:
 
             await asyncio.gather(
                 *[
-                    self._golem_service.destroy_activity(node.activity_id)
+                    node.activity.destroy()
                     for node in self._nodes.values()
-                    if node.activity_id is not None
+                    if node.activity is not None
                 ]
             )
 
@@ -156,7 +156,7 @@ class RayService:
 
     async def _create_node(self, node_id: NodeId, node_config: NodeConfigData) -> None:
         try:
-            activity_id, ip, ssh_proxy_command = await self._golem_service.create_activity(
+            activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
                 node_config=node_config,
                 public_ssh_key=self._ssh_public_key,
                 ssh_user=self._ssh_user,
@@ -174,7 +174,7 @@ class RayService:
                 node.state = NodeState.running
                 node.internal_ip = ip
                 node.ssh_proxy_command = ssh_proxy_command
-                node.activity_id = activity_id
+                node.activity = activity
 
             # TODO: check if node is a head node
             if not self._is_head_node_to_webserver_tunnel_running():
@@ -201,16 +201,24 @@ class RayService:
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminating
 
-        if node.activity_id:
-            await self._golem_service.destroy_activity(node.activity_id)
+        if node.activity:
+            await node.activity.destroy()
 
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminated
-            node.activity_id = None
+            node.activity = None
 
             logger.info(f"Terminating node `%s` done", node_id)
 
-            return {node.node_id: node.dict(exclude={"activity_id"})}
+            results = {node.node_id: node.dict(exclude={"activity"})}
+
+        async with self._nodes_lock:
+            if all(node.state == NodeState.terminated for node in self._nodes.values()):
+                logger.info("All nodes are terminated, terminating whole cluster.")
+                await self._stop_head_node_to_webserver_tunnel()
+                await self._golem_service.clear()
+
+        return results
 
     async def get_cluster_data(self) -> Dict[NodeId, NodeData]:
         async with self._nodes_lock:
