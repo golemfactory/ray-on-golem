@@ -32,5 +32,6 @@ RUN poetry install --no-interaction --no-ansi --only ray
 
 RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 RUN pip install pillow
+RUN pip install numpy numba
 
 COPY ray_on_golem /app/ray_on_golem/
