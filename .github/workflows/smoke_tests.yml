@@ -25,8 +25,8 @@ jobs:
         run: poetry install --no-ansi
 
       - name: Prepare `golem-cluster.tests.yaml`
-        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml
 
+        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml
       - name: Call `ray up`
         env:
           PYTHONUNBUFFERED: 1
