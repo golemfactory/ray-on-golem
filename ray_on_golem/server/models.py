@@ -1,9 +1,8 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import AnyUrl, BaseModel, Field, validator
-
 from golem.resources import Activity
+from pydantic import AnyUrl, BaseModel, Field, validator
 
 NodeId = str
 Tags = Dict[str, str]
