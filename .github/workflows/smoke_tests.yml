@@ -31,7 +31,7 @@ jobs:
         env:
           PYTHONUNBUFFERED: 1
           RUST_LOG: "INFO,ya_erc20_driver::erc20::wallet=debug"
-        run: poetry run ray up golem-cluster.tests.yaml -y
+        run: poetry run ray up golem-cluster.tests.yaml -y --no-config-cache
 
       - name: Run `examples/calculate.pi`
         run: poetry run ray submit golem-cluster.tests.yaml examples/calculate_pi.py
