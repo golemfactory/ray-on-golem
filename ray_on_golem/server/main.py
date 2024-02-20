@@ -1,10 +1,12 @@
 import logging
 import logging.config
+import os
 from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 
 import click
+import colorful
 import psutil
 from aiohttp import web
 
@@ -199,7 +201,7 @@ def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     "--port",
     type=int,
     default=4578,
-    help="Port for Ray on Golem's webserver to listen on.",
+    help="Port on which Ray on Golem's webserver is listening.",
 )
 @click.option(
     "-f",
@@ -261,6 +263,57 @@ def stop(port, force, kill, datadir):
         pass
     ctl.clear_pid()
     click.echo("Process terminated.")
+
+
+@click.command(
+    help="Show webserver status.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port on which Ray on Golem's webserver is listening.",
+)
+@click.option(
+    "--datadir",
+    type=Path,
+    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
+)
+def status(port, datadir):
+    from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
+
+    client = RayOnGolemClient(port)
+    server_status = client.get_webserver_status()
+
+    if not colorful.terminal.detect_color_support(os.environ):
+        colorful.disable()
+
+    if not server_status:
+        print(f"The webserver doesn't seem to be listening on {client.base_url}.")
+        ctl = RayOnGolemCtl(
+            client=client, output_logger=RayOnGolemCtlConsoleLogger(), datadir=datadir
+        )
+        process = ctl.get_process_info()
+        if process:
+            print(f"However, the webserver seems to be running under pid: {process.pid}.")
+            print("You may use the `ray-on-golem stop` command to terminate it.")
+
+        return
+
+    print(colorful.cyan(f"Ray On Golem webserver {server_status.version}"))
+    print(
+        "   Listening on:   {url}\n"
+        "   Status:         {status}\n"
+        "   Data directory: {datadir}\n".format(
+            url=client.base_url,
+            status="Shutting down" if server_status.shutting_down else "Running",
+            datadir=server_status.datadir,
+        )
+    )
 
 
 if __name__ == "__main__":
