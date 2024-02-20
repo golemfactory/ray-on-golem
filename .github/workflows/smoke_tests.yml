@@ -39,9 +39,12 @@ jobs:
       - name: Call `ray down`
         run: poetry run ray down golem-cluster.tests.yaml -y
 
+      - name: Call `ray-on-golem down`
+        run: poetry run ray-on-golem stop
+
       - name: Check node creation in logs
         continue-on-error: true
-        run: poetry run python tests/smoke.py ~/.local/share/ray_on_golem/
+        run: poetry run python tests/smoke.py ~/.local/share/ray_on_golem/webserver_debug.log
 
       - name: Collects logs
         if: always()
