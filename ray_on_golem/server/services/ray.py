@@ -6,7 +6,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from golem.exceptions import GolemException
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
 from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
@@ -173,10 +172,10 @@ class RayService:
             # TODO: check if node is a head node
             if not self._is_head_node_to_webserver_tunnel_running():
                 await self._start_head_node_to_webserver_tunnel()
-        except GolemException as e:
+        except Exception as e:
             async with self._get_node_context(node_id) as node:  # type: Node
                 node.state = NodeState.terminated
-                node.state_log.append(f"Failed to create activity: {e}")
+                node.state_log.append(f"Failed to create activity: {type(e).__name__}({e})")
         finally:
             self._create_node_tasks.remove(asyncio.current_task())
 

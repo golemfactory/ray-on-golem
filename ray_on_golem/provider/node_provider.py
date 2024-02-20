@@ -228,14 +228,17 @@ class GolemNodeProvider(NodeProvider):
         with cli_logger.group(group):
             for node in nodes:
                 for i in range(nodes_last_log_size[node.node_id], len(node.state_log) - 1):
-                    cli_logger.print((" " * (len(node.node_id) + 2)) + node.state_log[i])
+                    cli_logger.print(
+                        (" " * (len(node.node_id) + 2)) + node.state_log[i],
+                        no_format=True,
+                    )
 
                 try:
                     log = node.state_log[-1]
                 except IndexError:
                     log = "<none>"
 
-                cli_logger.labeled_value(node.node_id, log)
+                cli_logger.labeled_value(node.node_id, log, no_format=True)
 
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         terminated_nodes = self._ray_on_golem_client.terminate_node(node_id)
@@ -295,12 +298,12 @@ class GolemNodeProvider(NodeProvider):
         cli_logger.newline()
 
         with cli_logger.indented():
-            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network))
+            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network), no_format=True)
             cli_logger.print("Your wallet:")
 
             with cli_logger.indented():
                 for line in yagna_payment_status_output.splitlines():
-                    cli_logger.print(line)
+                    cli_logger.print(line, no_format=True)
 
             cli_logger.newline()
             cli_logger.print(
@@ -311,6 +314,7 @@ class GolemNodeProvider(NodeProvider):
                 "is an EXPERIMENTAL product. Even though it is functional, "
                 "we do not recommend using it unless you wish to help us beta-test this feature. "
                 "You'll find more information on `#Payment UX` discord channel "
-                "https://discord.com/channels/684703559954333727/1136984764197380096"
+                "https://discord.com/channels/684703559954333727/1136984764197380096",
+                no_format=True,
             )
             cli_logger.newline()
