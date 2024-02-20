@@ -1,5 +1,7 @@
 import argparse
 import math
+import numba
+import numpy as np
 from datetime import datetime, timezone
 from typing import NamedTuple, Optional, Tuple
 
@@ -14,51 +16,46 @@ class ScrCoords(NamedTuple):
     y: int
 
 
-def draw_pixel(v):
-    return math.floor(v * 255)
-
-
-def mandel(x0, y0, max_iter):
-    x = 0.0
-    y = 0.0
-    i = 0
-
-    while x * x + y * y < 4 and i < max_iter:
-        x1 = x * x - y * y + x0
-        y = 2 * x * y + y0
-        x = x1
-        i += 1
-
-    return draw_pixel(i / max_iter)
-
-
+@numba.jit(nopython=False)
 def calculate_mandel(
     tgt_range_x: Tuple[int, int],
     tgt_range_y: Tuple[int, int],
-    src_range_x: Tuple[float, float],
-    src_range_y: Tuple[float, float],
+    space_x: np.linspace,
+    space_y: np.linspace,
     max_iter: int,
-):
+) -> np.array:
+    max_iter = np.uint(max_iter)
+    vscale = np.uint8(255)
+
+    def mandel(c: complex) -> np.uint8:
+        z = complex(0, 0)
+        i = np.uint(0)
+
+        while abs(z) < 2 and i < max_iter:
+            z = z * z + c
+            i += 1
+
+        return np.uint8(i / max_iter * vscale)
+
     tgt_size_x = tgt_range_x[1] - tgt_range_x[0]
     tgt_size_y = tgt_range_y[1] - tgt_range_y[0]
-    x_step = (src_range_x[1] - src_range_x[0]) / tgt_size_x
-    y_step = (src_range_y[1] - src_range_y[0]) / tgt_size_y
-    buffer = bytearray(b"\xff" * (tgt_size_x * tgt_size_y))
+    max_iter = max_iter
+    buffer = np.zeros((tgt_size_y, tgt_size_x), dtype=np.uint8)
 
-    print(f"{datetime.now()}: starting chunk: {tgt_range_x}, {tgt_range_y}")
-    y = src_range_y[0]
+    print(f"starting chunk: {tgt_range_x}, {tgt_range_y}")
 
-    for ys in range(0, tgt_size_y):
-        y += y_step
-        x = src_range_x[0]
-        for xs in range(0, tgt_size_x):
-            x += x_step
-            r = mandel(x, y, max_iter)
-            buffer[tgt_size_x * ys + xs] = r
+    for ys in range(tgt_range_y[0], tgt_range_y[1]):
+        for xs in range(tgt_range_x[0], tgt_range_x[1]):
+            c = complex(space_x[xs], space_y[ys])
+            buffer[ys - tgt_range_y[0], xs - tgt_range_x[0]] = mandel(c)
 
-    print(f"{datetime.now()}: finalized chunk: {tgt_range_x}, {tgt_range_y}")
+    print(f"finalized chunk: {tgt_range_x}, {tgt_range_y}")
 
     return buffer
+
+
+def calculate_mandel_ray(*args, **kwargs):
+    return calculate_mandel(*args, **kwargs)
 
 
 def draw_mandelbrot(
@@ -72,7 +69,6 @@ def draw_mandelbrot(
 ):
     chunks = list()
 
-    y_step = (y_range[1] - y_range[0]) / size.y
     chunk_size = math.ceil(size.y / num_chunks)
 
     for c in range(0, num_chunks):
@@ -85,13 +81,13 @@ def draw_mandelbrot(
         calc_args = (
             (0, size.x),
             (start_y, end_y),
-            x_range,
-            (start_y * y_step + y_range[0], end_y * y_step + y_range[0]),
+            np.linspace(x_range[0], x_range[1], size.x),
+            np.linspace(y_range[0], y_range[1], size.y),
             max_iter,
         )
-        f = ray.remote(calculate_mandel).remote if use_ray else calculate_mandel
+        f = ray.remote(calculate_mandel_ray).remote if use_ray else calculate_mandel
 
-        print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args})")
+        print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args[0], calc_args[1]})")
         chunks.append(f(*calc_args))
 
     print(f"{datetime.now()}: finished scheduling")
@@ -115,7 +111,7 @@ def draw_mandelbrot(
 
         print(f"{datetime.now()}: got chunk {c}, size: {chunk_img_size}, box: {box}")
 
-        chunk_img = Image.frombytes("L", size=chunk_img_size, data=chunk)
+        chunk_img = Image.frombytes("L", size=chunk_img_size, data=bytearray(chunk.data))
         img.paste(chunk_img, box=box)
 
         print(f"{datetime.now()}: processed chunk {c}")
