@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import os
 from datetime import timedelta
 from pathlib import Path
 from typing import Optional
@@ -288,9 +289,14 @@ def status(port, datadir):
     client = RayOnGolemClient(port)
     server_status = client.get_webserver_status()
 
+    if not colorful.terminal.detect_color_support(os.environ):
+        colorful.disable()
+
     if not server_status:
         print(f"The webserver doesn't seem to be listening on {client.base_url}.")
-        ctl = RayOnGolemCtl(client=client, output_logger=RayOnGolemCtlConsoleLogger(), datadir=datadir)
+        ctl = RayOnGolemCtl(
+            client=client, output_logger=RayOnGolemCtlConsoleLogger(), datadir=datadir
+        )
         process = ctl.get_process_info()
         if process:
             print(f"However, the webserver seems to be running under pid: {process.pid}.")
@@ -302,8 +308,7 @@ def status(port, datadir):
     print(
         "   Listening on:   {url}\n"
         "   Status:         {status}\n"
-        "   Data directory: {datadir}\n"
-        .format(
+        "   Data directory: {datadir}\n".format(
             url=client.base_url,
             status="Shutting down" if server_status.shutting_down else "Running",
             datadir=server_status.datadir,
