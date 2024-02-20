@@ -6,7 +6,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from golem.exceptions import GolemException
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
 from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
