@@ -437,7 +437,7 @@ class GolemService:
 
             await self._network.refresh_nodes()
         except Exception as e:
-            logger.error(f"Creating new activity failed with `{e}`")
+            logger.error(f"Creating new activity failed with `{type(e).__name__}: {e}`")
             await activity.destroy()
             raise
 
