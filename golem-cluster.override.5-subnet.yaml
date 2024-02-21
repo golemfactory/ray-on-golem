@@ -1,4 +1,4 @@
 provider:
   parameters:
     node_config:
-      subnet_tag: "sdk"
+      subnet_tag: "public"

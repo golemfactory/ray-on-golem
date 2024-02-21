@@ -144,7 +144,11 @@ class RayService:
 
                 self._create_node_tasks.append(
                     create_task_with_logging(
-                        self._create_node(node_id, NodeConfigData(**node_config)),
+                        self._create_node(
+                            node_id,
+                            NodeConfigData(**node_config),
+                            is_head_node=self._is_head_node(tags),
+                        ),
                         trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
                     )
                 )
@@ -154,7 +158,9 @@ class RayService:
 
         return created_node_ids
 
-    async def _create_node(self, node_id: NodeId, node_config: NodeConfigData) -> None:
+    async def _create_node(
+        self, node_id: NodeId, node_config: NodeConfigData, is_head_node: bool
+    ) -> None:
         logger.info("Creating node `%s`...", node_id)
 
         try:
@@ -166,6 +172,7 @@ class RayService:
                 total_budget=self._provider_config.total_budget,
                 payment_network=self._provider_config.payment_network,
                 add_state_log=partial(self._add_node_state_log, node_id),
+                is_head_node=is_head_node,
             )
 
             self._print_ssh_command(
@@ -305,10 +312,13 @@ class RayService:
     async def _get_head_node(self) -> Node:
         async with self._nodes_lock:
             for node in self._nodes.values():
-                if node.tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD:
+                if self._is_head_node(node.tags):
                     return node
 
             raise NodeNotFound
+
+    def _is_head_node(self, tags: Tags) -> bool:
+        return tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD
 
     def _print_ssh_command(
         self, ip: str, ssh_proxy_command: str, ssh_user: str, ssh_private_key_path: Path

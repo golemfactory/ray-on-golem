@@ -1,15 +1,17 @@
 import logging
 from datetime import timedelta
+from typing import Dict
 
 from golem.managers import (
     LinearCoeffsCost,
     LinearPerCpuAverageCostPricing,
     MapScore,
+    ProposalManagerPlugin,
+    ProposalScorer,
     RejectIfCostsExceeds,
 )
 
 from ray_on_golem.server.models import NodeConfigData
-from ray_on_golem.server.services.golem.manager_stack import ManagerStack
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,9 @@ logger = logging.getLogger(__name__)
 class ManagerStackNodeConfigHelper:
     @staticmethod
     def apply_budget_control_expected_usage(
-        stack: ManagerStack, node_config: NodeConfigData
+        extra_proposal_plugins: Dict[str, ProposalManagerPlugin],
+        extra_proposal_scorers: Dict[str, ProposalScorer],
+        node_config: NodeConfigData,
     ) -> None:
         per_cpu_expected_usage = node_config.budget_control.per_cpu_expected_usage
 
@@ -30,13 +34,13 @@ class ManagerStackNodeConfigHelper:
             average_duration=timedelta(hours=per_cpu_expected_usage.duration_hours),
         )
 
-        stack.extra_proposal_scorers["Sort by linear per cpu average cost"] = MapScore(
+        extra_proposal_scorers["Sort by linear per cpu average cost"] = MapScore(
             linear_per_cpu_average_cost, normalize=True, normalize_flip=True
         )
 
         max_cost = per_cpu_expected_usage.max_cost
         if max_cost is not None:
-            stack.extra_proposal_plugins[
+            extra_proposal_plugins[
                 f"Reject if per cpu expected cost exceeds `max_cost` = {max_cost}"
             ] = RejectIfCostsExceeds(max_cost, linear_per_cpu_average_cost)
             logger.debug("Budget control based on per cpu expected usage applied with max limits")
@@ -46,7 +50,9 @@ class ManagerStackNodeConfigHelper:
             )
 
     @staticmethod
-    def apply_budget_control_hard_limits(stack: ManagerStack, node_config: NodeConfigData) -> None:
+    def apply_budget_control_hard_limits(
+        extra_proposal_plugins: Dict[str, ProposalManagerPlugin], node_config: NodeConfigData
+    ) -> None:
         # TODO: Consider creating RejectIfCostsExceeds variant for multiple values
         proposal_plugins = {}
         budget_control = node_config.budget_control
@@ -74,7 +80,7 @@ class ManagerStackNodeConfigHelper:
             )
 
         if proposal_plugins:
-            stack.extra_proposal_plugins.update(proposal_plugins)
+            extra_proposal_plugins.update(proposal_plugins)
             logger.debug("Budget control based on max limits applied")
         else:
             logger.debug("Budget control based on max limits is not enabled")

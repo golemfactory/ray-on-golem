@@ -5,13 +5,14 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Optional, Tuple
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers import (
     BlacklistProviderIdPlugin,
     DefaultAgreementManager,
     DefaultProposalManager,
+    DemandManager,
     MapScore,
     MidAgreementPaymentsNegotiator,
     NegotiatingPlugin,
@@ -19,13 +20,16 @@ from golem.managers import (
     PaymentManager,
     PaymentPlatformNegotiator,
     ProposalBuffer,
+    ProposalManagerPlugin,
+    ProposalScorer,
     ProposalScoringBuffer,
     RandomScore,
     RefreshingDemandManager,
     WorkContext,
 )
+from golem.managers.demand.union import UnionDemandManager
 from golem.node import GolemNode
-from golem.payload import PaymentInfo
+from golem.payload import Payload, PaymentInfo
 from golem.resources import Activity, Network, Proposal, ProposalData
 from yarl import URL
 
@@ -43,6 +47,8 @@ DEFAULT_LONG_RUNNING_DEMAND_LIFETIME = timedelta(days=365)
 DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
 DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
 DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
+# SUGGESTED_HEADS_SUBNET_TAG = "ray-on-golem-heads"
+SUGGESTED_HEADS_SUBNET_TAG = "sdk"
 
 
 class GolemService:
@@ -107,6 +113,7 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        is_head_node: bool,
     ) -> ManagerStack:
         stack_hash = self._get_hash_from_node_config(node_config)
 
@@ -117,7 +124,10 @@ class GolemService:
                     f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}"
                 )
                 self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, total_budget, payment_network
+                    node_config,
+                    total_budget,
+                    payment_network,
+                    is_head_node,
                 )
                 await stack.start()
 
@@ -134,6 +144,7 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
             self._payment_manager = PayAllPaymentManager(
@@ -142,14 +153,20 @@ class GolemService:
             await self._payment_manager.start()
 
         stack = ManagerStack()
+        extra_proposal_plugins: Dict[str, ProposalManagerPlugin] = {}
+        extra_proposal_scorers: Dict[str, ProposalScorer] = {}
 
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
         demand_lifetime = DEFAULT_DEMAND_LIFETIME
 
-        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(
+            extra_proposal_plugins, extra_proposal_scorers, node_config
+        )
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
+            extra_proposal_plugins, node_config
+        )
 
         proposal_negotiators = [PaymentPlatformNegotiator()]
         if node_config.budget_control.payment_interval_hours is not None:
@@ -185,50 +202,91 @@ class GolemService:
                 )
             )
 
-        stack.demand_manager = RefreshingDemandManager(
-            self._golem,
-            self._payment_manager.get_allocation,
-            payloads,
-            demand_lifetime=demand_lifetime,
-            subnet_tag=node_config.subnet_tag,
-        )
-        stack.proposal_manager = DefaultProposalManager(
-            self._golem,
-            stack.demand_manager.get_initial_proposal,
-            plugins=(
-                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
-                *stack.extra_proposal_plugins.values(),
-                ProposalScoringBuffer(
-                    min_size=50,
-                    max_size=1000,
-                    fill_at_start=True,
-                    proposal_scorers=(
-                        *stack.extra_proposal_scorers.values(),
-                        MapScore(
-                            partial(self._score_with_provider_data, payment_network=payment_network)
-                        ),
-                        (0.1, RandomScore()),
-                    ),
-                    scoring_debounce=timedelta(seconds=10),
-                    get_expiration_func=self._get_proposal_expiration,
-                ),
-                NegotiatingPlugin(
-                    proposal_negotiators=proposal_negotiators,
-                    proposal_response_timeout=DEFAULT_PROPOSAL_RESPONSE_TIMEOUT,
-                ),
-                ProposalBuffer(
-                    min_size=0,
-                    max_size=4,
-                    fill_concurrency_size=4,
-                    get_expiration_func=self._get_proposal_expiration,
-                ),
-            ),
-        )
-        stack.agreement_manager = DefaultAgreementManager(
-            self._golem, stack.proposal_manager.get_draft_proposal
+        demand_manager = self._prepare_demand_manager_for_node_type(
+            stack, payloads, demand_lifetime, node_config, is_head_node
         )
 
+        proposal_manager = stack.add_manager(
+            DefaultProposalManager(
+                self._golem,
+                demand_manager.get_initial_proposal,
+                plugins=(
+                    BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
+                    *extra_proposal_plugins.values(),
+                    ProposalScoringBuffer(
+                        min_size=50,
+                        max_size=1000,
+                        fill_at_start=True,
+                        proposal_scorers=(
+                            *extra_proposal_scorers.values(),
+                            MapScore(
+                                partial(
+                                    self._score_with_provider_data, payment_network=payment_network
+                                )
+                            ),
+                            MapScore(self._score_suggested_heads),
+                            (0.1, RandomScore()),
+                        ),
+                        scoring_debounce=timedelta(seconds=10),
+                        get_expiration_func=self._get_proposal_expiration,
+                    ),
+                    NegotiatingPlugin(
+                        proposal_negotiators=proposal_negotiators,
+                        proposal_response_timeout=DEFAULT_PROPOSAL_RESPONSE_TIMEOUT,
+                    ),
+                    ProposalBuffer(
+                        min_size=0,
+                        max_size=4,
+                        fill_concurrency_size=4,
+                        get_expiration_func=self._get_proposal_expiration,
+                    ),
+                ),
+            )
+        )
+        stack.add_manager(DefaultAgreementManager(self._golem, proposal_manager.get_draft_proposal))
+
         return stack
+
+    def _prepare_demand_manager_for_node_type(
+        self,
+        stack: ManagerStack,
+        payloads: List[Payload],
+        demand_lifetime: timedelta,
+        node_config: NodeConfigData,
+        is_head_node: bool,
+    ) -> DemandManager:
+        demand_manager = stack.add_manager(
+            RefreshingDemandManager(
+                self._golem,
+                self._payment_manager.get_allocation,
+                payloads,
+                demand_lifetime=demand_lifetime,
+                subnet_tag=node_config.subnet_tag,
+            )
+        )
+
+        if is_head_node:
+            suggested_heads_demand_manager = stack.add_manager(
+                RefreshingDemandManager(
+                    self._golem,
+                    self._payment_manager.get_allocation,
+                    payloads,
+                    demand_lifetime=demand_lifetime,
+                    subnet_tag=SUGGESTED_HEADS_SUBNET_TAG,
+                )
+            )
+
+            demand_manager = stack.add_manager(
+                UnionDemandManager(
+                    self._golem,
+                    [
+                        suggested_heads_demand_manager.get_initial_proposal,
+                        demand_manager.get_initial_proposal,
+                    ],
+                )
+            )
+
+        return demand_manager
 
     async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
         return await proposal.get_expiration_date() - datetime.now(timezone.utc)
@@ -246,6 +304,15 @@ class GolemService:
 
         # Gives pre-scored providers from 0.5 to 1.0 score
         return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
+
+    def _score_suggested_heads(self, proposal_data: ProposalData) -> Optional[float]:
+        dupa = proposal_data.properties.get("golem.node.debug.subnet") == SUGGESTED_HEADS_SUBNET_TAG
+        if dupa:
+            logger.info("BOOSTING SCORING FOR SUGGESTED HEAD")
+            return 0.5
+        else:
+            logger.info("NOT BOOSTING SCORING NOT SUGGESTED HEAD")
+            return 0
 
     @staticmethod
     async def _get_provider_desc(context: WorkContext):
@@ -367,9 +434,10 @@ class GolemService:
         total_budget: float,
         payment_network: str,
         add_state_log: Callable[[str], Awaitable[None]],
+        is_head_node: bool,
     ) -> Tuple[Activity, str, str]:
         stack = await self._get_or_create_stack_from_node_config(
-            node_config, total_budget, payment_network
+            node_config, total_budget, payment_network, is_head_node
         )
 
         while True:
@@ -404,7 +472,7 @@ class GolemService:
         await add_state_log("[1/9] Getting agreement...")
 
         try:
-            agreement = await stack.agreement_manager.get_agreement()
+            agreement = await stack._managers[-1].get_agreement()
         except Exception as e:
             logger.error(f"Creating new activity failed with `{e}`")
             raise GolemException(e) from e

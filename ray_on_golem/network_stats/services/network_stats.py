@@ -16,7 +16,12 @@ from golem.managers import (
     ProposalScoringBuffer,
     RefreshingDemandManager,
 )
-from golem.managers.base import ManagerPluginException, PaymentManager, ProposalNegotiator
+from golem.managers.base import (
+    ManagerPluginException,
+    PaymentManager,
+    ProposalNegotiator,
+    ProposalScorer,
+)
 from golem.node import GolemNode
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
@@ -173,7 +178,7 @@ class NetworkStatsService:
         drafts = []
         try:
             while True:
-                draft = await stack.proposal_manager.get_draft_proposal()
+                draft = await stack._managers[-1].get_draft_proposal()
                 drafts.append(draft)
         except asyncio.CancelledError:
             return
@@ -197,13 +202,19 @@ class NetworkStatsService:
             await self._payment_manager.start()
 
         stack = ManagerStack()
+        extra_proposal_plugins: Dict[str, ProposalManagerPlugin] = {}
+        extra_proposal_scorers: Dict[str, ProposalScorer] = {}
 
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
 
-        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(
+            extra_proposal_plugins, extra_proposal_scorers, node_config
+        )
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
+            extra_proposal_plugins, node_config
+        )
 
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
@@ -219,7 +230,7 @@ class NetworkStatsService:
             self._stats_plugin_factory.create_counter_plugin("Not blacklisted"),
         ]
 
-        for plugin_tag, plugin in stack.extra_proposal_plugins.items():
+        for plugin_tag, plugin in extra_proposal_plugins.items():
             plugins.append(plugin)
             plugins.append(self._stats_plugin_factory.create_counter_plugin(f"Passed {plugin_tag}"))
 
@@ -229,7 +240,7 @@ class NetworkStatsService:
                     min_size=500,
                     max_size=1000,
                     fill_at_start=True,
-                    proposal_scorers=(*stack.extra_proposal_scorers.values(),),
+                    proposal_scorers=(*extra_proposal_scorers.values(),),
                     scoring_debounce=timedelta(seconds=10),
                 ),
                 self._stats_plugin_factory.create_counter_plugin("Negotiation initialized"),
