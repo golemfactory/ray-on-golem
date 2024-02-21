@@ -14,13 +14,33 @@ from ray_on_golem.server.services import YagnaService
 from ray_on_golem.server.settings import DEFAULT_DATADIR, YAGNA_PATH, get_logging_config
 
 
+def validate_config_file(ctx, param, value):
+    with open(value) as file:
+        config = yaml.safe_load(file.read())
+
+    GolemNodeProvider._apply_config_defaults(config)
+
+    return config
+
+
+def validate_node_type(ctx, param, value):
+    node_types = ctx.params["cluster_config_file"]["available_node_types"]
+    if value not in node_types:
+        raise click.BadParameter(
+            f"Given node type `{value}` is not found in the config file! Available node types: `{'`, `'.join(node_types.keys())}`",
+        )
+
+    return value
+
+
 @click.command(
     name="network-stats",
     short_help="Run Golem Network statistics.",
-    help="Run Golem Network statistics based on given cluster config file.",
+    help="Run Golem Network statistics based on given cluster config file and node type.",
     context_settings={"show_default": True},
 )
-@click.argument("cluster-config-file", type=click.Path(exists=True))
+@click.argument("cluster-config-file", type=click.Path(exists=True), callback=validate_config_file)
+@click.argument("node-type", default="ray.head.default", callback=validate_node_type)
 @click.option(
     "-d",
     "--duration",
@@ -40,34 +60,31 @@ from ray_on_golem.server.settings import DEFAULT_DATADIR, YAGNA_PATH, get_loggin
     help=f"Ray on Golem's data directory. [default: {DEFAULT_DATADIR}"
     " (unless `webserver_datadir` is defined in the cluster config file)]",
 )
-def main(
-    cluster_config_file: str,
+def main(*args, **kwargs):
+    asyncio.run(_network_stats(*args, **kwargs))
+
+
+async def _network_stats(
+    cluster_config_file: Dict,
+    node_type: str,
     duration: int,
     enable_logging: bool,
     datadir: Optional[pathlib.Path],
 ):
-    with open(cluster_config_file) as file:
-        config = yaml.safe_load(file.read())
-
-    GolemNodeProvider._apply_config_defaults(config)
-    provider_params = config["provider"]["parameters"]
+    provider_params = cluster_config_file["provider"]["parameters"]
 
     datadir = datadir or provider_params["webserver_datadir"]
 
     if enable_logging:
         logging.config.dictConfig(get_logging_config(datadir=datadir))
 
-    asyncio.run(_network_stats(provider_params, duration, datadir))
-
-
-async def _network_stats(provider_params: Dict, duration: int, datadir: Optional[pathlib.Path]):
     async with network_stats_service(
         provider_params["enable_registry_stats"],
         provider_params["payment_network"],
         provider_params["payment_driver"],
         datadir,
     ) as stats_service:
-        await stats_service.run(provider_params, duration)
+        await stats_service.run(cluster_config_file, node_type, duration)
 
 
 @asynccontextmanager
@@ -77,7 +94,7 @@ async def network_stats_service(
     driver: str,
     datadir: Optional[pathlib.Path],
 ) -> NetworkStatsService:
-    network_stats_service: NetworkStatsService = NetworkStatsService(registry_stats)
+    service = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
         datadir=datadir,
@@ -86,11 +103,11 @@ async def network_stats_service(
     await yagna_service.init()
     await yagna_service.run_payment_fund(network, driver)
 
-    await network_stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
+    await service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield network_stats_service
+    yield service
 
-    await network_stats_service.shutdown()
+    await service.shutdown()
     await yagna_service.shutdown()
 
 
