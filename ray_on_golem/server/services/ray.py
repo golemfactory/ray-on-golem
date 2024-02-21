@@ -317,7 +317,8 @@ class RayService:
 
             raise NodeNotFound
 
-    def _is_head_node(self, tags: Tags) -> bool:
+    @staticmethod
+    def _is_head_node(tags: Tags) -> bool:
         return tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD
 
     def _print_ssh_command(

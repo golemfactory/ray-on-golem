@@ -1,17 +1,25 @@
 import logging
 from datetime import timedelta
-from typing import Dict
+from typing import Dict, List
 
 from golem.managers import (
+    DemandManager,
     LinearCoeffsCost,
     LinearPerCpuAverageCostPricing,
     MapScore,
+    PaymentManager,
     ProposalManagerPlugin,
     ProposalScorer,
+    RefreshingDemandManager,
     RejectIfCostsExceeds,
 )
+from golem.managers.demand.union import UnionDemandManager
+from golem.node import GolemNode
+from golem.payload import Payload
 
 from ray_on_golem.server.models import NodeConfigData
+from ray_on_golem.server.services.golem.manager_stack import ManagerStack
+from ray_on_golem.server.settings import SUGGESTED_HEADS_SUBNET_TAG
 
 logger = logging.getLogger(__name__)
 
@@ -84,3 +92,46 @@ class ManagerStackNodeConfigHelper:
             logger.debug("Budget control based on max limits applied")
         else:
             logger.debug("Budget control based on max limits is not enabled")
+
+    @staticmethod
+    def prepare_demand_manager_for_node_type(
+        stack: ManagerStack,
+        payloads: List[Payload],
+        demand_lifetime: timedelta,
+        node_config: NodeConfigData,
+        is_head_node: bool,
+        golem_node: GolemNode,
+        payment_manager: PaymentManager,
+    ) -> DemandManager:
+        demand_manager = stack.add_manager(
+            RefreshingDemandManager(
+                golem_node,
+                payment_manager.get_allocation,
+                payloads,
+                demand_lifetime=demand_lifetime,
+                subnet_tag=node_config.subnet_tag,
+            )
+        )
+
+        if is_head_node:
+            suggested_heads_demand_manager = stack.add_manager(
+                RefreshingDemandManager(
+                    golem_node,
+                    payment_manager.get_allocation,
+                    payloads,
+                    demand_lifetime=demand_lifetime,
+                    subnet_tag=SUGGESTED_HEADS_SUBNET_TAG,
+                )
+            )
+
+            demand_manager = stack.add_manager(
+                UnionDemandManager(
+                    golem_node,
+                    [
+                        suggested_heads_demand_manager.get_initial_proposal,
+                        demand_manager.get_initial_proposal,
+                    ],
+                )
+            )
+
+        return demand_manager

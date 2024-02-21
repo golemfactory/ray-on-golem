@@ -5,14 +5,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import Awaitable, Callable, Dict, Optional, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers import (
     BlacklistProviderIdPlugin,
     DefaultAgreementManager,
     DefaultProposalManager,
-    DemandManager,
     MapScore,
     MidAgreementPaymentsNegotiator,
     NegotiatingPlugin,
@@ -24,12 +23,10 @@ from golem.managers import (
     ProposalScorer,
     ProposalScoringBuffer,
     RandomScore,
-    RefreshingDemandManager,
     WorkContext,
 )
-from golem.managers.demand.union import UnionDemandManager
 from golem.node import GolemNode
-from golem.payload import Payload, PaymentInfo
+from golem.payload import PaymentInfo
 from golem.resources import Activity, Network, Proposal, ProposalData
 from yarl import URL
 
@@ -39,6 +36,7 @@ from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStac
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
 from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST, PROVIDERS_SCORED
 from ray_on_golem.server.services.utils import get_ssh_command
+from ray_on_golem.server.settings import SUGGESTED_HEADS_SUBNET_TAG
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +45,6 @@ DEFAULT_LONG_RUNNING_DEMAND_LIFETIME = timedelta(days=365)
 DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
 DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
 DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
-# SUGGESTED_HEADS_SUBNET_TAG = "ray-on-golem-heads"
-SUGGESTED_HEADS_SUBNET_TAG = "sdk"
 
 
 class GolemService:
@@ -202,8 +198,14 @@ class GolemService:
                 )
             )
 
-        demand_manager = self._prepare_demand_manager_for_node_type(
-            stack, payloads, demand_lifetime, node_config, is_head_node
+        demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
+            stack,
+            payloads,
+            demand_lifetime,
+            node_config,
+            is_head_node,
+            self._golem,
+            self._payment_manager,
         )
 
         proposal_manager = stack.add_manager(
@@ -247,47 +249,6 @@ class GolemService:
 
         return stack
 
-    def _prepare_demand_manager_for_node_type(
-        self,
-        stack: ManagerStack,
-        payloads: List[Payload],
-        demand_lifetime: timedelta,
-        node_config: NodeConfigData,
-        is_head_node: bool,
-    ) -> DemandManager:
-        demand_manager = stack.add_manager(
-            RefreshingDemandManager(
-                self._golem,
-                self._payment_manager.get_allocation,
-                payloads,
-                demand_lifetime=demand_lifetime,
-                subnet_tag=node_config.subnet_tag,
-            )
-        )
-
-        if is_head_node:
-            suggested_heads_demand_manager = stack.add_manager(
-                RefreshingDemandManager(
-                    self._golem,
-                    self._payment_manager.get_allocation,
-                    payloads,
-                    demand_lifetime=demand_lifetime,
-                    subnet_tag=SUGGESTED_HEADS_SUBNET_TAG,
-                )
-            )
-
-            demand_manager = stack.add_manager(
-                UnionDemandManager(
-                    self._golem,
-                    [
-                        suggested_heads_demand_manager.get_initial_proposal,
-                        demand_manager.get_initial_proposal,
-                    ],
-                )
-            )
-
-        return demand_manager
-
     async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
         return await proposal.get_expiration_date() - datetime.now(timezone.utc)
 
@@ -306,13 +267,11 @@ class GolemService:
         return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
 
     def _score_suggested_heads(self, proposal_data: ProposalData) -> Optional[float]:
-        dupa = proposal_data.properties.get("golem.node.debug.subnet") == SUGGESTED_HEADS_SUBNET_TAG
-        if dupa:
-            logger.info("BOOSTING SCORING FOR SUGGESTED HEAD")
-            return 0.5
-        else:
-            logger.info("NOT BOOSTING SCORING NOT SUGGESTED HEAD")
-            return 0
+        add_scoring = (
+            proposal_data.properties.get("golem.node.debug.subnet") == SUGGESTED_HEADS_SUBNET_TAG
+        )
+
+        return 0.5 if add_scoring else 0
 
     @staticmethod
     async def _get_provider_desc(context: WorkContext):

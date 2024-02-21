@@ -14,7 +14,6 @@ from golem.managers import (
     ProposalBuffer,
     ProposalManagerPlugin,
     ProposalScoringBuffer,
-    RefreshingDemandManager,
 )
 from golem.managers.base import (
     ManagerPluginException,
@@ -28,6 +27,7 @@ from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
 
 from ray_on_golem.server.models import NodeConfigData
+from ray_on_golem.server.services.golem.golem import DEFAULT_DEMAND_LIFETIME
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
@@ -154,10 +154,16 @@ class NetworkStatsService:
         total_budget: float = provider_parameters["total_budget"]
         node_config = NodeConfigData(**config["available_node_types"][node_type]["node_config"])
 
-        stack = await self._create_stack(node_config, total_budget, payment_network)
+        is_head_node = node_type == config.get("head_node_type")
+
+        stack = await self._create_stack(node_config, total_budget, payment_network, is_head_node)
         await stack.start()
 
-        print(f"Gathering stats data for {duration_minutes} minutes for `{node_type}`...")
+        print(
+            "Gathering stats data for {} minutes for `{}`{}...".format(
+                duration_minutes, node_type, " (head node)" if is_head_node else ""
+            )
+        )
         consume_proposals_task = asyncio.create_task(self._consume_draft_proposals(stack))
         try:
             await asyncio.wait(
@@ -194,6 +200,7 @@ class NetworkStatsService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
             self._payment_manager = PayAllPaymentManager(
@@ -216,12 +223,14 @@ class NetworkStatsService:
             extra_proposal_plugins, node_config
         )
 
-        stack.demand_manager = RefreshingDemandManager(
-            self._golem,
-            self._payment_manager.get_allocation,
+        demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
+            stack,
             payloads,
-            demand_lifetime=timedelta(hours=8),
-            subnet_tag=node_config.subnet_tag,
+            DEFAULT_DEMAND_LIFETIME,
+            node_config,
+            is_head_node,
+            self._golem,
+            self._payment_manager,
         )
 
         plugins = [
@@ -249,10 +258,12 @@ class NetworkStatsService:
                 ProposalBuffer(min_size=800, max_size=1000, fill_concurrency_size=16),
             ]
         )
-        stack.proposal_manager = DefaultProposalManager(
-            self._golem,
-            stack.demand_manager.get_initial_proposal,
-            plugins=plugins,
+        stack.add_manager(
+            DefaultProposalManager(
+                self._golem,
+                demand_manager.get_initial_proposal,
+                plugins=plugins,
+            )
         )
 
         return stack
