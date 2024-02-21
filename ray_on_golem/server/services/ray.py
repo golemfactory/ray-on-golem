@@ -155,6 +155,8 @@ class RayService:
         return created_node_ids
 
     async def _create_node(self, node_id: NodeId, node_config: NodeConfigData) -> None:
+        logger.info("Creating node `%s`...", node_id)
+
         try:
             activity, ip, ssh_proxy_command = await self._golem_service.create_activity(
                 node_config=node_config,
@@ -186,6 +188,8 @@ class RayService:
         finally:
             self._create_node_tasks.remove(asyncio.current_task())
 
+        logger.info("Creating node `%s` done", node_id)
+
     async def _add_node_state_log(self, node_id: NodeId, log_entry: str) -> None:
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state_log.append(log_entry)
@@ -196,7 +200,7 @@ class RayService:
         return node_id
 
     async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
-        logger.info("Terminating node: %s", node_id)
+        logger.info("Terminating node `%s`...", node_id)
 
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminating
