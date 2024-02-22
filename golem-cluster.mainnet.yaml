@@ -1,4 +1,6 @@
-# This is Ray on Golem Mainnet yaml - the example config for mainnet cluster, with properties allowing fine-tuning
+# This is Ray on Golem Mainnet yaml 
+# - the example config for mainnet cluster, 
+# with properties allowing fine-tuning
 
 # Ray on Golem cluster name
 cluster_name: golem-cluster
