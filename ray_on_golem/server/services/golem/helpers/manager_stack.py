@@ -95,21 +95,27 @@ class ManagerStackNodeConfigHelper:
             logger.debug("Budget control based on max limits is not enabled")
 
     @classmethod
-    def apply_priority_head_node_scoring(cls, extra_proposal_scorers: Dict[str, ProposalScorer],
-        node_config: NodeConfigData,):
+    def apply_priority_head_node_scoring(
+        cls,
+        extra_proposal_scorers: Dict[str, ProposalScorer],
+        node_config: NodeConfigData,
+    ):
         if not node_config.priority_head_subnet_tag:
             return
 
-        extra_proposal_scorers['Extra score for priority head node'] = MapScore(
+        extra_proposal_scorers["Extra score for priority head node"] = MapScore(
             partial(
-                cls._score_suggested_heads, priority_head_subnet_tag=node_config.priority_head_subnet_tag
+                cls._score_suggested_heads,
+                priority_head_subnet_tag=node_config.priority_head_subnet_tag,
             )
         )
 
     @staticmethod
-    def _score_suggested_heads(proposal_data: ProposalData, priority_head_subnet_tag: Optional[str]) -> Optional[float]:
-        add_scoring = (
-            priority_head_subnet_tag and (proposal_data.properties.get("golem.node.debug.subnet") == priority_head_subnet_tag)
+    def _score_suggested_heads(
+        proposal_data: ProposalData, priority_head_subnet_tag: Optional[str]
+    ) -> Optional[float]:
+        add_scoring = priority_head_subnet_tag and (
+            proposal_data.properties.get("golem.node.debug.subnet") == priority_head_subnet_tag
         )
 
         return 0.5 if add_scoring else 0

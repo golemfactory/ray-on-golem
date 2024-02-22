@@ -1,11 +1,10 @@
 import asyncio
-import hashlib
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Optional, Tuple, DefaultDict
+from typing import Awaitable, Callable, DefaultDict, Dict, Optional, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers import (
