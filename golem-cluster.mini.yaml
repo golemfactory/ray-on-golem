@@ -1,3 +1,6 @@
+# This is Ray on Golem Mini yaml - the smallest config for testnet cluster of up to 10 nodes
+
+
 # Ray on Golem cluster name
 cluster_name: golem-cluster
 
