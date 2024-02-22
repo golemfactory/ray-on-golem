@@ -50,8 +50,6 @@ PAYMENT_NETWORK_POLYGON = "polygon"
 PAYMENT_NETWORK_GOERLI = "goerli"
 PAYMENT_DRIVER_ERC20 = "erc20"
 
-SUGGESTED_HEADS_SUBNET_TAG = "ray-on-golem-heads"
-
 RAY_ON_GOLEM_PATH = Path(os.getenv("RAY_ON_GOLEM_PATH", "ray-on-golem"))
 YAGNA_PATH = Path(os.getenv("YAGNA_PATH", "yagna"))
 WEBSOCAT_PATH = Path(os.getenv("WEBSOCAT_PATH", "websocat"))

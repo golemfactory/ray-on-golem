@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Optional, Tuple
+from typing import Awaitable, Callable, Dict, Optional, Tuple, DefaultDict
 
 from golem.exceptions import GolemException
 from golem.managers import (
@@ -36,7 +36,6 @@ from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStac
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
 from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST, PROVIDERS_SCORED
 from ray_on_golem.server.services.utils import get_ssh_command
-from ray_on_golem.server.settings import SUGGESTED_HEADS_SUBNET_TAG
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +54,8 @@ class GolemService:
         self._golem: Optional[GolemNode] = None
         self._network: Optional[Network] = None
         self._yagna_appkey: Optional[str] = None
-        self._stacks: Dict[str, ManagerStack] = {}
-        self._stacks_locks = defaultdict(asyncio.Lock)
+        self._stacks: Dict[(str, bool), ManagerStack] = {}
+        self._stacks_locks: DefaultDict[(str, bool), asyncio.Lock] = defaultdict(asyncio.Lock)
         self._payment_manager: Optional[PaymentManager] = None
 
     async def init(self, yagna_appkey: str) -> None:
@@ -109,17 +108,18 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        node_type: str,
         is_head_node: bool,
     ) -> ManagerStack:
-        stack_hash = self._get_hash_from_node_config(node_config)
+        stack_key = (node_type, is_head_node)
 
-        async with self._stacks_locks[stack_hash]:
-            stack = self._stacks.get(stack_hash)
+        async with self._stacks_locks[stack_key]:
+            stack = self._stacks.get(stack_key)
             if stack is None:
                 logger.info(
-                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}"
+                    f"Creating new stack `{stack_key}`... {total_budget=}, {payment_network=}"
                 )
-                self._stacks[stack_hash] = stack = await self._create_stack(
+                self._stacks[stack_key] = stack = await self._create_stack(
                     node_config,
                     total_budget,
                     payment_network,
@@ -127,13 +127,9 @@ class GolemService:
                 )
                 await stack.start()
 
-                logger.info(f"Creating new stack `{stack_hash}` done")
+                logger.info(f"Creating new stack `{stack_key}` done")
 
             return stack
-
-    @staticmethod
-    def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
-        return hashlib.md5(node_config.json().encode()).hexdigest()
 
     async def _create_stack(
         self,
@@ -162,6 +158,9 @@ class GolemService:
         )
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
             extra_proposal_plugins, node_config
+        )
+        ManagerStackNodeConfigHelper.apply_priority_head_node_scoring(
+            extra_proposal_scorers, node_config
         )
 
         proposal_negotiators = [PaymentPlatformNegotiator()]
@@ -226,7 +225,6 @@ class GolemService:
                                     self._score_with_provider_data, payment_network=payment_network
                                 )
                             ),
-                            MapScore(self._score_suggested_heads),
                             (0.1, RandomScore()),
                         ),
                         scoring_debounce=timedelta(seconds=10),
@@ -265,13 +263,6 @@ class GolemService:
 
         # Gives pre-scored providers from 0.5 to 1.0 score
         return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
-
-    def _score_suggested_heads(self, proposal_data: ProposalData) -> Optional[float]:
-        add_scoring = (
-            proposal_data.properties.get("golem.node.debug.subnet") == SUGGESTED_HEADS_SUBNET_TAG
-        )
-
-        return 0.5 if add_scoring else 0
 
     @staticmethod
     async def _get_provider_desc(context: WorkContext):
@@ -393,10 +384,11 @@ class GolemService:
         total_budget: float,
         payment_network: str,
         add_state_log: Callable[[str], Awaitable[None]],
+        node_type: str,
         is_head_node: bool,
     ) -> Tuple[Activity, str, str]:
         stack = await self._get_or_create_stack_from_node_config(
-            node_config, total_budget, payment_network, is_head_node
+            node_config, total_budget, payment_network, node_type, is_head_node
         )
 
         while True:

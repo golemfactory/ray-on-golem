@@ -1,6 +1,7 @@
 import logging
 from datetime import timedelta
-from typing import Dict, List
+from functools import partial
+from typing import Dict, List, Optional
 
 from golem.managers import (
     DemandManager,
@@ -16,10 +17,10 @@ from golem.managers import (
 from golem.managers.demand.union import UnionDemandManager
 from golem.node import GolemNode
 from golem.payload import Payload
+from golem.resources import ProposalData
 
 from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.settings import SUGGESTED_HEADS_SUBNET_TAG
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,26 @@ class ManagerStackNodeConfigHelper:
         else:
             logger.debug("Budget control based on max limits is not enabled")
 
+    @classmethod
+    def apply_priority_head_node_scoring(cls, extra_proposal_scorers: Dict[str, ProposalScorer],
+        node_config: NodeConfigData,):
+        if not node_config.priority_head_subnet_tag:
+            return
+
+        extra_proposal_scorers['Extra score for priority head node'] = MapScore(
+            partial(
+                cls._score_suggested_heads, priority_head_subnet_tag=node_config.priority_head_subnet_tag
+            )
+        )
+
+    @staticmethod
+    def _score_suggested_heads(proposal_data: ProposalData, priority_head_subnet_tag: Optional[str]) -> Optional[float]:
+        add_scoring = (
+            priority_head_subnet_tag and (proposal_data.properties.get("golem.node.debug.subnet") == priority_head_subnet_tag)
+        )
+
+        return 0.5 if add_scoring else 0
+
     @staticmethod
     def prepare_demand_manager_for_node_type(
         stack: ManagerStack,
@@ -113,14 +134,14 @@ class ManagerStackNodeConfigHelper:
             )
         )
 
-        if is_head_node:
+        if is_head_node and node_config.priority_head_subnet_tag:
             suggested_heads_demand_manager = stack.add_manager(
                 RefreshingDemandManager(
                     golem_node,
                     payment_manager.get_allocation,
                     payloads,
                     demand_lifetime=demand_lifetime,
-                    subnet_tag=SUGGESTED_HEADS_SUBNET_TAG,
+                    subnet_tag=node_config.priority_head_subnet_tag,
                 )
             )
 
