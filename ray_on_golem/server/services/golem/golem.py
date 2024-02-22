@@ -7,6 +7,7 @@ from functools import partial
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, Optional, Tuple
 
+from golem.exceptions import GolemException
 from golem.managers import (
     BlacklistProviderIdPlugin,
     DefaultAgreementManager,
@@ -381,10 +382,9 @@ class GolemService:
                     ssh_private_key_path,
                     add_state_log=add_state_log,
                 )
-
             except (ManagerException,):
                 raise
-            except Exception as e:
+            except (GolemException,) as e:
                 msg = "Failed to create activity, retrying."
                 error = f"{type(e).__module__}.{type(e).__name__}: {e}"
                 await add_state_log(f"{msg} {error=}")
