@@ -15,9 +15,17 @@ provider:
       demand:
         image_tag: "golem/ray-on-golem:0.7.0-py3.10.13-ray2.7.1"
 
+# The files or directories to copy to the head and worker nodes
+# Remote workdir is /root/
 file_mounts: {
   # <remote_path>: <local_path>
+  # "/absolute/path/dir/": ".",
+  # "./relative/path/dir/": ".",
+  # "./relative/path/file.txt": "./file.txt"
 }
+
+# A list of paths to the files or directories to copy from the head node to the worker nodes
+cluster_synced_files: []
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -31,6 +39,9 @@ available_node_types:
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
 initialization_commands: []
+#initialization_commands: [
+#  "pip install endplay",
+#]
 
 # List of shell commands to run to set up nodes
 setup_commands: []
@@ -51,5 +62,8 @@ worker_start_ray_commands: [
   "ray start --address $RAY_HEAD_IP:6379",
 ]
 
-# A list of paths to the files or directories to copy from the head node to the worker nodes
-cluster_synced_files: []
+# Satisfy checks to disable warning about legacy fields at `ray up`.
+# This will be removed by ray-on-golem on the fly.
+head_node: True
+worker_nodes: True
+
