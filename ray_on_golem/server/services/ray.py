@@ -184,7 +184,9 @@ class RayService:
         except Exception as e:
             async with self._get_node_context(node_id) as node:  # type: Node
                 node.state = NodeState.terminated
-                node.state_log.append(f"Failed to create activity: {type(e).__name__}({e})")
+                node.state_log.append(
+                    f"Failed to create activity: {type(e).__module__}.{type(e).__name__}: {e}"
+                )
         finally:
             self._create_node_tasks.remove(asyncio.current_task())
 

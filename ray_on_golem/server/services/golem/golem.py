@@ -7,7 +7,6 @@ from functools import partial
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, Optional, Tuple
 
-from golem.exceptions import GolemException
 from golem.managers import (
     BlacklistProviderIdPlugin,
     DefaultAgreementManager,
@@ -24,6 +23,7 @@ from golem.managers import (
     RefreshingDemandManager,
     WorkContext,
 )
+from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
 from golem.resources import Activity, Network, Proposal, ProposalData
@@ -382,12 +382,12 @@ class GolemService:
                     add_state_log=add_state_log,
                 )
 
-            # TODO: Consider explicit "retryable" and "non-retryable" exceptions
-            except GolemException:
+            except (ManagerException,):
                 raise
             except Exception as e:
-                msg = "Failed to create activity, retrying"
-                await add_state_log(f"{msg}: {e}")
+                msg = "Failed to create activity, retrying."
+                error = f"{type(e).__module__}.{type(e).__name__}: {e}"
+                await add_state_log(f"{msg} {error=}")
                 logger.warning(msg, exc_info=True)
 
     async def _create_activity(
@@ -407,7 +407,7 @@ class GolemService:
             agreement = await stack.agreement_manager.get_agreement()
         except Exception as e:
             logger.error(f"Creating new activity failed with `{e}`")
-            raise GolemException(e) from e
+            raise
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
