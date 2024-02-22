@@ -13,16 +13,11 @@ provider:
   use_internal_ips: true
   module: "ray_on_golem.provider.node_provider.GolemNodeProvider"
   parameters:
-    # Port of golem webserver that has connection with golem network
-    webserver_port: 4578
 
     # Blockchain used for payments.
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
     payment_network: "goerli"
-
-    # Maximum amount of GML that's going to be spent (not supported yet)
-    total_budget: 2
 
     # Params for creating golem demands (same for head and workers)
     node_config:
@@ -35,10 +30,6 @@ provider:
       # If not provided demand will not use Computation Manifest
       outbound_urls: ["https://pypi.dev.golem.network"]
 
-      # you can also provide the image hash directly (although it is not recommended :)
-      # image_hash: "c6fc9b12da19d56a998eace84b6df961852360b37479e93ef4ce3913" # approxit/ray-test:py3.10.12-ray2.3.1
-
-      capabilities: ['vpn', 'inet', 'manifest-support']
       min_mem_gib: 0
       min_cpu_threads: 0
       min_storage_gib: 0
@@ -95,13 +86,10 @@ worker_start_ray_commands: [
   "ray start --address 192.168.0.3:6379",
 ]
 
-# Authentication credentials that Ray will use to launch nodes
-# auth:
-  # Custom username for ssh
-  # ssh_user: "root"
-
-  # If ssh_private_key will be not provided, temporary key will be created and used
-  # ssh_private_key: '~/.ssh/id_rsa'
-
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: []
+
+# Satisfy checks to disable warning about legacy fields at `ray up`.
+# This will be removed by ray-on-golem on the fly.
+head_node: True
+worker_nodes: True
