@@ -91,6 +91,7 @@ class BudgetControlData(BaseModel):
 
 class NodeConfigData(BaseModel):
     subnet_tag: str
+    priority_head_subnet_tag: Optional[str]
     demand: DemandConfigData = Field(default_factory=DemandConfigData)
     budget_control: Optional[BudgetControlData] = Field(default_factory=BudgetControlData)
 

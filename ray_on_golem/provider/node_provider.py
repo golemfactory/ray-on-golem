@@ -45,6 +45,7 @@ PROVIDER_DEFAULTS = {
     "payment_driver": PAYMENT_DRIVER_ERC20,
     "node_config": {
         "subnet_tag": "public",
+        "priority_head_subnet_tag": "ray-on-golem-heads",
     },
     "total_budget": 1.0,
 }

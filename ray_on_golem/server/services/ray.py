@@ -8,7 +8,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
 from golem.utils.logging import get_trace_id_name
-from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
+from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.exceptions import NodeNotFound
@@ -144,7 +144,12 @@ class RayService:
 
                 self._create_node_tasks.append(
                     create_task_with_logging(
-                        self._create_node(node_id, NodeConfigData(**node_config)),
+                        self._create_node(
+                            node_id,
+                            NodeConfigData(**node_config),
+                            node_type=self._get_node_type(tags),
+                            is_head_node=self._is_head_node(tags),
+                        ),
                         trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
                     )
                 )
@@ -154,7 +159,9 @@ class RayService:
 
         return created_node_ids
 
-    async def _create_node(self, node_id: NodeId, node_config: NodeConfigData) -> None:
+    async def _create_node(
+        self, node_id: NodeId, node_config: NodeConfigData, node_type: str, is_head_node: bool
+    ) -> None:
         logger.info("Creating node `%s`...", node_id)
 
         try:
@@ -166,6 +173,8 @@ class RayService:
                 total_budget=self._provider_config.total_budget,
                 payment_network=self._provider_config.payment_network,
                 add_state_log=partial(self._add_node_state_log, node_id),
+                node_type=node_type,
+                is_head_node=is_head_node,
             )
 
             self._print_ssh_command(
@@ -305,10 +314,18 @@ class RayService:
     async def _get_head_node(self) -> Node:
         async with self._nodes_lock:
             for node in self._nodes.values():
-                if node.tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD:
+                if self._is_head_node(node.tags):
                     return node
 
             raise NodeNotFound
+
+    @staticmethod
+    def _is_head_node(tags: Tags) -> bool:
+        return tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD
+
+    @staticmethod
+    def _get_node_type(tags: Tags) -> str:
+        return tags.get(TAG_RAY_USER_NODE_TYPE)
 
     def _print_ssh_command(
         self, ip: str, ssh_proxy_command: str, ssh_user: str, ssh_private_key_path: Path

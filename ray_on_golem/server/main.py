@@ -123,7 +123,9 @@ async def startup_print(app: web.Application) -> None:
 
 async def shutdown_print(app: web.Application) -> None:
     print("")  # explicit new line to console to visually better handle ^C
-    logger.info("Stopping server gracefully, forcing after `%s`...", RAY_ON_GOLEM_SHUTDOWN_TIMEOUT)
+    logger.info(
+        "Waiting up to `%s` for current connections to close...", RAY_ON_GOLEM_SHUTDOWN_TIMEOUT
+    )
 
 
 async def yagna_service_ctx(app: web.Application) -> None:
