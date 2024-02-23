@@ -11,7 +11,7 @@ python = "^3.8.1"
 
 ray = {version="^2.9.2", extras=["default"]}
 #golem-core = {path="../golem-core-python", develop=true}
-golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="approxit/suggested-heads"}
+golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
 #golem-core = "^0.5.0"
 aiohttp = "^3"
 requests = "^2"
@@ -31,7 +31,7 @@ python = "^3.8.1"
 
 ray = {version="==2.9.2", extras=["default"]}
 #golem-core = {path="../golem-core-python", develop=true}
-golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="approxit/suggested-heads"}
+golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
 #golem-core = "^0.5.0"
 aiohttp = "^3"
 requests = "^2"
