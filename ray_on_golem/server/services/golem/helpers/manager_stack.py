@@ -4,6 +4,7 @@ from functools import partial
 from typing import Dict, List, Optional
 
 from golem.managers import (
+    AggregatingDemandManager,
     DemandManager,
     LinearCoeffsCost,
     LinearPerCpuAverageCostPricing,
@@ -14,7 +15,6 @@ from golem.managers import (
     RefreshingDemandManager,
     RejectIfCostsExceeds,
 )
-from golem.managers.demand.union import UnionDemandManager
 from golem.node import GolemNode
 from golem.payload import Payload
 from golem.resources import ProposalData
@@ -152,7 +152,7 @@ class ManagerStackNodeConfigHelper:
             )
 
             demand_manager = stack.add_manager(
-                UnionDemandManager(
+                AggregatingDemandManager(
                     golem_node,
                     [
                         suggested_heads_demand_manager.get_initial_proposal,
