@@ -31,7 +31,7 @@ jobs:
         env:
           PYTHONUNBUFFERED: 1
           RUST_LOG: "INFO,ya_erc20_driver::erc20::wallet=debug"
-        run: poetry run ray up golem-cluster.tests.yaml -y
+        run: poetry run ray up golem-cluster.tests.yaml -y --no-config-cache
 
       - name: Run `examples/calculate.pi`
         run: poetry run ray submit golem-cluster.tests.yaml examples/calculate_pi.py
@@ -39,9 +39,12 @@ jobs:
       - name: Call `ray down`
         run: poetry run ray down golem-cluster.tests.yaml -y
 
+      - name: Call `ray-on-golem down`
+        run: poetry run ray-on-golem stop
+
       - name: Check node creation in logs
         continue-on-error: true
-        run: poetry run python tests/smoke.py ~/.local/share/ray_on_golem/
+        run: poetry run python tests/smoke.py ~/.local/share/ray_on_golem/webserver_debug.log
 
       - name: Collects logs
         if: always()

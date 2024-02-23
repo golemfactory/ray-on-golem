@@ -91,6 +91,7 @@ class BudgetControlData(BaseModel):
 
 
 class NodeConfigData(BaseModel):
+    subnet_tag: str
     demand: DemandConfigData = Field(default_factory=DemandConfigData)
     budget_control: Optional[BudgetControlData] = Field(default_factory=BudgetControlData)
 
@@ -102,7 +103,6 @@ class ProviderConfigData(BaseModel):
     node_config: NodeConfigData
     ssh_private_key: str
     ssh_user: str
-    subnet_tag: str
 
 
 class CreateClusterRequestData(ProviderConfigData):

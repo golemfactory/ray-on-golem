@@ -1,10 +1,10 @@
 import re
 import sys
 
-creating_re = re.compile(r".*] Creating ([0-9]+) nodes\.\.\..*")
-created_re = re.compile(r".*] Creating ([0-9]+) nodes done.*")
-terminating_re = re.compile(r".*] Terminating `[^`]+` node\.\.\..*")
-terminated_re = re.compile(r".*] Terminating `[^`]+` node done.*")
+creating_re = re.compile(r".*] Creating node `[^`]+`\.\.\..*")
+created_re = re.compile(r".*] Creating node `[^`]+` done.*")
+terminating_re = re.compile(r".*] Terminating node `[^`]+`\.\.\..*")
+terminated_re = re.compile(r".*] Terminating node `[^`]+` done.*")
 
 creating_count = 0
 created_count = 0
@@ -15,11 +15,11 @@ with open(sys.argv[1]) as file:
     for line in file:
         match = creating_re.match(line)
         if match:
-            creating_count += int(match.groups()[0])
+            creating_count += 1
 
         match = created_re.match(line)
         if match:
-            created_count += int(match.groups()[0])
+            created_count += 1
 
         match = terminating_re.match(line)
         if match:
@@ -46,6 +46,9 @@ if created_count != terminated_count:
         f"Logs contains miss-matched logs between node creation and termination level: created={created_count} "
         f"terminated={terminated_count}"
     )
+
+if not created_count:
+    errors.append("No creation entries found in log file!")
 
 if errors:
     print("Errors:", file=sys.stderr)

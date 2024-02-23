@@ -5,7 +5,6 @@ from golem.managers import (
     ActivityManager,
     AgreementManager,
     DemandManager,
-    PaymentManager,
     ProposalManager,
     ProposalManagerPlugin,
     ProposalScorer,
@@ -16,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class ManagerStack(BaseModel):
-    payment_manager: Optional[PaymentManager]
     demand_manager: Optional[DemandManager]
     proposal_manager: Optional[ProposalManager]
     agreement_manager: Optional[AgreementManager]
@@ -30,7 +28,6 @@ class ManagerStack(BaseModel):
     @property
     def _managers(self):
         return [
-            self.payment_manager,
             self.demand_manager,
             self.proposal_manager,
             self.agreement_manager,
