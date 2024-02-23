@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ray-on-golem"
-version = "0.8.0a1"
+version = "0.8.0"
 description = "Golem Network integration with Ray"
 authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
