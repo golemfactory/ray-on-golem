@@ -17,7 +17,8 @@ class ScrCoords(NamedTuple):
 
 
 @numba.jit(nopython=False)
-def calculate_mandel(
+def calculate_mandel_cpu(
+    buffer: np.array,
     tgt_range_x: Tuple[int, int],
     tgt_range_y: Tuple[int, int],
     space_x: np.linspace,
@@ -37,25 +38,26 @@ def calculate_mandel(
 
         return np.uint8(i / max_iter * vscale)
 
-    tgt_size_x = tgt_range_x[1] - tgt_range_x[0]
-    tgt_size_y = tgt_range_y[1] - tgt_range_y[0]
-    max_iter = max_iter
-    buffer = np.zeros((tgt_size_y, tgt_size_x), dtype=np.uint8)
-
-    print(f"starting chunk: {tgt_range_x}, {tgt_range_y}")
-
     for ys in range(tgt_range_y[0], tgt_range_y[1]):
         for xs in range(tgt_range_x[0], tgt_range_x[1]):
             c = complex(space_x[xs], space_y[ys])
             buffer[ys - tgt_range_y[0], xs - tgt_range_x[0]] = mandel(c)
 
+
+def calculate_mandel(
+    tgt_range_x: Tuple[int, int],
+    tgt_range_y: Tuple[int, int],
+    space_x: np.linspace,
+    space_y: np.linspace,
+    max_iter: int,
+):
+    tgt_size_x = tgt_range_x[1] - tgt_range_x[0]
+    tgt_size_y = tgt_range_y[1] - tgt_range_y[0]
+    buffer = np.zeros((tgt_size_y, tgt_size_x), dtype=np.uint8)
+    print(f"starting chunk: {tgt_range_x}, {tgt_range_y}")
+    calculate_mandel_cpu(buffer, tgt_range_x, tgt_range_y, space_x, space_y, max_iter)
     print(f"finalized chunk: {tgt_range_x}, {tgt_range_y}")
-
     return buffer
-
-
-def calculate_mandel_ray(*args, **kwargs):
-    return calculate_mandel(*args, **kwargs)
 
 
 def draw_mandelbrot(
@@ -85,7 +87,7 @@ def draw_mandelbrot(
             np.linspace(y_range[0], y_range[1], size.y),
             max_iter,
         )
-        f = ray.remote(calculate_mandel_ray).remote if use_ray else calculate_mandel
+        f = ray.remote(calculate_mandel).remote if use_ray else calculate_mandel
 
         print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args[0], calc_args[1]})")
         chunks.append(f(*calc_args))
