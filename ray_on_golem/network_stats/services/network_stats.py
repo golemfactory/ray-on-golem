@@ -151,12 +151,19 @@ class NetworkStatsService:
         provider_parameters: Dict = config["provider"]["parameters"]
 
         payment_network: str = provider_parameters["payment_network"]
+        payment_driver: str = provider_parameters["payment_driver"]
         total_budget: float = provider_parameters["total_budget"]
         node_config = NodeConfigData(**config["available_node_types"][node_type]["node_config"])
 
         is_head_node = node_type == config.get("head_node_type")
 
-        stack = await self._create_stack(node_config, total_budget, payment_network, is_head_node)
+        stack = await self._create_stack(
+            node_config=node_config,
+            total_budget=total_budget,
+            payment_network=payment_network,
+            payment_driver=payment_driver,
+            is_head_node=is_head_node,
+        )
         await stack.start()
 
         print(
@@ -200,11 +207,12 @@ class NetworkStatsService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
             self._payment_manager = PayAllPaymentManager(
-                self._golem, budget=total_budget, network=payment_network
+                self._golem, budget=total_budget, network=payment_network, driver=payment_driver,
             )
             await self._payment_manager.start()
 

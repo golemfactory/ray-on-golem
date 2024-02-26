@@ -172,6 +172,7 @@ class RayService:
                 ssh_private_key_path=self._ssh_private_key_path,
                 total_budget=self._provider_config.total_budget,
                 payment_network=self._provider_config.payment_network,
+                payment_driver=self._provider_config.payment_driver,
                 add_state_log=partial(self._add_node_state_log, node_id),
                 node_type=node_type,
                 is_head_node=is_head_node,
