@@ -75,20 +75,6 @@ provider:
           minimal: 1
           optimal: 12 # optional defaults to `minimal`
 
-# The files or directories to copy to the head and worker nodes
-# Remote workdir is /root/
-file_mounts: {
-  # <remote_path>: <local_path>
-  # "/absolute/path/dir/": ".",
-  # "./relative/path/dir/": ".",
-  # "./relative/path/file.txt": "./file.txt"
-}
-
-# Satisfy checks to disable warning about legacy fields at `ray up`.
-# This will be removed by ray-on-golem on the fly.
-head_node: True
-worker_nodes: True
-
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
   ray.head.default:
@@ -112,6 +98,23 @@ available_node_types:
     max_workers: 10
     resources: {}
     node_config: {}
+
+# Specify the node type of the head node (as configured above).
+head_node_type: ray.head.default
+
+# Satisfy checks to disable warning about legacy fields at `ray up`.
+# This will be removed by ray-on-golem on the fly.
+head_node: True
+worker_nodes: True
+
+# The files or directories to copy to the head and worker nodes
+# Remote workdir is /root/
+file_mounts: {
+  # <remote_path>: <local_path>
+  # "/absolute/path/dir/": ".",
+  # "./relative/path/dir/": ".",
+  # "./relative/path/file.txt": "./file.txt"
+}
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
 initialization_commands: []
