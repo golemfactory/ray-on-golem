@@ -24,6 +24,7 @@ from golem.managers import (
     RandomScore,
     WorkContext,
 )
+from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
 from golem.resources import Activity, Network, Proposal, ProposalData
@@ -399,13 +400,12 @@ class GolemService:
                     ssh_private_key_path,
                     add_state_log=add_state_log,
                 )
-
-            # TODO: Consider explicit "retryable" and "non-retryable" exceptions
-            except GolemException:
+            except (ManagerException,):
                 raise
-            except Exception as e:
-                msg = "Failed to create activity, retrying"
-                await add_state_log(f"{msg}: {e}")
+            except (GolemException,) as e:
+                msg = "Failed to create activity, retrying."
+                error = f"{type(e).__module__}.{type(e).__name__}: {e}"
+                await add_state_log(f"{msg} {error=}")
                 logger.warning(msg, exc_info=True)
 
     async def _create_activity(
@@ -425,7 +425,7 @@ class GolemService:
             agreement = await stack._managers[-1].get_agreement()
         except Exception as e:
             logger.error(f"Creating new activity failed with `{e}`")
-            raise GolemException(e) from e
+            raise
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
@@ -455,7 +455,7 @@ class GolemService:
 
             await self._network.refresh_nodes()
         except Exception as e:
-            logger.error(f"Creating new activity failed with `{e}`")
+            logger.error(f"Creating new activity failed with `{type(e).__name__}: {e}`")
             await activity.destroy()
             raise
 
