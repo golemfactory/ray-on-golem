@@ -14,9 +14,10 @@ provider:
       # Parameters for golem demands (same for head and workers)
       demand:
         image_tag: "blueshade/raytest:nvidia-test"
-        outbound_urls: ["https://pypi.dev.golem.network"]
+        outbound_urls: []
         runtime: "vm-nvidia"
-    subnet_tag: "ray"
+      subnet_tag: "ray"
+      priority_head_subnet_tag: "ray"
 
 file_mounts: {
   # <remote_path>: <local_path>
