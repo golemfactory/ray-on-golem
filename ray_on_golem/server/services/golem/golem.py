@@ -108,6 +108,7 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
         node_type: str,
         is_head_node: bool,
     ) -> ManagerStack:
@@ -117,13 +118,18 @@ class GolemService:
             stack = self._stacks.get(stack_key)
             if stack is None:
                 logger.info(
-                    f"Creating new stack `{stack_key}`... {total_budget=}, {payment_network=}"
+                    "Creating new stack `{%s}`: {%s}/{%s}, total_budget={%s}",
+                    stack_key,
+                    payment_driver,
+                    payment_network,
+                    total_budget,
                 )
                 self._stacks[stack_key] = stack = await self._create_stack(
-                    node_config,
-                    total_budget,
-                    payment_network,
-                    is_head_node,
+                    node_config=node_config,
+                    total_budget=total_budget,
+                    payment_network=payment_network,
+                    payment_driver=payment_driver,
+                    is_head_node=is_head_node,
                 )
                 await stack.start()
 
@@ -136,11 +142,12 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
             self._payment_manager = PayAllPaymentManager(
-                self._golem, budget=total_budget, network=payment_network
+                self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()
 
@@ -383,12 +390,18 @@ class GolemService:
         ssh_private_key_path: Path,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
         add_state_log: Callable[[str], Awaitable[None]],
         node_type: str,
         is_head_node: bool,
     ) -> Tuple[Activity, str, str]:
         stack = await self._get_or_create_stack_from_node_config(
-            node_config, total_budget, payment_network, node_type, is_head_node
+            node_config=node_config,
+            total_budget=total_budget,
+            payment_network=payment_network,
+            payment_driver=payment_driver,
+            node_type=node_type,
+            is_head_node=is_head_node,
         )
 
         while True:
