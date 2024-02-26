@@ -18,6 +18,7 @@ class NodeState(Enum):
 class ShutdownState(Enum):
     NOT_ENABLED = "not_enabled"
     CLUSTER_NOT_EMPTY = "cluster_not_empty"
+    FORCED_SHUTDOWN = "forced_shutdown"
     WILL_SHUTDOWN = "will_shutdown"
 
 
@@ -89,6 +90,7 @@ class BudgetControlData(BaseModel):
 
 
 class NodeConfigData(BaseModel):
+    subnet_tag: str
     demand: DemandConfigData = Field(default_factory=DemandConfigData)
     budget_control: Optional[BudgetControlData] = Field(default_factory=BudgetControlData)
 
@@ -100,7 +102,6 @@ class ProviderConfigData(BaseModel):
     node_config: NodeConfigData
     ssh_private_key: str
     ssh_user: str
-    subnet_tag: str
 
 
 class CreateClusterRequestData(ProviderConfigData):
@@ -170,16 +171,26 @@ class GetOrCreateDefaultSshKeyRequestData(BaseModel):
 
 
 class GetOrCreateDefaultSshKeyResponseData(BaseModel):
-    ssh_key_base64: str
+    ssh_private_key_base64: str
+    ssh_public_key_base64: str
 
 
-class SelfShutdownRequestData(BaseModel):
-    pass
+class ShutdownRequestData(BaseModel):
+    ignore_self_shutdown: bool = False
+    force_shutdown: bool = False
+    shutdown_delay: Optional[int] = None
 
 
-class SelfShutdownResponseData(BaseModel):
+class ShutdownResponseData(BaseModel):
     shutdown_state: ShutdownState
 
 
 class HealthCheckResponseData(BaseModel):
     is_shutting_down: bool
+
+
+class WebserverStatus(BaseModel):
+    version: str
+    datadir: str
+    shutting_down: bool
+    self_shutdown: bool

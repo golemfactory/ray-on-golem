@@ -12,16 +12,16 @@ from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.server.settings import (
     LOGGING_BACKUP_COUNT,
-    LOGGING_YAGNA_PATH,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
-    RAY_ON_GOLEM_CHECK_DEADLINE,
+    RAY_ON_GOLEM_CHECK_INTERVAL,
     YAGNA_API_URL,
     YAGNA_APPKEY,
     YAGNA_APPNAME,
-    YAGNA_CHECK_DEADLINE,
-    YAGNA_FUND_DEADLINE,
-    YAGNA_START_DEADLINE,
+    YAGNA_CHECK_INTERVAL,
+    YAGNA_FUND_TIMEOUT,
+    YAGNA_START_TIMEOUT,
+    get_log_path,
 )
 from ray_on_golem.utils import get_last_lines_from_file, run_subprocess, run_subprocess_output
 
@@ -33,12 +33,13 @@ class YagnaServiceError(RayOnGolemError):
 
 
 class YagnaService:
-    def __init__(self, yagna_path: Path):
+    def __init__(self, yagna_path: Path, datadir: Path):
         self._yagna_path = yagna_path
 
         self.yagna_appkey: Optional[str] = None
         self._yagna_process: Optional[Process] = None
         self._yagna_early_exit_task: Optional[asyncio.Task] = None
+        self._datadir = datadir
 
     async def init(self) -> None:
         logger.info("Starting YagnaService...")
@@ -62,7 +63,7 @@ class YagnaService:
     async def _wait_for_yagna_api(self) -> bool:
         logger.debug("Waiting for Yagna Api...")
 
-        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
+        check_seconds = int(RAY_ON_GOLEM_CHECK_INTERVAL.total_seconds())
         for _ in range(25):
             if await self._check_if_yagna_is_running():
                 logger.debug("Waiting for Yagna Api done")
@@ -88,7 +89,7 @@ class YagnaService:
     async def _run_yagna(self) -> None:
         logger.info("Starting Yagna...")
 
-        log_file_path = LOGGING_YAGNA_PATH
+        log_file_path = get_log_path("yagna", self._datadir)
         yagna_logger = ZippingRotatingFileHandler(log_file_path, backupCount=LOGGING_BACKUP_COUNT)
 
         self._yagna_process = await run_subprocess(
@@ -97,10 +98,11 @@ class YagnaService:
             "run",
             stderr=yagna_logger.stream,
             stdout=yagna_logger.stream,
+            detach=True,
         )
 
-        start_deadline = datetime.now() + YAGNA_START_DEADLINE
-        check_seconds = int(YAGNA_CHECK_DEADLINE.total_seconds())
+        start_deadline = datetime.now() + YAGNA_START_TIMEOUT
+        check_seconds = int(YAGNA_CHECK_INTERVAL.total_seconds())
         while datetime.now() < start_deadline:
             try:
                 await asyncio.wait_for(self._yagna_process.communicate(), timeout=check_seconds)
@@ -123,8 +125,8 @@ class YagnaService:
             )
 
         logger.error(
-            "Starting Yagna failed! Deadline of `%s` reached.\nShowing last 50 lines from `%s`:\n%s",
-            YAGNA_START_DEADLINE,
+            "Starting Yagna failed! Timeout of `%s` reached.\nShowing last 50 lines from `%s`:\n%s",
+            YAGNA_START_TIMEOUT,
             log_file_path,
             get_last_lines_from_file(log_file_path, 50),
         )
@@ -158,10 +160,10 @@ class YagnaService:
         logger.info("Stopping Yagna done")
 
     async def run_payment_fund(self, network: str, driver: str) -> Dict:
-        logger.debug("Preparing `%s` funds with deadline up to %s...", network, YAGNA_FUND_DEADLINE)
+        logger.debug("Preparing `%s` funds with a timeout up to %s...", network, YAGNA_FUND_TIMEOUT)
 
-        fund_deadline = datetime.now() + YAGNA_FUND_DEADLINE
-        check_seconds = int(YAGNA_CHECK_DEADLINE.total_seconds())
+        fund_deadline = datetime.now() + YAGNA_FUND_TIMEOUT
+        check_seconds = int(YAGNA_CHECK_INTERVAL.total_seconds())
         while datetime.now() < fund_deadline:
             try:
                 await run_subprocess_output(
@@ -208,7 +210,7 @@ class YagnaService:
             await asyncio.sleep(check_seconds)
 
         raise YagnaServiceError(
-            f"Can't prepare `{network}` funds! Deadline of `{YAGNA_CHECK_DEADLINE}` reached."
+            f"Can't prepare `{network}` funds! Timeout of `{YAGNA_FUND_TIMEOUT}` reached."
         )
 
     async def fetch_payment_status(self, network: str, driver: str) -> str:

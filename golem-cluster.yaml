@@ -25,11 +25,12 @@ provider:
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
 
+    # Common parameters for all node types. Can be overriden in available_node_types
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.7.0-py3.10.13-ray2.7.1"
+        image_tag: "golem/ray-on-golem:0.8.0-py3.10.13-ray2.9.2"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
@@ -83,6 +84,11 @@ file_mounts: {
   # "./relative/path/file.txt": "./file.txt"
 }
 
+# Satisfy checks to disable warning about legacy fields at `ray up`.
+# This will be removed by ray-on-golem on the fly.
+head_node: True
+worker_nodes: True
+
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
   ray.head.default:
@@ -95,7 +101,12 @@ available_node_types:
     # The node type's CPU and GPU resources
     resources: {}
 
-    node_config: {} # TODO: Demand description here
+    # Additional parameters specific for this node type added on top of node_config from provider.parameters.node_config
+    node_config: {}
+    #node_config:
+    #  demand:
+    #    min_mem_gib: 10
+
   ray.worker.default:
     min_workers: 1
     max_workers: 10
@@ -103,10 +114,10 @@ available_node_types:
     node_config: {}
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
+initialization_commands: []
 #initialization_commands: [
 #  "pip install endplay",
 #]
-initialization_commands: []
 
 # List of shell commands to run to set up nodes
 setup_commands: []

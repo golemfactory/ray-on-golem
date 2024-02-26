@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import logging.config
+import pathlib
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Dict, Optional
 
 import click
 import yaml
@@ -10,17 +11,36 @@ import yaml
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
-from ray_on_golem.server.settings import LOGGING_CONFIG, YAGNA_PATH
-from ray_on_golem.utils import prepare_tmp_dir
+from ray_on_golem.server.settings import DEFAULT_DATADIR, YAGNA_PATH, get_logging_config
+
+
+def validate_config_file(ctx, param, value):
+    with open(value) as file:
+        config = yaml.safe_load(file.read())
+
+    GolemNodeProvider._apply_config_defaults(config)
+
+    return config
+
+
+def validate_node_type(ctx, param, value):
+    node_types = ctx.params["cluster_config_file"]["available_node_types"]
+    if value not in node_types:
+        raise click.BadParameter(
+            f"Given node type `{value}` is not found in the config file! Available node types: `{'`, `'.join(node_types.keys())}`",
+        )
+
+    return value
 
 
 @click.command(
     name="network-stats",
     short_help="Run Golem Network statistics.",
-    help="Run Golem Network statistics based on given cluster config file.",
+    help="Run Golem Network statistics based on given cluster config file and node type.",
     context_settings={"show_default": True},
 )
-@click.argument("cluster-config-file", type=click.Path(exists=True))
+@click.argument("cluster-config-file", type=click.Path(exists=True), callback=validate_config_file)
+@click.argument("node-type", default="ray.head.default", callback=validate_node_type)
 @click.option(
     "-d",
     "--duration",
@@ -34,49 +54,62 @@ from ray_on_golem.utils import prepare_tmp_dir
     default=False,
     help="Enable verbose logging.",
 )
-def main(cluster_config_file: str, duration: int, enable_logging: bool):
+@click.option(
+    "--datadir",
+    type=pathlib.Path,
+    help=f"Ray on Golem's data directory. [default: {DEFAULT_DATADIR}"
+    " (unless `webserver_datadir` is defined in the cluster config file)]",
+)
+def main(*args, **kwargs):
+    asyncio.run(_network_stats(*args, **kwargs))
+
+
+async def _network_stats(
+    cluster_config_file: Dict,
+    node_type: str,
+    duration: int,
+    enable_logging: bool,
+    datadir: Optional[pathlib.Path],
+):
+    provider_params = cluster_config_file["provider"]["parameters"]
+
+    datadir = datadir or provider_params["webserver_datadir"]
+
     if enable_logging:
-        logging.config.dictConfig(LOGGING_CONFIG)
-
-    with open(cluster_config_file) as file:
-        config = yaml.safe_load(file.read())
-
-    GolemNodeProvider._apply_config_defaults(config)
-
-    asyncio.run(_network_stats(config, duration))
-
-
-async def _network_stats(config: Dict, duration: int):
-    provider_params = config["provider"]["parameters"]
+        logging.config.dictConfig(get_logging_config(datadir=datadir))
 
     async with network_stats_service(
         provider_params["enable_registry_stats"],
         provider_params["payment_network"],
         provider_params["payment_driver"],
+        datadir,
     ) as stats_service:
-        await stats_service.run(provider_params, duration)
+        await stats_service.run(cluster_config_file, node_type, duration)
 
 
 @asynccontextmanager
 async def network_stats_service(
-    registry_stats: bool, network: str, driver: str
+    registry_stats: bool,
+    network: str,
+    driver: str,
+    datadir: Optional[pathlib.Path],
 ) -> NetworkStatsService:
-    network_stats_service: NetworkStatsService = NetworkStatsService(registry_stats)
+    service = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
+        datadir=datadir,
     )
 
     await yagna_service.init()
     await yagna_service.run_payment_fund(network, driver)
 
-    await network_stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
+    await service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield network_stats_service
+    yield service
 
-    await network_stats_service.shutdown()
+    await service.shutdown()
     await yagna_service.shutdown()
 
 
 if __name__ == "__main__":
-    prepare_tmp_dir()
     main()

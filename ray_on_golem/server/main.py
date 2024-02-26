@@ -1,20 +1,26 @@
 import logging
 import logging.config
+import os
+from datetime import timedelta
+from pathlib import Path
+from typing import Optional
 
 import click
+import colorful
+import psutil
 from aiohttp import web
 
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
-    LOGGING_CONFIG,
-    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
-    TMP_PATH,
+    DEFAULT_DATADIR,
+    RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
     WEBSOCAT_PATH,
     YAGNA_PATH,
+    get_datadir,
+    get_logging_config,
 )
 from ray_on_golem.server.views import routes
-from ray_on_golem.utils import prepare_tmp_dir
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +38,7 @@ logger = logging.getLogger(__name__)
     help="Port for Ray on Golem's webserver to listen on.",
 )
 @click.option(
-    "--self-shutdown",
+    "--self-shutdown/--no-self-shutdown",
     is_flag=True,
     help="Enable self-shutdown after last node termination.",
 )
@@ -41,10 +47,16 @@ logger = logging.getLogger(__name__)
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-def main(port: int, self_shutdown: bool, registry_stats: bool):
-    logging.config.dictConfig(LOGGING_CONFIG)
+@click.option(
+    "--datadir",
+    type=Path,
+    default=DEFAULT_DATADIR,
+    help="Ray on Golem's data directory.",
+)
+def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
+    logging.config.dictConfig(get_logging_config(datadir))
 
-    app = create_application(port, self_shutdown, registry_stats)
+    app = create_application(port, self_shutdown, registry_stats, get_datadir(datadir))
 
     logger.info(f"Starting server... {port=}, {self_shutdown=}, {registry_stats=}")
 
@@ -53,7 +65,7 @@ def main(port: int, self_shutdown: bool, registry_stats: bool):
             app,
             port=app["port"],
             print=None,
-            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_DEADLINE.total_seconds(),
+            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT.total_seconds(),
         )
     except Exception:
         logger.info("Server unexpectedly died, bye!")
@@ -61,7 +73,12 @@ def main(port: int, self_shutdown: bool, registry_stats: bool):
         logger.info("Stopping server done, bye!")
 
 
-def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> web.Application:
+def create_application(
+    port: int,
+    self_shutdown: bool,
+    registry_stats: bool,
+    datadir: Path,
+) -> web.Application:
     app = web.Application(
         middlewares=[
             trace_id_middleware,
@@ -75,6 +92,7 @@ def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> 
 
     app["yagna_service"] = YagnaService(
         yagna_path=YAGNA_PATH,
+        datadir=datadir,
     )
 
     app["golem_service"] = GolemService(
@@ -86,7 +104,7 @@ def create_application(port: int, self_shutdown: bool, registry_stats: bool) -> 
         ray_on_golem_port=port,
         golem_service=app["golem_service"],
         yagna_service=app["yagna_service"],
-        tmp_path=TMP_PATH,
+        datadir=datadir,
     )
 
     app.add_routes(routes)
@@ -105,7 +123,7 @@ async def startup_print(app: web.Application) -> None:
 
 async def shutdown_print(app: web.Application) -> None:
     print("")  # explicit new line to console to visually better handle ^C
-    logger.info("Stopping server gracefully, forcing after `%s`...", RAY_ON_GOLEM_SHUTDOWN_DEADLINE)
+    logger.info("Stopping server gracefully, forcing after `%s`...", RAY_ON_GOLEM_SHUTDOWN_TIMEOUT)
 
 
 async def yagna_service_ctx(app: web.Application) -> None:
@@ -137,6 +155,166 @@ async def ray_service_ctx(app: web.Application) -> None:
     await ray_service.shutdown()
 
 
+@click.command(
+    help="Start Ray on Golem's webserver and the yagna daemon.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port for Ray on Golem's webserver to listen on.",
+)
+@click.option(
+    "--registry-stats/--no-registry-stats",
+    default=True,
+    help="Enable collection of Golem Registry stats about resolved images.",
+)
+@click.option(
+    "--datadir",
+    type=Path,
+    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
+)
+def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
+    from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
+
+    ctl = RayOnGolemCtl(
+        client=RayOnGolemClient(port),
+        output_logger=RayOnGolemCtlConsoleLogger(),
+        datadir=datadir,
+    )
+    ctl.start_webserver(
+        registry_stats=registry_stats,
+        self_shutdown=False,
+    )
+
+
+@click.command(
+    help="Stop Ray on Golem's webserver and the yagna daemon.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port on which Ray on Golem's webserver is listening.",
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Force the shutdown even if the webserver contains active nodes.",
+)
+@click.option(
+    "-k",
+    "--kill",
+    is_flag=True,
+    help="Kill the process if it fails to exit after shutdown.",
+)
+@click.option(
+    "--datadir",
+    type=Path,
+    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
+)
+def stop(port, force, kill, datadir):
+    from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger, RayOnGolemCtlError
+    from ray_on_golem.server.models import ShutdownState
+
+    ctl = RayOnGolemCtl(
+        client=RayOnGolemClient(port), output_logger=RayOnGolemCtlConsoleLogger(), datadir=datadir
+    )
+
+    shutdown_state = ctl.stop_webserver(
+        ignore_self_shutdown=True, shutdown_delay=timedelta(seconds=0)
+    )
+
+    if shutdown_state == ShutdownState.CLUSTER_NOT_EMPTY:
+        if force or click.confirm("Force the shutdown?"):
+            ctl.stop_webserver(
+                ignore_self_shutdown=True, force_shutdown=True, shutdown_delay=timedelta(seconds=0)
+            )
+        else:
+            click.echo("Shutdown cancelled.")
+            return
+
+    try:
+        ctl.wait_for_stop(starting_up=False)
+    except RayOnGolemCtlError as e:
+        click.echo(e)
+
+    process = ctl.get_process_info()
+    if not process:
+        click.echo("Shutdown completed.")
+        return
+
+    if not (kill or click.confirm("Terminate the webserver process?")):
+        click.echo("The webserver is still running...")
+        return
+
+    try:
+        process.kill()
+    except psutil.NoSuchProcess:
+        pass
+    ctl.clear_pid()
+    click.echo("Process terminated.")
+
+
+@click.command(
+    help="Show webserver status.",
+    context_settings={"show_default": True},
+)
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=4578,
+    help="Port on which Ray on Golem's webserver is listening.",
+)
+@click.option(
+    "--datadir",
+    type=Path,
+    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
+)
+def status(port, datadir):
+    from ray_on_golem.client import RayOnGolemClient
+    from ray_on_golem.ctl import RayOnGolemCtl
+    from ray_on_golem.ctl.log import RayOnGolemCtlConsoleLogger
+
+    client = RayOnGolemClient(port)
+    server_status = client.get_webserver_status()
+
+    if not colorful.terminal.detect_color_support(os.environ):
+        colorful.disable()
+
+    if not server_status:
+        print(f"The webserver doesn't seem to be listening on {client.base_url}.")
+        ctl = RayOnGolemCtl(
+            client=client, output_logger=RayOnGolemCtlConsoleLogger(), datadir=datadir
+        )
+        process = ctl.get_process_info()
+        if process:
+            print(f"However, the webserver seems to be running under pid: {process.pid}.")
+            print("You may use the `ray-on-golem stop` command to terminate it.")
+
+        return
+
+    print(colorful.cyan(f"Ray On Golem webserver {server_status.version}"))
+    print(
+        "   Listening on:   {url}\n"
+        "   Status:         {status}\n"
+        "   Data directory: {datadir}\n".format(
+            url=client.base_url,
+            status="Shutting down" if server_status.shutting_down else "Running",
+            datadir=server_status.datadir,
+        )
+    )
+
+
 if __name__ == "__main__":
-    prepare_tmp_dir()
     main()

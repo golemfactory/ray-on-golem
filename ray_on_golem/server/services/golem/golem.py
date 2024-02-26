@@ -2,28 +2,32 @@ import asyncio
 import hashlib
 import logging
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, Optional, Tuple
 
+from golem.exceptions import GolemException
 from golem.managers import (
     BlacklistProviderIdPlugin,
-    Buffer,
     DefaultAgreementManager,
     DefaultProposalManager,
     MapScore,
     MidAgreementPaymentsNegotiator,
     NegotiatingPlugin,
     PayAllPaymentManager,
+    PaymentManager,
     PaymentPlatformNegotiator,
+    ProposalBuffer,
+    ProposalScoringBuffer,
+    RandomScore,
     RefreshingDemandManager,
-    ScoringBuffer,
     WorkContext,
 )
+from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
-from golem.resources import Activity, Network, ProposalData
+from golem.resources import Activity, Network, Proposal, ProposalData
 from yarl import URL
 
 from ray_on_golem.server.models import NodeConfigData
@@ -52,6 +56,7 @@ class GolemService:
         self._yagna_appkey: Optional[str] = None
         self._stacks: Dict[str, ManagerStack] = {}
         self._stacks_locks = defaultdict(asyncio.Lock)
+        self._payment_manager: Optional[PaymentManager] = None
 
     async def init(self, yagna_appkey: str) -> None:
         logger.info("Starting GolemService...")
@@ -70,30 +75,39 @@ class GolemService:
     async def shutdown(self) -> None:
         logger.info("Stopping GolemService...")
 
-        await asyncio.gather(
-            *[self._remove_stack(stack_hash) for stack_hash in self._stacks.keys()]
-        )
+        await self.clear()
 
         await self._golem.aclose()
         self._golem = None
 
         logger.info("Stopping GolemService done")
 
-    # TODO: Remove stack when last activity was terminated instead of relying on self shutdown
+    # FIXME: Remove this method in case of multiple cluster support
+    async def clear(self) -> None:
+        await asyncio.gather(
+            *[self._remove_stack(stack_hash) for stack_hash in self._stacks.keys()]
+        )
+
+        if self._payment_manager:
+            await self._payment_manager.stop()
+            self._payment_manager = None
+
     async def _remove_stack(self, stack_hash: str) -> None:
+        logger.info(f"Removing stack `{stack_hash}`...")
+
         async with self._stacks_locks[stack_hash]:
-            # FIXME make sure to terminate running activities
             await self._stacks[stack_hash].stop()
 
             del self._stacks[stack_hash]
             del self._stacks_locks[stack_hash]
+
+        logger.info(f"Removing stack `{stack_hash}` done")
 
     async def _get_or_create_stack_from_node_config(
         self,
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
-        subnet_tag: str,
     ) -> ManagerStack:
         stack_hash = self._get_hash_from_node_config(node_config)
 
@@ -101,10 +115,10 @@ class GolemService:
             stack = self._stacks.get(stack_hash)
             if stack is None:
                 logger.info(
-                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}, {subnet_tag=}"
+                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}"
                 )
                 self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, total_budget, payment_network, subnet_tag
+                    node_config, total_budget, payment_network
                 )
                 await stack.start()
 
@@ -121,8 +135,13 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
-        subnet_tag: str,
     ) -> ManagerStack:
+        if not self._payment_manager:
+            self._payment_manager = PayAllPaymentManager(
+                self._golem, budget=total_budget, network=payment_network
+            )
+            await self._payment_manager.start()
+
         stack = ManagerStack()
 
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
@@ -167,15 +186,12 @@ class GolemService:
                 )
             )
 
-        stack.payment_manager = PayAllPaymentManager(
-            self._golem, budget=total_budget, network=payment_network
-        )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
-            stack.payment_manager.get_allocation,
+            self._payment_manager.get_allocation,
             payloads,
             demand_lifetime=demand_lifetime,
-            subnet_tag=subnet_tag,
+            subnet_tag=node_config.subnet_tag,
         )
         stack.proposal_manager = DefaultProposalManager(
             self._golem,
@@ -183,7 +199,7 @@ class GolemService:
             plugins=(
                 BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
                 *stack.extra_proposal_plugins.values(),
-                ScoringBuffer(
+                ProposalScoringBuffer(
                     min_size=50,
                     max_size=1000,
                     fill_at_start=True,
@@ -192,14 +208,21 @@ class GolemService:
                         MapScore(
                             partial(self._score_with_provider_data, payment_network=payment_network)
                         ),
+                        (0.1, RandomScore()),
                     ),
-                    update_interval=timedelta(seconds=10),
+                    scoring_debounce=timedelta(seconds=10),
+                    get_expiration_func=self._get_proposal_expiration,
                 ),
                 NegotiatingPlugin(
                     proposal_negotiators=proposal_negotiators,
                     proposal_response_timeout=DEFAULT_PROPOSAL_RESPONSE_TIMEOUT,
                 ),
-                Buffer(min_size=0, max_size=4, fill_concurrency_size=4),
+                ProposalBuffer(
+                    min_size=0,
+                    max_size=4,
+                    fill_concurrency_size=4,
+                    get_expiration_func=self._get_proposal_expiration,
+                ),
             ),
         )
         stack.agreement_manager = DefaultAgreementManager(
@@ -207,6 +230,9 @@ class GolemService:
         )
 
         return stack
+
+    async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
+        return await proposal.get_expiration_date() - datetime.now(timezone.utc)
 
     def _score_with_provider_data(
         self, proposal_data: ProposalData, payment_network: str
@@ -341,11 +367,10 @@ class GolemService:
         ssh_private_key_path: Path,
         total_budget: float,
         payment_network: str,
-        subnet_tag: str,
         add_state_log: Callable[[str], Awaitable[None]],
     ) -> Tuple[Activity, str, str]:
         stack = await self._get_or_create_stack_from_node_config(
-            node_config, total_budget, payment_network, subnet_tag
+            node_config, total_budget, payment_network
         )
 
         while True:
@@ -357,11 +382,12 @@ class GolemService:
                     ssh_private_key_path,
                     add_state_log=add_state_log,
                 )
-            except RuntimeError:
+            except (ManagerException,):
                 raise
-            except Exception:
-                msg = "Failed to create activity, retrying"
-                await add_state_log(msg)
+            except (GolemException,) as e:
+                msg = "Failed to create activity, retrying."
+                error = f"{type(e).__module__}.{type(e).__name__}: {e}"
+                await add_state_log(f"{msg} {error=}")
                 logger.warning(msg, exc_info=True)
 
     async def _create_activity(
@@ -376,12 +402,17 @@ class GolemService:
         logger.info(f"Creating new activity...")
 
         await add_state_log("[1/9] Getting agreement...")
-        agreement = await stack.agreement_manager.get_agreement()
+
+        try:
+            agreement = await stack.agreement_manager.get_agreement()
+        except Exception as e:
+            logger.error(f"Creating new activity failed with `{e}`")
+            raise
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
         await add_state_log(f"[2/9] Creating activity on provider: {provider_desc}...")
-        activity = await agreement.create_activity()
+        activity: Activity = await agreement.create_activity()
         try:
             await add_state_log("[3/9] Adding activity to internal VPN...")
             ip = await self._network.create_node(activity.parent.parent.data.issuer_id)
@@ -405,7 +436,8 @@ class GolemService:
             )
 
             await self._network.refresh_nodes()
-        except Exception:
+        except Exception as e:
+            logger.error(f"Creating new activity failed with `{type(e).__name__}: {e}`")
             await activity.destroy()
             raise
 
@@ -422,5 +454,5 @@ class GolemService:
         return network_url.with_scheme("ws") / "net" / self._network.id / "tcp" / ip
 
     def _get_ssh_proxy_command(self, connection_uri: URL) -> str:
-        # Using single quotes for JWT token as double quotes are causing problems with CLI character escaping in ray
+        # Using single quotes for the authentication token as double quotes are causing problems with CLI character escaping in ray
         return f"{self._websocat_path} asyncstdio: {connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"

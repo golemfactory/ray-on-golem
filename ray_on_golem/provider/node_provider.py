@@ -1,59 +1,53 @@
-import logging
-import subprocess
+import os
 import time
 from copy import deepcopy
 from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable, List, Optional
 
+import dpath.util
 from ray.autoscaler._private.cli_logger import cli_logger
 from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
 
-from ray_on_golem.client.client import RayOnGolemClient
-from ray_on_golem.log import ZippingRotatingFileHandler
+from ray_on_golem.client import RayOnGolemClient
+from ray_on_golem.ctl import RayOnGolemCtl
+from ray_on_golem.provider.log import NodeProviderCliLogger
 from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
-from ray_on_golem.server.models import NodeData, NodeId, NodeState, ShutdownState
+from ray_on_golem.server.models import NodeData, NodeId, NodeState
 from ray_on_golem.server.settings import (
-    LOGGING_BACKUP_COUNT,
-    LOGGING_DEBUG_PATH,
     PAYMENT_DRIVER_ERC20,
     PAYMENT_NETWORK_GOERLI,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
-    RAY_ON_GOLEM_CHECK_DEADLINE,
-    RAY_ON_GOLEM_PATH,
-    RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
-    RAY_ON_GOLEM_START_DEADLINE,
     TMP_PATH,
 )
-from ray_on_golem.utils import (
-    get_default_ssh_key_name,
-    get_last_lines_from_file,
-    is_running_on_golem_network,
-    prepare_tmp_dir,
-)
+from ray_on_golem.utils import get_default_ssh_key_name, is_running_on_golem_network
 from ray_on_golem.version import get_version
 
 LOG_GROUP = f"Ray On Golem {get_version()}"
 
+
 ONBOARDING_MESSAGE = {
     PAYMENT_NETWORK_MAINNET: "Running Ray on Golem on the Ethereum Mainnet requires GLM and ETH tokens.",
-    PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
+    PAYMENT_NETWORK_POLYGON: "Running Ray on Golem on the mainnet requires GLM and MATIC tokens "
+    "on the Polygon blockchain (see: https://docs.golem.network/docs/creators/ray/mainnet).",
 }
 
 PROVIDER_DEFAULTS = {
     "webserver_port": 4578,
+    "webserver_datadir": None,
     "enable_registry_stats": True,
     "payment_network": PAYMENT_NETWORK_GOERLI,
     "payment_driver": PAYMENT_DRIVER_ERC20,
-    "subnet_tag": "public",
+    "node_config": {
+        "subnet_tag": "public",
+    },
     "total_budget": 1.0,
 }
-
-logger = logging.getLogger(__name__)
 
 
 class GolemNodeProvider(NodeProvider):
@@ -62,9 +56,10 @@ class GolemNodeProvider(NodeProvider):
 
         provider_parameters: Dict = provider_config["parameters"]
 
-        self._ray_on_golem_client = self._get_ray_on_golem_client_instance(
-            provider_parameters["webserver_port"],
-            provider_parameters["enable_registry_stats"],
+        self._ray_on_golem_client = self._ensure_webserver_and_get_client(
+            port=provider_parameters["webserver_port"],
+            registry_stats=provider_parameters["enable_registry_stats"],
+            datadir=provider_parameters["webserver_datadir"],
         )
 
         provider_parameters = self._map_ssh_config(provider_parameters)
@@ -83,6 +78,35 @@ class GolemNodeProvider(NodeProvider):
         if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
+    @staticmethod
+    def fillout_available_node_types_resources(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
+        cluster_config.pop("head_node", None)
+        cluster_config.pop("worker_nodes", None)
+
+        return cluster_config
+
+    @classmethod
+    @lru_cache()
+    def _ensure_webserver_and_get_client(
+        cls,
+        port: int,
+        registry_stats: bool = True,
+        datadir: Optional[str] = None,
+    ) -> RayOnGolemClient:
+        if datadir:
+            datadir = Path(datadir)
+
+        client = RayOnGolemClient(port)
+        ctl = RayOnGolemCtl(client=client, output_logger=NodeProviderCliLogger(), datadir=datadir)
+
+        # consider starting the webserver only if this code is executed
+        # on a requestor agent and not inside the VM on a provider
+        if not is_running_on_golem_network():
+            with cli_logger.group(LOG_GROUP):
+                ctl.start_webserver(registry_stats, self_shutdown=True)
+
+        return client
+
     @classmethod
     def bootstrap_config(cls, cluster_config: Dict[str, Any]) -> Dict[str, Any]:
         config = deepcopy(cluster_config)
@@ -90,9 +114,10 @@ class GolemNodeProvider(NodeProvider):
         cls._apply_config_defaults(config)
 
         provider_parameters = config["provider"]["parameters"]
-        ray_on_golem_client = cls._get_ray_on_golem_client_instance(
-            provider_parameters["webserver_port"],
-            provider_parameters["enable_registry_stats"],
+        ray_on_golem_client = cls._ensure_webserver_and_get_client(
+            port=provider_parameters["webserver_port"],
+            registry_stats=provider_parameters["enable_registry_stats"],
+            datadir=provider_parameters["webserver_datadir"],
         )
         # TODO: SAVE wallet address
 
@@ -100,14 +125,19 @@ class GolemNodeProvider(NodeProvider):
         default_ssh_private_key = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
         if auth["ssh_private_key"] == str(default_ssh_private_key):
             if not default_ssh_private_key.exists():
-                ssh_key_base64 = ray_on_golem_client.get_or_create_default_ssh_key(
+                priv_base64, pub_base64 = ray_on_golem_client.get_or_create_default_ssh_key(
                     config["cluster_name"]
                 )
 
-                # FIXME: mitigate double file writing on local machine as get_or_create_default_ssh_key creates the file
                 default_ssh_private_key.parent.mkdir(parents=True, exist_ok=True)
+                pub_key_path = default_ssh_private_key.with_suffix(".pub")
                 with default_ssh_private_key.open("w") as f:
-                    f.write(ssh_key_base64)
+                    f.write(priv_base64)
+
+                os.chmod(default_ssh_private_key, 0o600)
+
+                with pub_key_path.open("w") as f:
+                    f.write(pub_base64)
 
         global_event_system.execute_callback(
             CreateClusterEvent.ssh_keypair_downloaded,
@@ -115,16 +145,6 @@ class GolemNodeProvider(NodeProvider):
         )
 
         return config
-
-    @classmethod
-    @lru_cache()
-    def _get_ray_on_golem_client_instance(cls, webserver_port: int, enable_registry_stats: bool):
-        ray_on_golem_client = RayOnGolemClient(webserver_port)
-
-        if not is_running_on_golem_network():
-            cls._start_webserver(ray_on_golem_client, webserver_port, enable_registry_stats)
-
-        return ray_on_golem_client
 
     def get_command_runner(
         self,
@@ -194,6 +214,14 @@ class GolemNodeProvider(NodeProvider):
                     cli_logger.success(f"All {count} requested nodes ready")
 
                     return monitored_nodes
+                elif all([node.state == NodeState.terminated for node in monitored_nodes.values()]):
+                    cli_logger.abort("All node requests failed!")
+
+                    return {}
+                elif any([node.state == NodeState.terminated for node in monitored_nodes.values()]):
+                    cli_logger.warning("Some node requests failed!")
+
+                    return monitored_nodes
 
                 time.sleep(5)
 
@@ -203,21 +231,20 @@ class GolemNodeProvider(NodeProvider):
         with cli_logger.group(group):
             for node in nodes:
                 for i in range(nodes_last_log_size[node.node_id], len(node.state_log) - 1):
-                    cli_logger.print((" " * (len(node.node_id) + 2)) + node.state_log[i])
+                    cli_logger.print(
+                        (" " * (len(node.node_id) + 2)) + node.state_log[i],
+                        no_format=True,
+                    )
 
                 try:
                     log = node.state_log[-1]
                 except IndexError:
                     log = "<none>"
 
-                cli_logger.labeled_value(node.node_id, log)
+                cli_logger.labeled_value(node.node_id, log, no_format=True)
 
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
-        terminated_nodes = self._ray_on_golem_client.terminate_node(node_id)
-
-        self._stop_webserver(self._ray_on_golem_client)
-
-        return terminated_nodes
+        return self._ray_on_golem_client.terminate_node(node_id)
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
         return self._ray_on_golem_client.non_terminated_nodes(tag_filters)
@@ -247,9 +274,23 @@ class GolemNodeProvider(NodeProvider):
 
     @staticmethod
     def _apply_config_defaults(config: Dict[str, Any]) -> None:
-        provider_parameters: Dict = config["provider"]["parameters"]
-        for k, v in PROVIDER_DEFAULTS.items():
-            provider_parameters.setdefault(k, v)
+        provider_parameters: Dict = deepcopy(PROVIDER_DEFAULTS)
+
+        dpath.util.merge(
+            provider_parameters,
+            config["provider"]["parameters"],
+        )
+
+        config["provider"]["parameters"] = provider_parameters
+
+        for node_type in config.get("available_node_types", {}).values():
+            node_config = deepcopy(config["provider"]["parameters"]["node_config"])
+            dpath.util.merge(
+                node_config,
+                node_type["node_config"],
+            )
+
+            node_type["node_config"] = node_config
 
         auth: Dict = config.setdefault("auth", {})
         auth.setdefault("ssh_user", "root")
@@ -263,128 +304,6 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
         provider_parameters["_ssh_user"] = auth["ssh_user"]
 
-    @classmethod
-    def _start_webserver(
-        cls,
-        ray_on_golem_client: RayOnGolemClient,
-        port: int,
-        registry_stats: bool,
-    ) -> None:
-        with cli_logger.group(LOG_GROUP):
-            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
-            if webserver_serviceable:
-                cli_logger.print("Not starting webserver, as it's already running")
-                return
-            elif webserver_serviceable is False:
-                cls._wait_for_shutdown(ray_on_golem_client)
-
-            cli_logger.print(
-                "Starting webserver with deadline up to `{}`...", RAY_ON_GOLEM_START_DEADLINE
-            )
-            args = [
-                RAY_ON_GOLEM_PATH,
-                "webserver",
-                "-p",
-                str(port),
-                "--registry-stats" if registry_stats else "--no-registry-stats",
-                "--self-shutdown",
-            ]
-
-            cli_logger.verbose("Webserver command: `{}`", " ".join([str(a) for a in args]))
-
-            log_file_path = LOGGING_DEBUG_PATH
-            prepare_tmp_dir()
-            debug_logger = ZippingRotatingFileHandler(
-                log_file_path, backupCount=LOGGING_BACKUP_COUNT
-            )
-            proc = subprocess.Popen(
-                args,
-                stdout=debug_logger.stream,
-                stderr=debug_logger.stream,
-                start_new_session=True,
-            )
-
-            start_deadline = datetime.now() + RAY_ON_GOLEM_START_DEADLINE
-            check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
-            while datetime.now() < start_deadline:
-                try:
-                    proc.communicate(timeout=check_seconds)
-                except subprocess.TimeoutExpired:
-                    if ray_on_golem_client.is_webserver_serviceable():
-                        cli_logger.print("Starting webserver done")
-                        return
-                else:
-                    cli_logger.abort(
-                        "Starting webserver failed!\nShowing last 50 lines from `{}`:\n{}",
-                        log_file_path,
-                        get_last_lines_from_file(log_file_path, 50),
-                    )
-
-                cli_logger.print(
-                    "Webserver is not yet running, waiting additional `{}` seconds...",
-                    check_seconds,
-                )
-
-            cli_logger.abort(
-                "Starting webserver failed! Deadline of `{}` reached.\nShowing last 50 lines from `{}`:\n{}",
-                RAY_ON_GOLEM_START_DEADLINE,
-                log_file_path,
-                get_last_lines_from_file(log_file_path, 50),
-            )
-
-    @staticmethod
-    def _stop_webserver(ray_on_golem_client: RayOnGolemClient) -> None:
-        with cli_logger.group(LOG_GROUP):
-            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
-            if not webserver_serviceable:
-                if webserver_serviceable is None:
-                    cli_logger.print("Not stopping the webserver, as it's not running")
-                else:
-                    cli_logger.print("Not stopping the webserver, as it's already shutting down")
-
-                return
-
-            cli_logger.print("Requesting webserver shutdown...")
-
-            shutdown_state = ray_on_golem_client.shutdown_webserver()
-
-            if shutdown_state == ShutdownState.NOT_ENABLED:
-                cli_logger.print("Not stopping webserver, as it was started externally")
-                return
-            elif shutdown_state == ShutdownState.CLUSTER_NOT_EMPTY:
-                cli_logger.print("Not stopping webserver, as the cluster is not empty")
-                return
-
-            cli_logger.print("Requesting webserver shutdown done, will stop soon")
-
-    @staticmethod
-    def _wait_for_shutdown(ray_on_golem_client: RayOnGolemClient) -> None:
-        cli_logger.print(
-            "Previous webserver instance is still shutting down, waiting with deadline up to `{}`...",
-            RAY_ON_GOLEM_SHUTDOWN_DEADLINE,
-        )
-
-        wait_deadline = datetime.now() + RAY_ON_GOLEM_SHUTDOWN_DEADLINE
-        check_seconds = int(RAY_ON_GOLEM_CHECK_DEADLINE.total_seconds())
-
-        time.sleep(check_seconds)
-        while datetime.now() < wait_deadline:
-            webserver_serviceable = ray_on_golem_client.is_webserver_serviceable()
-            if webserver_serviceable is None:
-                cli_logger.print("Previous webserver instance shutdown done")
-                return
-
-            cli_logger.print(
-                "Previous webserver instance is not yet shutdown, waiting additional `{}` seconds...",
-                check_seconds,
-            )
-            time.sleep(check_seconds)
-
-        cli_logger.abort(
-            "Previous webserver instance is still running! Deadline of `{}` reached.",
-            RAY_ON_GOLEM_START_DEADLINE,
-        )
-
     def _print_mainnet_onboarding_message(self, yagna_payment_status_output: str) -> None:
         if self._payment_network not in ONBOARDING_MESSAGE:
             return
@@ -392,12 +311,12 @@ class GolemNodeProvider(NodeProvider):
         cli_logger.newline()
 
         with cli_logger.indented():
-            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network))
+            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network), no_format=True)
             cli_logger.print("Your wallet:")
 
             with cli_logger.indented():
                 for line in yagna_payment_status_output.splitlines():
-                    cli_logger.print(line)
+                    cli_logger.print(line, no_format=True)
 
             cli_logger.newline()
             cli_logger.print(
@@ -408,6 +327,7 @@ class GolemNodeProvider(NodeProvider):
                 "is an EXPERIMENTAL product. Even though it is functional, "
                 "we do not recommend using it unless you wish to help us beta-test this feature. "
                 "You'll find more information on `#Payment UX` discord channel "
-                "https://discord.com/channels/684703559954333727/1136984764197380096"
+                "https://discord.com/channels/684703559954333727/1136984764197380096",
+                no_format=True,
             )
             cli_logger.newline()

@@ -7,16 +7,16 @@ from typing import Dict, Optional, Sequence
 
 from golem.managers import (
     BlacklistProviderIdPlugin,
-    Buffer,
     DefaultProposalManager,
     NegotiatingPlugin,
     PayAllPaymentManager,
     PaymentPlatformNegotiator,
+    ProposalBuffer,
     ProposalManagerPlugin,
+    ProposalScoringBuffer,
     RefreshingDemandManager,
-    ScoringBuffer,
 )
-from golem.managers.base import ProposalNegotiator
+from golem.managers.base import ManagerPluginException, PaymentManager, ProposalNegotiator
 from golem.node import GolemNode
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
@@ -75,9 +75,13 @@ class StatsNegotiatingPlugin(NegotiatingPlugin):
             )
         except ApiException as e:
             error_msg = re.sub(r"\[.*?\]", "[***]", str(e.body))
-            raise RuntimeError(f"Failed to send proposal response! {e.status}: {error_msg}") from e
+            raise ManagerPluginException(
+                f"Failed to send proposal response! {e.status}: {error_msg}"
+            ) from e
         except asyncio.TimeoutError as e:
-            raise RuntimeError(f"Failed to send proposal response! Request timed out") from e
+            raise ManagerPluginException(
+                f"Failed to send proposal response! Request timed out"
+            ) from e
 
 
 class StatsPluginFactory:
@@ -119,6 +123,8 @@ class NetworkStatsService:
 
         self._stats_plugin_factory = StatsPluginFactory()
 
+        self._payment_manager: Optional[PaymentManager] = None
+
     async def init(self, yagna_appkey: str) -> None:
         logger.info("Starting NetworkStatsService...")
 
@@ -136,16 +142,17 @@ class NetworkStatsService:
 
         logger.info("Stopping NetworkStatsService done")
 
-    async def run(self, provider_parameters: Dict, duration_minutes: int) -> None:
+    async def run(self, config: Dict, node_type: str, duration_minutes: int) -> None:
+        provider_parameters: Dict = config["provider"]["parameters"]
+
         payment_network: str = provider_parameters["payment_network"]
         total_budget: float = provider_parameters["total_budget"]
-        subnet_tag: str = provider_parameters["subnet_tag"]
-        node_config: NodeConfigData = NodeConfigData(**provider_parameters["node_config"])
+        node_config = NodeConfigData(**config["available_node_types"][node_type]["node_config"])
 
-        stack = await self._create_stack(node_config, total_budget, payment_network, subnet_tag)
+        stack = await self._create_stack(node_config, total_budget, payment_network)
         await stack.start()
 
-        print(f"Gathering stats data for {duration_minutes} minutes...")
+        print(f"Gathering stats data for {duration_minutes} minutes for `{node_type}`...")
         consume_proposals_task = asyncio.create_task(self._consume_draft_proposals(stack))
         try:
             await asyncio.wait(
@@ -157,6 +164,8 @@ class NetworkStatsService:
             await consume_proposals_task
 
             await stack.stop()
+            await self._payment_manager.stop()
+            self._payment_manager = None
             print("Gathering stats data done")
             self._stats_plugin_factory.print_gathered_stats()
 
@@ -180,8 +189,13 @@ class NetworkStatsService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
-        subnet_tag: str,
     ) -> ManagerStack:
+        if not self._payment_manager:
+            self._payment_manager = PayAllPaymentManager(
+                self._golem, budget=total_budget, network=payment_network
+            )
+            await self._payment_manager.start()
+
         stack = ManagerStack()
 
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
@@ -191,15 +205,12 @@ class NetworkStatsService:
         ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
 
-        stack.payment_manager = PayAllPaymentManager(
-            self._golem, budget=total_budget, network=payment_network
-        )
         stack.demand_manager = RefreshingDemandManager(
             self._golem,
-            stack.payment_manager.get_allocation,
+            self._payment_manager.get_allocation,
             payloads,
             demand_lifetime=timedelta(hours=8),
-            subnet_tag=subnet_tag,
+            subnet_tag=node_config.subnet_tag,
         )
 
         plugins = [
@@ -214,17 +225,17 @@ class NetworkStatsService:
 
         plugins.extend(
             [
-                ScoringBuffer(
+                ProposalScoringBuffer(
                     min_size=500,
                     max_size=1000,
                     fill_at_start=True,
                     proposal_scorers=(*stack.extra_proposal_scorers.values(),),
-                    update_interval=timedelta(seconds=10),
+                    scoring_debounce=timedelta(seconds=10),
                 ),
                 self._stats_plugin_factory.create_counter_plugin("Negotiation initialized"),
                 self._stats_plugin_factory.create_negotiating_plugin(),
                 self._stats_plugin_factory.create_counter_plugin("Negotiated successfully"),
-                Buffer(min_size=800, max_size=1000, fill_concurrency_size=16),
+                ProposalBuffer(min_size=800, max_size=1000, fill_concurrency_size=16),
             ]
         )
         stack.proposal_manager = DefaultProposalManager(

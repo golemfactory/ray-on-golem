@@ -9,26 +9,26 @@ from typing import Dict
 from aiohttp.web_runner import GracefulExit
 
 from ray_on_golem.exceptions import RayOnGolemError
-from ray_on_golem.server.settings import TMP_PATH
 
 
 async def run_subprocess(
-    *args, stderr=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL
+    *args,
+    stderr=asyncio.subprocess.DEVNULL,
+    stdout=asyncio.subprocess.DEVNULL,
+    detach=False,
 ) -> Process:
     process = await asyncio.create_subprocess_exec(
         *args,
         stderr=stderr,
         stdout=stdout,
-        # As this process lifetime will be fully managed, we need to disable signal propagation
-        # from parent to child process https://stackoverflow.com/a/5446982/1993670
-        preexec_fn=os.setpgrp,
+        start_new_session=detach,
     )
 
     return process
 
 
 async def run_subprocess_output(*args) -> bytes:
-    process = await asyncio.create_subprocess_exec(
+    process = await run_subprocess(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -54,6 +54,7 @@ def are_dicts_equal(dict1: Dict, dict2: Dict) -> bool:
 
 
 def is_running_on_golem_network() -> bool:
+    """Detect if this code is being executed inside a VM on a provider node."""
     return os.getenv("ON_GOLEM_NETWORK") is not None
 
 
@@ -68,10 +69,3 @@ def raise_graceful_exit() -> None:
 def get_last_lines_from_file(file_path: Path, max_lines: int) -> str:
     with file_path.open() as file:
         return "".join(deque(file, max_lines))
-
-
-def prepare_tmp_dir():
-    try:
-        TMP_PATH.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        pass
