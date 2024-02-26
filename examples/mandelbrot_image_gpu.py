@@ -16,11 +16,8 @@ class ScrCoords(NamedTuple):
     y: int
 
 
-@numba.jit(nopython=False)
-def calculate_mandel_cpu(
+def calculate_mandel(
     buffer: np.array,
-    tgt_range_x: Tuple[int, int],
-    tgt_range_y: Tuple[int, int],
     space_x: np.linspace,
     space_y: np.linspace,
     max_iter: int,
@@ -38,24 +35,30 @@ def calculate_mandel_cpu(
 
         return np.uint8(i / max_iter * vscale)
 
-    for ys in range(tgt_range_y[0], tgt_range_y[1]):
-        for xs in range(tgt_range_x[0], tgt_range_x[1]):
+    for ys in range(len(space_y)):
+        for xs in range(len(space_x)):
             c = complex(space_x[xs], space_y[ys])
-            buffer[ys - tgt_range_y[0], xs - tgt_range_x[0]] = mandel(c)
+            buffer[ys, xs] = mandel(c)
 
 
-def calculate_mandel(
+def calculate_mandel_chunk(
     tgt_range_x: Tuple[int, int],
     tgt_range_y: Tuple[int, int],
     space_x: np.linspace,
     space_y: np.linspace,
     max_iter: int,
+    f,
 ):
     tgt_size_x = tgt_range_x[1] - tgt_range_x[0]
     tgt_size_y = tgt_range_y[1] - tgt_range_y[0]
     buffer = np.zeros((tgt_size_y, tgt_size_x), dtype=np.uint8)
     print(f"starting chunk: {tgt_range_x}, {tgt_range_y}")
-    calculate_mandel_cpu(buffer, tgt_range_x, tgt_range_y, space_x, space_y, max_iter)
+    f(
+        buffer,
+        space_x[tgt_range_x[0]:tgt_range_x[1]],
+        space_y[tgt_range_y[0]:tgt_range_y[1]],
+        max_iter
+    )
     print(f"finalized chunk: {tgt_range_x}, {tgt_range_y}")
     return buffer
 
@@ -73,6 +76,8 @@ def draw_mandelbrot(
 
     chunk_size = math.ceil(size.y / num_chunks)
 
+    calculate_mandel_func = numba.jit(nopython=False)(calculate_mandel)
+
     for c in range(0, num_chunks):
         start_y = c * chunk_size
         end_y = min(start_y + chunk_size, size.y)
@@ -86,8 +91,9 @@ def draw_mandelbrot(
             np.linspace(x_range[0], x_range[1], size.x),
             np.linspace(y_range[0], y_range[1], size.y),
             max_iter,
+            calculate_mandel_func,
         )
-        f = ray.remote(calculate_mandel).remote if use_ray else calculate_mandel
+        f = ray.remote(calculate_mandel_chunk).remote if use_ray else calculate_mandel_chunk
 
         print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args[0], calc_args[1]})")
         chunks.append(f(*calc_args))

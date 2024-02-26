@@ -13,11 +13,13 @@ provider:
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
-        image_tag: "blueshade/raytest:nvidia-test"
+        image_tag: "blueshade/raytest:nvidia-test0.9.2"
         outbound_urls: []
         runtime: "vm-nvidia"
       subnet_tag: "ray"
       priority_head_subnet_tag: "ray"
+    payment_network: "holesky"
+    payment_driver: "erc20next"
 
 file_mounts: {
   # <remote_path>: <local_path>
