@@ -1,5 +1,4 @@
-ARG PYTHON_VERSION
-FROM python:${PYTHON_VERSION}-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
 		openssh-server \
@@ -20,7 +19,13 @@ RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
 	echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
 	echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
 
-RUN pip install -U pip
+RUN wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-py310_23.11.0-2-Linux-x86_64.sh
+RUN bash miniconda.sh -b -u
+ENV PATH="/root/miniconda3/bin:${PATH}"
+RUN bash -c "echo 'PATH=/root/miniconda3/bin:${PATH}' >> /root/.bashrc"
+RUN conda install -y cudatoolkit
+
+RUN pip install wheel setuptools typing-extensions
 
 WORKDIR /app
 
@@ -31,17 +36,8 @@ RUN pip install poetry && \
 	poetry config virtualenvs.create false
 RUN poetry install --no-interaction --no-ansi --only ray
 
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb
-RUN dpkg -i cuda-keyring_1.1-1_all.deb
-#RUN add-apt-repository contrib
-RUN apt-get update
-RUN apt-get -y install cuda-toolkit-12-3
-
-RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 RUN pip install pillow
-RUN pip install cuda-python
 RUN pip install numpy numba
-
-
+RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
 COPY ray_on_golem /app/ray_on_golem/
