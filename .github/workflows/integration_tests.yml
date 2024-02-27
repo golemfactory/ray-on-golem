@@ -1,0 +1,89 @@
+name: Integration tests
+
+on:
+  workflow_call:
+
+jobs:
+  examples:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - example_name: calculate_pi
+
+#          - example_name: dds-with-ray
+
+          - example_name: hash_cracker_ray_ready
+            args: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+
+          - example_name: mandelbrot_image
+            base_yaml_path: examples/mandelbrot-golem-cluster.yaml
+
+#          - example_name: outbound
+#            base_yaml_path: examples/outbound.yaml
+#
+#          - example_name: outbound_tester
+#            base_yaml_path: examples/outbound_tester.yaml
+
+          - example_name: simple-actor
+
+          - example_name: simple-task
+
+    name: Example ${{ matrix.example_name }} (goth)
+    runs-on: goth2
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start Goth
+        env:
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: ./tests/integration/start-goth.sh
+
+      - name: Install poetry
+        uses: Gr1N/setup-poetry@v9
+
+      - name: Install dependencies
+        run: poetry install --no-ansi
+
+      - name: Prepare `golem-cluster.tests.yaml`
+        run: |
+          cat /etc/hosts
+          cat /etc/hostname
+          poetry run python -m utils.apply_overrides -b ${{ matrix.base_yaml_path || './golem-cluster.yaml' }} -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override-goth.yaml
+          cat golem-cluster.tests.yaml 
+
+      - name: Call `ray up`
+        env:
+          PYTHONUNBUFFERED: 1
+          RUST_LOG: "INFO,ya_erc20_driver::erc20::wallet=debug"
+        run: poetry run ray up golem-cluster.tests.yaml -y --no-config-cache
+
+      - name: Run `examples/${{ matrix.example_name }}.py`
+        run: poetry run ray submit golem-cluster.tests.yaml examples/${{ matrix.example_name }}.py -- ${{ matrix.args }}
+
+      - name: Print last cluster logs
+        if: always()
+        continue-on-error: true
+        run: |
+          poetry run ray exec golem-cluster.tests.yaml 'ls /tmp/ray/session_latest/logs/'
+          poetry run ray exec golem-cluster.tests.yaml 'tail -n 100 /tmp/ray/session_latest/logs/*'
+
+      - name: Call `ray down`
+        run: poetry run ray down golem-cluster.tests.yaml -y
+
+      - name: Call `ray-on-golem stop`
+        run: poetry run ray-on-golem stop
+
+      - name: Collects logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-example-${{ matrix.example_name }}
+          path: |
+            /root/.local/share/ray_on_golem/webserver_debug.log
+            /root/.local/share/ray_on_golem/yagna.log
+            /tmp/goth-tests

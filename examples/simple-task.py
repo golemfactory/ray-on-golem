@@ -28,7 +28,7 @@ output_cluster_info()
 def f():
     time.sleep(0.5)
 
-    return socket.gethostbyname(socket.gethostname())
+    return socket.gethostname()
 
 
 # get the number of remote calls from the command line
