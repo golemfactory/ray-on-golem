@@ -1,6 +1,7 @@
 import argparse
 import math
 import numba
+from numba import cuda
 import numpy as np
 from datetime import datetime, timezone
 from typing import NamedTuple, Optional, Tuple
@@ -9,6 +10,8 @@ import ray
 from PIL import Image
 
 ZOOM_BASE = 2.0
+VSCALE = np.uint8(255)
+NUM_GPUS = 0.1
 
 
 class ScrCoords(NamedTuple):
@@ -16,14 +19,12 @@ class ScrCoords(NamedTuple):
     y: int
 
 
-def calculate_mandel(
+def calculate_mandel_gpu(
     buffer: np.array,
-    space_x: np.linspace,
-    space_y: np.linspace,
-    max_iter: int,
+    start_x: np.float64, end_x: np.float64, x_size: np.uint,
+    start_y: np.float64, end_y: np.float64, y_size: np.uint,
+    max_iter: np.uint,
 ) -> np.array:
-    max_iter = np.uint(max_iter)
-    vscale = np.uint8(255)
 
     def mandel(c: complex) -> np.uint8:
         z = complex(0, 0)
@@ -33,12 +34,39 @@ def calculate_mandel(
             z = z * z + c
             i += 1
 
-        return np.uint8(i / max_iter * vscale)
+        return np.uint8(i / max_iter * VSCALE)
 
-    for ys in range(len(space_y)):
-        for xs in range(len(space_x)):
-            c = complex(space_x[xs], space_y[ys])
-            buffer[ys, xs] = mandel(c)
+    x_step = (end_x - start_x) / x_size
+    y_step = (end_y - start_y) / y_size
+    xs, ys = cuda.grid(2)
+    buffer[ys, xs] = mandel(complex(start_x + xs * x_step, start_y + ys * y_step))
+
+
+def calculate_mandel_cpu(
+    buffer: np.array,
+    start_x: np.float64, end_x: np.float64, x_size: np.uint,
+    start_y: np.float64, end_y: np.float64, y_size: np.uint,
+    max_iter: np.uint,
+) -> np.array:
+
+    def mandel(c: complex) -> np.uint8:
+        z = complex(0, 0)
+        i = np.uint(0)
+
+        while abs(z) < 2 and i < max_iter:
+            z = z * z + c
+            i += 1
+
+        return np.uint8(i / max_iter * VSCALE)
+
+    x_step = (end_x - start_x) / x_size
+    y_step = (end_y - start_y) / y_size
+
+    for ys in range(y_size):
+        y = start_y + ys * y_step
+        for xs in range(x_size):
+            x = start_x + xs * x_step
+            buffer[ys, xs] = mandel(complex(x, y))
 
 
 def calculate_mandel_chunk(
@@ -47,18 +75,27 @@ def calculate_mandel_chunk(
     space_x: np.linspace,
     space_y: np.linspace,
     max_iter: int,
-    f,
+    use_gpu: bool,
 ):
     tgt_size_x = tgt_range_x[1] - tgt_range_x[0]
     tgt_size_y = tgt_range_y[1] - tgt_range_y[0]
     buffer = np.zeros((tgt_size_y, tgt_size_x), dtype=np.uint8)
     print(f"starting chunk: {tgt_range_x}, {tgt_range_y}")
-    f(
+
+    if use_gpu:
+        block = (32, 32)
+        grid = (math.ceil(tgt_size_x / block[0]), math.ceil(tgt_size_y / block[1]))
+        mandel_func = cuda.jit(calculate_mandel_gpu)[grid, block]
+    else:
+        mandel_func = numba.jit(nopython=False)(calculate_mandel_cpu)
+
+    mandel_func(
         buffer,
-        space_x[tgt_range_x[0]:tgt_range_x[1]],
-        space_y[tgt_range_y[0]:tgt_range_y[1]],
-        max_iter
+        space_x[tgt_range_x[0]], space_x[tgt_range_x[1] - 1], tgt_size_x,
+        space_y[tgt_range_y[0]], space_y[tgt_range_y[1] - 1], tgt_size_y,
+        np.uint(max_iter),
     )
+
     print(f"finalized chunk: {tgt_range_x}, {tgt_range_y}")
     return buffer
 
@@ -71,12 +108,11 @@ def draw_mandelbrot(
     num_chunks: int = 1,
     output_file: Optional[str] = None,
     use_ray: bool = True,
+    use_gpu: bool = False,
 ):
     chunks = list()
 
     chunk_size = math.ceil(size.y / num_chunks)
-
-    calculate_mandel_func = numba.jit(nopython=False)(calculate_mandel)
 
     for c in range(0, num_chunks):
         start_y = c * chunk_size
@@ -91,9 +127,14 @@ def draw_mandelbrot(
             np.linspace(x_range[0], x_range[1], size.x),
             np.linspace(y_range[0], y_range[1], size.y),
             max_iter,
-            calculate_mandel_func,
+            use_gpu,
         )
-        f = ray.remote(calculate_mandel_chunk).remote if use_ray else calculate_mandel_chunk
+        if not use_ray:
+            f = calculate_mandel_chunk
+        elif not use_gpu:
+            f = ray.remote(calculate_mandel_chunk).remote
+        else:
+            f = ray.remote(num_gpus=NUM_GPUS)(calculate_mandel_chunk).remote
 
         print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args[0], calc_args[1]})")
         chunks.append(f(*calc_args))
@@ -190,7 +231,11 @@ def argument_parser():
     parser.add_argument(
         "-R", "--no-use-ray", dest="use_ray", action="store_false", help="don't use ray"
     )
-    parser.set_defaults(use_ray=True)
+    parser.add_argument("-g", "--use-gpu", action="store_true", help="use GPU")
+    parser.add_argument(
+        "-G", "--no-use-gpu", dest="use_gpu", action="store_false", help="don't use GPU"
+    )
+    parser.set_defaults(use_ray=True, use_gpu=False)
 
     return parser
 
@@ -221,6 +266,7 @@ draw_mandelbrot(
     num_chunks=args.num_chunks,
     output_file=args.output_file,
     use_ray=args.use_ray,
+    use_gpu=args.use_gpu,
 )
 
 print(f"{datetime.now()}: finished. elapsed time: {datetime.now() - start}")
