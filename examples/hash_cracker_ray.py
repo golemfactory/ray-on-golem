@@ -32,8 +32,6 @@ CHARS = [
     )
 ]
 
-start_time = datetime.now()
-
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "-l", "--length", type=int, default=3, help="brute force length, default: %(default)s"
@@ -109,6 +107,8 @@ def scan_range(searched_hash: str, start: int, end: int):
             if word_hash == searched_hash:
                 return word
 
+
+start_time = datetime.now()
 
 ray.init()
 
