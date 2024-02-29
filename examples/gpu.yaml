@@ -1,0 +1,58 @@
+# Ray on Golem cluster name
+cluster_name: gpu-cluster
+
+# The maximum number of workers the cluster will have at any given time
+max_workers: 10
+
+# The cloud provider-specific configuration properties.
+provider:
+  type: "external"
+  use_internal_ips: true
+  module: "ray_on_golem.provider.node_provider.GolemNodeProvider"
+  parameters:
+    node_config:
+      # Parameters for golem demands (same for head and workers)
+      demand:
+        image_tag: "blueshade/raytest:0.9.0-py3.10-ray2.9.2-cuda11.8"
+        outbound_urls: []
+        runtime: "vm-nvidia"
+      subnet_tag: "ray"
+
+file_mounts: {
+  # <remote_path>: <local_path>
+}
+
+# Tells the autoscaler the allowed node types and the resources they provide
+available_node_types:
+  ray.head.default:
+    resources: {}
+    node_config: {}
+
+  ray.worker.default:
+    resources: {}
+    node_config: {}
+
+# List of commands that will be run to initialize the nodes (before `setup_commands`)
+initialization_commands: []
+
+# List of shell commands to run to set up nodes
+setup_commands: []
+
+# Custom commands that will be run on the head node after common setup.
+head_setup_commands: []
+
+# Custom commands that will be run on worker nodes after common setup.
+worker_setup_commands: []
+
+# Command to start ray on the head node. You don't need to change this.
+head_start_ray_commands: [
+  "ray start --head --node-ip-address $NODE_IP --include-dashboard=True --dashboard-host 0.0.0.0 --disable-usage-stats --autoscaling-config=~/ray_bootstrap_config.yaml",
+]
+
+# Command to start ray on worker nodes. You don't need to change this.
+worker_start_ray_commands: [
+  "ray start --address $RAY_HEAD_IP:6379",
+]
+
+# A list of paths to the files or directories to copy from the head node to the worker nodes
+cluster_synced_files: []
