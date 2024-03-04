@@ -7,7 +7,7 @@ import yaml
 
 from .yaml import load_yamls
 
-BASE_YAML: Final = Path("golem-cluster.mini.yaml")
+BASE_YAML: Final = Path("golem-cluster.yaml")
 LOCAL_OVERRIDE_YAML: Final = Path("golem-cluster.local.yaml")
 
 

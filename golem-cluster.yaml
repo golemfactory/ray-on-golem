@@ -1,6 +1,7 @@
-# This is Ray on Golem Mainnet yaml 
-# - the example config for mainnet cluster, 
-# with properties allowing fine-tuning
+# This is Ray on Golem Example yaml 
+# - the example config for testnet cluster, 
+# - ready for easy switch to mainnet
+# - with properties allowing fine-tuning
 
 # Ray on Golem cluster name
 cluster_name: golem-cluster
@@ -9,7 +10,7 @@ cluster_name: golem-cluster
 max_workers: 10
 
 # The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
-idle_timeout_minutes: 2
+#idle_timeout_minutes: 2
 
 # The cloud provider-specific configuration properties.
 provider:
@@ -21,11 +22,11 @@ provider:
     # Blockchain used for payments.
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
-    #payment_network: "goerli"
-    payment_network: "polygon"
+    payment_network: "goerli"
+    #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
-    total_budget: 5
+    #total_budget: 5
 
     # Common parameters for all node types. Can be overriden in available_node_types
     node_config:
@@ -40,12 +41,12 @@ provider:
         #outbound_urls: ["https://pypi.dev.golem.network"]
 
         # Minimal values of parameters offered by Golem provider 
-        min_mem_gib: 1
-        min_cpu_threads: 1
-        min_storage_gib: 1
+        #min_mem_gib: 1
+        #min_cpu_threads: 1
+        #min_storage_gib: 1
 
         # Maximal values of parameters offered by Golem provider
-        max_cpu_threads: null
+        #max_cpu_threads: null
 
       budget_control:
         per_cpu_expected_usage:
@@ -56,32 +57,32 @@ provider:
         
           # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
           # If not provided, offers will be picked at random.
-          cpu_load: 0.8
-          duration_hours: 0.5 # 30 minutes
+          #cpu_load: 0.8
+          #duration_hours: 0.5 # 30 minutes
 
           # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
-          max_cost: 1.5
+          #max_cost: 1.5
 
         # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
-        max_start_price: 0.5
+        #max_start_price: 0.5
 
         # Amount of GLMs for CPU utilisation per hour which Golem provider offer will be rejected if exceeded.
-        max_cpu_per_hour_price: 0.5
+        #max_cpu_per_hour_price: 0.5
 
         # Amount of GLMs for each hour that worker runs which Golem provider offer will be rejected if exceeded.
-        max_env_per_hour_price: 0.5
+        #max_env_per_hour_price: 0.5
 
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
   ray.head.default:
     # The minimum number of worker nodes of this type to launch
-    min_workers: 0
+    #min_workers: 0
 
     # The maximum number of worker nodes of this type to launch
-    max_workers: 0
+    #max_workers: 0
 
-    # The node type's CPU and GPU resources
+    # The node type's CPU and GPU resources - leave it empty for autodetection
     resources: {}
 
     # Additional parameters specific for this node type added on top of node_config from provider.parameters.node_config
@@ -137,3 +138,4 @@ worker_start_ray_commands: [
 # This will be removed by ray-on-golem on the fly.
 head_node: True
 worker_nodes: True
+
