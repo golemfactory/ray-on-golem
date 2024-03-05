@@ -65,6 +65,7 @@ class DemandConfigHelper:
             list(set([url.scheme for url in demand_config.outbound_urls])),
             demand_config.outbound_urls,
         )
+        logger.debug("Generated manifest:  %s", str(manifest))
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
         params = demand_config.dict(
