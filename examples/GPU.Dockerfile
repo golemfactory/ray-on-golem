@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 		rsync \
 		vim \
 		curl \
-        wget \
+		wget \
 	&& rm -rf /var/lib/apt/lists/*
 
 RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \

@@ -13,7 +13,7 @@ provider:
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
-        image_tag: "blueshade/raytest:0.9.0-py3.10-ray2.9.2-cuda11.8"
+        image_tag: "blueshade/ray-on-golem:0.9.0-dev-py3.10-ray2.9.2-cuda11.8"
         outbound_urls: []
         runtime: "vm-nvidia"
       subnet_tag: "ray"
