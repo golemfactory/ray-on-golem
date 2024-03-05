@@ -7,9 +7,9 @@ from typing import Dict, Optional, Sequence
 
 from golem.managers import (
     BlacklistProviderIdPlugin,
+    DefaultPaymentManager,
     DefaultProposalManager,
     NegotiatingPlugin,
-    PayAllPaymentManager,
     PaymentPlatformNegotiator,
     ProposalBuffer,
     ProposalManagerPlugin,
@@ -211,7 +211,7 @@ class NetworkStatsService:
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            self._payment_manager = PayAllPaymentManager(
+            self._payment_manager = DefaultPaymentManager(
                 self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()

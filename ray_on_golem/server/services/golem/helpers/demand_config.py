@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MaxCpuThreadsPayload(Payload):
-    max_cpu_threads: int = constraint(defaults.INF_CPU_THREADS, "<=", default=None)
+    max_cpu_threads: int = constraint(defaults.PROP_INF_CPU_THREADS, "<=", default=None)
 
 
 class DemandConfigHelper:
