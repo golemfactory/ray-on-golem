@@ -1,8 +1,4 @@
 #!/bin/bash
-echo CLEANUP DOCKER
-docker rm --force $(docker ps -a -q)
-sudo systemctl restart docker
-
 echo LOGIN TO GHCR.IO
 echo $GITHUB_API_TOKEN | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
 
