@@ -157,3 +157,30 @@ def get_logging_config(datadir: Optional[Path] = None):
             },
         },
     }
+
+def get_reputation_db_config(datadir: Optional[Path] = None):
+    db_dir = get_datadir(datadir) / "db"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    migrations_dir = Path(__file__).parent / "services" / "reputation" / "migrations"
+
+    db_file = db_dir / "reputation.sqlite3"
+
+    models_path = "ray_on_golem.server.services.reputation.models"
+
+    tortoise_config = {
+        "connections": {
+            "default": f"sqlite://{db_file.resolve()}",
+        },
+        "apps": {
+            "models": {
+                "models": [models_path, "aerich.models"],
+                "default_connection": "default",
+            }
+        }
+    }
+    aerich_config = {
+        "tortoise_config": tortoise_config,
+        "location": str(migrations_dir.resolve()),
+        "app": "models",
+    }
+    return {"db": tortoise_config, "migrations": aerich_config}

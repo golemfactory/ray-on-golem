@@ -25,6 +25,8 @@ websocat = "^1.12.0"
 golem-node = "0.14.0"
 
 setuptools = "*"
+tortoise-orm = "^0.20.0"
+aerich = "^0.7.2"
 
 [tool.poetry.group.ray.dependencies]
 python = "^3.8.1"
