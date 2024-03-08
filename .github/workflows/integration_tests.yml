@@ -82,6 +82,9 @@ jobs:
       - name: Call `ray-on-golem stop`
         run: poetry run ray-on-golem stop
 
+      - name: Stop Goth
+        run: ./.github/workflows/stop-goth.sh
+
       - name: Collects logs
         if: always()
         uses: actions/upload-artifact@v4
