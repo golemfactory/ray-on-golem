@@ -14,7 +14,6 @@ jobs:
         include:
           - example_name: calculate_pi
 
-
           - example_name: hash_cracker_ray_ready
             args: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
 
@@ -27,10 +26,10 @@ jobs:
 
           # Commented out as Goth does not support outbound yet
           # - example_name: dds-with-ray
-          #  - example_name: outbound
-          #    base_yaml_path: examples/outbound.yaml
-          #  - example_name: outbound_tester
-          #    base_yaml_path: examples/outbound_tester.yaml
+          # - example_name: outbound
+          #   base_yaml_path: examples/outbound.yaml
+          # - example_name: outbound_tester
+          #   base_yaml_path: examples/outbound_tester.yaml
 
     name: Example ${{ matrix.example_name }} (goth)
     runs-on: goth2

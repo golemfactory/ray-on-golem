@@ -11,9 +11,10 @@ jobs:
   code_tests:
     name: Code checks
     uses: ./.github/workflows/code_tests.yml
-#  integration_tests:
-#    name: Integration tests
-#    uses: ./.github/workflows/integration_tests.yml
+# FIXME: Enable integration tests when they became stable
+  integration_tests:
+    name: Integration tests
+    uses: ./.github/workflows/integration_tests.yml
   smoke_tests:
     name: Smoke tests
     uses: ./.github/workflows/smoke_tests.yml

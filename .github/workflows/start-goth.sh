@@ -32,7 +32,7 @@ echo STARTING NETWORK
 cat .envs/goth/assets/goth-config.yml
 python -m goth start .envs/goth/assets/goth-config.yml &
 GOTH_PID=$!
-echo $GOTH_PID
+echo "GOTH_PID=$GOTH_PID" | tee "$GITHUB_ENV"
 
 echo WAITING FOR NETWORK
 STARTED_WAITING_AT=$((SECONDS + 900))

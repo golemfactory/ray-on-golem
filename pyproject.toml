@@ -23,7 +23,7 @@ appdirs = "^1.4.4"
 
 websocat = "^1.12.0"
 golem-node = "0.14.0"
-#golem-node = {version = "0.15.0a18", source = "test"}
+#golem-node = {version = "0.15.0a18", source = "test-pypi"}
 
 setuptools = "*"
 
