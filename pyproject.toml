@@ -58,7 +58,7 @@ yamlpath = "^3.8.1"
 pytest = "^7.4.3"
 
 [[tool.poetry.source]]
-name = "test"
+name = "test-pypi"
 url = "https://test.pypi.org/simple/"
 priority = "explicit"
 

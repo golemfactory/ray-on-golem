@@ -21,7 +21,7 @@ python -m pip install --upgrade pip
 python -m pip install --upgrade setuptools wheel
 
 echo INSTALLING DEPENDENCIES
-python -m pip install goth==0.15.11 pytest pytest-asyncio pexpect
+python -m pip install goth==$GOTH_VERSION pytest pytest-asyncio pexpect
 
 echo CREATING ASSETS
 python -m goth create-assets .envs/goth/assets
