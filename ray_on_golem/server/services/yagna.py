@@ -79,11 +79,15 @@ class YagnaService:
         return False
 
     async def _check_if_yagna_is_running(self) -> bool:
+        logger.debug("Checking yagna instance at %s...", YAGNA_API_URL)
+
         try:
             async with aiohttp.ClientSession() as client:
                 async with client.get(YAGNA_API_URL):
+                    logger.debug("Checking yagna instance at %s done", YAGNA_API_URL)
                     return True
         except aiohttp.ClientError:
+            logger.debug("Checking yagna instance at %s failed", YAGNA_API_URL)
             return False
 
     async def _run_yagna(self) -> None:

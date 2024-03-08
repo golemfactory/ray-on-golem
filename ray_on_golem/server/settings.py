@@ -10,7 +10,7 @@ YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
 YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
 YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
 YAGNA_START_TIMEOUT = timedelta(minutes=2)
-YAGNA_FUND_TIMEOUT = timedelta(minutes=2)
+YAGNA_FUND_TIMEOUT = timedelta(minutes=5)
 YAGNA_CHECK_INTERVAL = timedelta(seconds=2)
 
 # how long will we wait until we raise an error on webserver startup

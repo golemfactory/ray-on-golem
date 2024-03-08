@@ -17,7 +17,7 @@ class CounterActor:
         time.sleep(0.5)
         self.value += 1
 
-        node_ip = socket.gethostbyname(socket.gethostname())
+        node_ip = socket.gethostname()
         self.node_ips.append(node_ip)
 
         return node_ip

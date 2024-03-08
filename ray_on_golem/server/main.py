@@ -58,7 +58,7 @@ def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
 
     app = create_application(port, self_shutdown, registry_stats, get_datadir(datadir))
 
-    logger.info(f"Starting server... {port=}, {self_shutdown=}, {registry_stats=}")
+    logger.info(f"Starting server... {port=}, {self_shutdown=}, {registry_stats=}, {datadir=}")
 
     try:
         web.run_app(
