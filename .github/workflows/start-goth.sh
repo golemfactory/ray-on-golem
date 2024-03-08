@@ -33,7 +33,6 @@ cat .envs/goth/assets/goth-config.yml
 python -m goth start .envs/goth/assets/goth-config.yml &
 GOTH_PID=$!
 echo "GOTH_PID=$GOTH_PID" | tee "$GITHUB_ENV"
-cat $GITHUB_ENV
 
 echo WAITING FOR NETWORK
 STARTED_WAITING_AT=$((SECONDS + 900))
@@ -52,3 +51,5 @@ done
 deactivate
 cat /tmp/goth_interactive.env | envsubst | sed "s/^export *//g" | tee "$GITHUB_ENV"
 echo STARTUP COMPLETED
+
+cat $GITHUB_ENV
