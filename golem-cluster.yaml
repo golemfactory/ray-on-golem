@@ -19,7 +19,7 @@ provider:
     # Blockchain used for payments.
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
-    payment_network: "goerli"
+    payment_network: "holesky"
     #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
