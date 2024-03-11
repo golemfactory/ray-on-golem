@@ -158,6 +158,7 @@ def get_logging_config(datadir: Optional[Path] = None):
         },
     }
 
+
 def get_reputation_db_config(datadir: Optional[Path] = None):
     db_dir = get_datadir(datadir) / "db"
     db_dir.mkdir(parents=True, exist_ok=True)

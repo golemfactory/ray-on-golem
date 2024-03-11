@@ -1,5 +1,5 @@
-from ray_on_golem.server.services.reputation.reputation import Reputation
+from ray_on_golem.server.services.reputation.service import ReputationService
 
 __all__ = (
-    "Reputation",
+    "ReputationService",
 )
