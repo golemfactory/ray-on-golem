@@ -1,8 +1,8 @@
-# TODO: remove this file
+from datetime import datetime, timezone
+from tortoise import BaseDBAsyncClient
 
-from typing import Dict, List, Set
-
-PROVIDERS_BLACKLIST: Dict[str, Set[str]] = {
+BLACKLISTED_FOREVER = datetime.fromtimestamp(2**32, tz=timezone.utc)
+PROVIDERS_BLACKLIST = {
     "polygon": {
         "0xf460871f1741dd2eebfa115c3ddd8a1aaa7fa914",
         "0xc3ba6bf1464d4e10ffd3ed8e01b38524520724a0",
@@ -25,10 +25,27 @@ PROVIDERS_BLACKLIST: Dict[str, Set[str]] = {
     }
 }
 
-# TODO: add PROVIDERS_SCORED VVV
 
-PROVIDERS_SCORED: Dict[str, List[str]] = {
-    "polygon": [
-        "0x7d529a5b0b58400d09154b47d94ee022ba7658cc",
-    ]
-}
+async def upgrade(db: BaseDBAsyncClient) -> str:
+    for network in PROVIDERS_BLACKLIST.keys():
+        network_id = await db.execute_insert(
+            "insert into network (network_name) values(?);",
+            [network, ],
+        )
+        for golem_node_id in PROVIDERS_BLACKLIST.get(network):
+            node_id = await db.execute_insert(
+                "insert into node (node_id) values(?);",
+                [golem_node_id],
+            )
+            await db.execute_insert(
+                "insert into nodereputation (network_id, node_id, blacklisted_until) values (?, ?, ?);",
+                [network_id, node_id, BLACKLISTED_FOREVER],
+            )
+
+    return """
+        ;"""
+
+
+async def downgrade(db: BaseDBAsyncClient) -> str:
+    return """
+        ;"""

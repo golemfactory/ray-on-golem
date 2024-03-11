@@ -10,12 +10,12 @@ async def upgrade(db: BaseDBAsyncClient) -> str:
 CREATE TABLE IF NOT EXISTS "node" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     "node_id" VARCHAR(42) NOT NULL UNIQUE,
-    "name" TEXT NOT NULL
+    "name" TEXT
 ) /* Single Golem node record. */;
 CREATE TABLE IF NOT EXISTS "nodereputation" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "success_rate" REAL NOT NULL,
-    "uptime" REAL NOT NULL,
+    "success_rate" REAL,
+    "uptime" REAL,
     "blacklisted_until" TIMESTAMP NOT NULL  DEFAULT '1970-01-01T00:00:00+00:00',
     "network_id" INT NOT NULL REFERENCES "network" ("id") ON DELETE CASCADE,
     "node_id" INT NOT NULL REFERENCES "node" ("id") ON DELETE CASCADE

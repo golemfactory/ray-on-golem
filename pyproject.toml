@@ -45,7 +45,7 @@ appdirs = "^1.4.4"
 
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.main:main"
-rog_db_adm = "ray_on_golem.server.services.reputation.main:reputation_ctl"
+rog-db = "ray_on_golem.server.services.reputation.ctl:ctl"
 
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.22.0"

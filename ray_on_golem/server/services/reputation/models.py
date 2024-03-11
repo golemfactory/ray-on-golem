@@ -10,7 +10,7 @@ class Node(Model):
 
     id = fields.IntField(pk=True)
     node_id = fields.CharField(max_length=42, unique=True)
-    name = fields.TextField()
+    name = fields.TextField(null=True)
 
 
 class NodeReputation(Model):
@@ -18,8 +18,8 @@ class NodeReputation(Model):
 
     node = fields.ForeignKeyField("models.Node")
     network = fields.ForeignKeyField("models.Network")
-    success_rate = fields.FloatField()
-    uptime = fields.FloatField()
+    success_rate = fields.FloatField(null=True)
+    uptime = fields.FloatField(null=True)
     blacklisted_until = fields.DatetimeField(default=BLACKLISTED_NEVER)
 
 
