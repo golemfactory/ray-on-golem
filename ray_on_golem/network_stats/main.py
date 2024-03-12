@@ -8,10 +8,11 @@ from typing import Dict, Optional
 import click
 import yaml
 
+from ray_on_golem.cli import with_datadir
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
-from ray_on_golem.server.settings import DEFAULT_DATADIR, YAGNA_PATH, get_logging_config
+from ray_on_golem.server.settings import YAGNA_PATH, get_logging_config
 
 
 def validate_config_file(ctx, param, value):
@@ -54,12 +55,7 @@ def validate_node_type(ctx, param, value):
     default=False,
     help="Enable verbose logging.",
 )
-@click.option(
-    "--datadir",
-    type=pathlib.Path,
-    help=f"Ray on Golem's data directory. [default: {DEFAULT_DATADIR}"
-    " (unless `webserver_datadir` is defined in the cluster config file)]",
-)
+@with_datadir
 def main(*args, **kwargs):
     asyncio.run(_network_stats(*args, **kwargs))
 
@@ -97,7 +93,7 @@ async def network_stats_service(
     service = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
-        datadir=datadir,
+        datadir=datadirdatadir,
     )
 
     await yagna_service.init()

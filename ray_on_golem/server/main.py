@@ -10,6 +10,7 @@ import colorful
 import psutil
 from aiohttp import web
 
+from ray_on_golem.cli import with_datadir
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
@@ -47,12 +48,7 @@ logger = logging.getLogger(__name__)
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    default=DEFAULT_DATADIR,
-    help="Ray on Golem's data directory.",
-)
+@with_datadir
 def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
     logging.config.dictConfig(get_logging_config(datadir))
 
@@ -173,11 +169,7 @@ async def ray_service_ctx(app: web.Application) -> None:
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
-)
+@with_datadir
 def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl
@@ -217,11 +209,7 @@ def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     is_flag=True,
     help="Kill the process if it fails to exit after shutdown.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
-)
+@with_datadir
 def stop(port, force, kill, datadir):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl
@@ -278,11 +266,7 @@ def stop(port, force, kill, datadir):
     default=4578,
     help="Port on which Ray on Golem's webserver is listening.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
-)
+@with_datadir
 def status(port, datadir):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl

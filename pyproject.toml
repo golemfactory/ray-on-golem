@@ -27,6 +27,7 @@ golem-node = "0.14.0"
 setuptools = "*"
 tortoise-orm = "^0.20.0"
 aerich = "^0.7.2"
+prettytable = "^3.10.0"
 
 [tool.poetry.group.ray.dependencies]
 python = "^3.8.1"
@@ -45,7 +46,7 @@ appdirs = "^1.4.4"
 
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.main:main"
-rog-db = "ray_on_golem.server.services.reputation.ctl:ctl"
+rog-db = "ray_on_golem.server.services.reputation.admin:admin"
 
 [tool.poetry.group.dev.dependencies]
 poethepoet = "^0.22.0"
