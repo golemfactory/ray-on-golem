@@ -230,7 +230,7 @@ class YagnaService:
             run_subprocess_output(
                 self._yagna_path, "payment", "status", "--network", network, "--driver", driver
             ),
-            timeout=timedelta(seconds=30).total_seconds()
+            timeout=timedelta(seconds=30).total_seconds(),
         )
         return output.decode()
 
