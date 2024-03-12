@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from asyncio.subprocess import Process
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -188,15 +188,18 @@ class YagnaService:
                 logger.error("Preparing `%s` funds failed with error: %s", platform, e)
             else:
                 output = json.loads(
-                    await run_subprocess_output(
-                        self._yagna_path,
-                        "payment",
-                        "status",
-                        "--network",
-                        network,
-                        "--driver",
-                        driver,
-                        "--json",
+                    await asyncio.wait_for(
+                        run_subprocess_output(
+                            self._yagna_path,
+                            "payment",
+                            "status",
+                            "--network",
+                            network,
+                            "--driver",
+                            driver,
+                            "--json",
+                        ),
+                        timeout=timedelta(seconds=30).total_seconds(),
                     )
                 )
 

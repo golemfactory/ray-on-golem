@@ -22,6 +22,9 @@ RAY_ON_GOLEM_CHECK_INTERVAL = timedelta(seconds=2)
 # how long a shutdown request will wait until the webserver shutdown is initiated
 RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=60)
 
+# how long we wait for the webserver shutdown pending connection to complete
+RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT = timedelta(seconds=5)
+
 # how long we wait for the webserver shutdown to complete
 RAY_ON_GOLEM_SHUTDOWN_TIMEOUT = timedelta(seconds=60)
 
@@ -31,7 +34,7 @@ RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
 RAY_ON_GOLEM_PID_FILENAME = "ray_on_golem.pid"
 
 URL_STATUS = "/"
-URL_CREATE_CLUSTER = "/create_cluster"
+URL_BOOTSTRAP_CLUSTER = "/bootstrap_cluster"
 URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
 URL_IS_RUNNING = "/is_running"
 URL_IS_TERMINATED = "/is_terminated"

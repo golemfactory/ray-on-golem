@@ -109,11 +109,12 @@ class ProviderConfigData(BaseModel):
     ssh_user: str
 
 
-class CreateClusterRequestData(ProviderConfigData):
-    pass
+class BootstrapClusterRequestData(BaseModel):
+    provider_config: ProviderConfigData
+    cluster_name: str
 
 
-class CreateClusterResponseData(BaseModel):
+class BootstrapClusterResponseData(BaseModel):
     is_cluster_just_created: bool
     wallet_address: str
     yagna_payment_status_output: str
