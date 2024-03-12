@@ -1,4 +1,4 @@
-name: Nightly
+name: On schedule
 
 on:
   workflow_call:
@@ -14,8 +14,8 @@ jobs:
         branch: ["main", "develop"]
 
     steps:
-      integration_tests:
-        name: Integration tests
-        uses: ./.github/workflows/smoke_tests.yml
-        with:
-          BRANCH: ${{ matrix.branch }}
+      - integration_tests:
+          name: Integration tests
+          uses: ./.github/workflows/smoke_tests.yml
+          with:
+            BRANCH: ${{ matrix.branch }}
