@@ -9,7 +9,6 @@ from tortoise.exceptions import OperationalError
 
 from ray_on_golem.server.settings import get_reputation_db_config
 
-
 logger = logging.getLogger(__name__)
 
 

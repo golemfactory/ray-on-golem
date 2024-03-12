@@ -6,7 +6,7 @@ from tortoise.exceptions import DoesNotExist
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.server.services.reputation.service import ReputationService
 from ray_on_golem.server.services.reputation import models as m
-
+from ray_on_golem.server.services.reputation.updater import ReputationUpdater
 
 @click.group(
     name="reputation",
@@ -96,3 +96,17 @@ def unblock(datadir, network, node_id):
                 print(f"No reputation record found for {node_id} on {network}")
 
     asyncio.run(_unblock())
+
+@reputation_cli.command(help="Update local reputation data from the global Reputation System.")
+@click.option(
+    "--network",
+    type=click.Choice(["polygon"], ),
+    default="polygon",
+    help="The network for the score"
+)
+@with_datadir
+def update(datadir, network):
+    async def _update():
+        await ReputationUpdater(network).update()
+
+    asyncio.run(_update())
