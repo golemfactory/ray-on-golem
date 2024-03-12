@@ -1,7 +1,7 @@
 name: On schedule
 
 on:
-  workflow_dispatch:
+  pull_request:
   schedule:
     # run this workflow every day at 2:00 AM UTC
     -   cron: '0 2 * * *'
