@@ -2,9 +2,10 @@ name: Integration tests
 
 on:
   workflow_call:
-  schedule:
-    # run this workflow every day at 2:00 AM UTC
-    -   cron: '0 2 * * *'
+    inputs:
+      BRANCH:
+        description: Git branch to be used in run
+        default: main
 
 jobs:
   examples:
@@ -38,6 +39,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          red: ${{ inputs.BRANCH }}
 
       - name: Start Goth
         env:
