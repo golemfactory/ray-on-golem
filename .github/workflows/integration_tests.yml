@@ -4,6 +4,7 @@ on:
   workflow_call:
     inputs:
       BRANCH:
+        type: string
         description: Git branch to be used in run
         default: main
 
