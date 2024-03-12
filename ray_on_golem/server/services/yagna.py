@@ -226,8 +226,11 @@ class YagnaService:
         )
 
     async def fetch_payment_status(self, network: str, driver: str) -> str:
-        output = await run_subprocess_output(
-            self._yagna_path, "payment", "status", "--network", network, "--driver", driver
+        output = await asyncio.wait_for(
+            run_subprocess_output(
+                self._yagna_path, "payment", "status", "--network", network, "--driver", driver
+            ),
+            timeout=timedelta(seconds=30).total_seconds()
         )
         return output.decode()
 
