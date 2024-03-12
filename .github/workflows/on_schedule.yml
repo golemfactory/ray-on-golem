@@ -11,10 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: ["main", "develop"]
-
-    steps:
-      - name: Integration tests
-        uses: ./.github/workflows/smoke_tests.yml
-        with:
-            BRANCH: ${{ matrix.branch }}
+        branch: [main, develop]
+    uses: ./.github/workflows/integration_tests.yml
+    with:
+        BRANCH: ${{ matrix.branch }}
