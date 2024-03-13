@@ -1,9 +1,11 @@
-import click
 from pathlib import Path
+
+import click
 
 
 def with_datadir(cli_func):
     from ray_on_golem.server.settings import DEFAULT_DATADIR
+
     return click.option(
         "--datadir",
         type=Path,

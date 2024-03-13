@@ -1,6 +1,8 @@
 import asyncio
-from aerich import Migrate
+
 import click
+from aerich import Migrate
+
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.server.services.reputation.service import ReputationService
 

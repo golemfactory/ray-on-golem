@@ -1,18 +1,20 @@
 import asyncio
-import click
 from functools import partial
+
+import click
 from prettytable import PrettyTable
 from tortoise.exceptions import DoesNotExist
 
 from ray_on_golem.cli import with_datadir
-from ray_on_golem.server.services.reputation.service import ReputationService
 from ray_on_golem.server.services.reputation import models as m
+from ray_on_golem.server.services.reputation.service import ReputationService
 from ray_on_golem.server.services.reputation.updater import ReputationUpdater
+
 
 @click.group(
     name="reputation",
     help="Reputation subsystem management.",
-    context_settings={"show_default": True}
+    context_settings={"show_default": True},
 )
 def reputation_cli():
     ...
@@ -26,7 +28,9 @@ def reputation_cli():
 @with_datadir
 def list_(datadir, node_id):
     async def list_records():
-        table = PrettyTable(["ID", "Name", "Network", "Blacklisted?", "Success Rate", "Uptime score"])
+        table = PrettyTable(
+            ["ID", "Name", "Network", "Blacklisted?", "Success Rate", "Uptime score"]
+        )
 
         async with ReputationService(datadir):
             qs = m.NodeReputation.all()
@@ -40,7 +44,9 @@ def list_(datadir, node_id):
                         node.name or "",
                         node_reputation.network.network_name,
                         node_reputation.is_blacklisted(),
-                        node_reputation.success_rate if node_reputation.success_rate is not None else "",
+                        node_reputation.success_rate
+                        if node_reputation.success_rate is not None
+                        else "",
                         node_reputation.uptime if node_reputation.uptime is not None else "",
                     ]
                 )
@@ -57,9 +63,11 @@ def list_(datadir, node_id):
 )
 @click.option(
     "--network",
-    type=click.Choice(["polygon"], ),
+    type=click.Choice(
+        ["polygon"],
+    ),
     default="polygon",
-    help="The network for the score"
+    help="The network for the score",
 )
 @with_datadir
 def block(datadir, network, node_id):
@@ -67,7 +75,9 @@ def block(datadir, network, node_id):
         async with ReputationService(datadir):
             node, _ = await m.Node.get_or_create(node_id=node_id)
             node_network, _ = await m.Network.get_or_create(network_name=network)
-            node_reputation, _ = await m.NodeReputation.get_or_create(node=node, network=node_network)
+            node_reputation, _ = await m.NodeReputation.get_or_create(
+                node=node, network=node_network
+            )
             node_reputation.blacklisted_until = m.BLACKLISTED_FOREVER
             await node_reputation.save()
             print(f"Node {node_id} blocked on {network}.")
@@ -82,16 +92,20 @@ def block(datadir, network, node_id):
 )
 @click.option(
     "--network",
-    type=click.Choice(["polygon"], ),
+    type=click.Choice(
+        ["polygon"],
+    ),
     default="polygon",
-    help="The network for the score"
+    help="The network for the score",
 )
 @with_datadir
 def unblock(datadir, network, node_id):
     async def _unblock():
         async with ReputationService(datadir):
             try:
-                node_reputation = await m.NodeReputation.get(node__node_id=node_id, network__network_name=network)
+                node_reputation = await m.NodeReputation.get(
+                    node__node_id=node_id, network__network_name=network
+                )
                 node_reputation.blacklisted_until = m.BLACKLISTED_NEVER
                 await node_reputation.save()
                 print(f"Node {node_id} unblocked on {network}.")
@@ -100,19 +114,26 @@ def unblock(datadir, network, node_id):
 
     asyncio.run(_unblock())
 
+
 @reputation_cli.command(help="Update local reputation data from the global Reputation System.")
 @click.option(
     "--network",
-    type=click.Choice(["polygon"], ),
+    type=click.Choice(
+        ["polygon"],
+    ),
     default="polygon",
-    help="The network for the score"
+    help="The network for the score",
 )
 @with_datadir
 def update(datadir, network):
     async def _update():
         async with ReputationService(datadir):
-            cnt_added, cnt_updated, cnt_ignored, cnt_total = await ReputationUpdater(network).update(partial(click.progressbar, label="Updating scores"))
+            cnt_added, cnt_updated, cnt_ignored, cnt_total = await ReputationUpdater(
+                network
+            ).update(partial(click.progressbar, label="Updating scores"))
 
-        print(f"Reputation DB updated. Total scores={cnt_total} (added={cnt_added}, updated={cnt_updated}, ignored={cnt_ignored}).")
+        print(
+            f"Reputation DB updated. Total scores={cnt_total} (added={cnt_added}, updated={cnt_updated}, ignored={cnt_ignored})."
+        )
 
     asyncio.run(_update())

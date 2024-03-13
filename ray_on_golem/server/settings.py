@@ -177,7 +177,7 @@ def get_reputation_db_config(datadir: Optional[Path] = None):
                 "models": [models_path, "aerich.models"],
                 "default_connection": "default",
             }
-        }
+        },
     }
     aerich_config = {
         "tortoise_config": tortoise_config,

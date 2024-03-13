@@ -1,5 +1,5 @@
-from contextlib import AbstractAsyncContextManager
 import logging
+from contextlib import AbstractAsyncContextManager
 from pathlib import Path
 from typing import Optional
 
@@ -35,8 +35,7 @@ class ReputationService(AbstractAsyncContextManager):
             if not migrations_available:
                 return
             logger.info(
-                "Reputation DB updates available: %s. Running migrations.",
-                migrations_available
+                "Reputation DB updates available: %s. Running migrations.", migrations_available
             )
         except OperationalError:
             logger.info("The DB had not yet been initialized. Initializing from scratch.")
@@ -55,4 +54,3 @@ class ReputationService(AbstractAsyncContextManager):
 
     async def stop(self):
         await Tortoise.close_connections()
-

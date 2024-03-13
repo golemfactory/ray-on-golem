@@ -1,5 +1,6 @@
-from tortoise import fields, Model
 from datetime import datetime, timezone
+
+from tortoise import Model, fields
 
 BLACKLISTED_NEVER = datetime.fromtimestamp(0, tz=timezone.utc)
 BLACKLISTED_FOREVER = datetime.fromtimestamp(2**32, tz=timezone.utc)
@@ -26,7 +27,7 @@ class NodeReputation(Model):
     blacklisted_until = fields.DatetimeField(default=BLACKLISTED_NEVER)
 
     class Meta:
-        unique_together = (("node", "network"), )
+        unique_together = (("node", "network"),)
 
     def is_blacklisted(self):
         return self.blacklisted_until >= datetime.now(timezone.utc)

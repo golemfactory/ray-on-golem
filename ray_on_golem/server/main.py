@@ -14,7 +14,6 @@ from ray_on_golem.cli import with_datadir
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
-    DEFAULT_DATADIR,
     RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
     WEBSOCAT_PATH,
     YAGNA_PATH,

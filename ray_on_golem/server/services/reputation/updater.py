@@ -1,6 +1,8 @@
-import aiohttp
 from contextlib import contextmanager
-from typing import Tuple, Iterable, ContextManager
+from typing import Iterable, Tuple
+
+import aiohttp
+
 from ray_on_golem.server.services.reputation import models as m
 
 REPUTATION_SYSTEM_URI = "https://reputation.dev-test.golem.network/v1/"
@@ -23,7 +25,7 @@ class ReputationUpdater:
     def _no_progress_bar(self, iterable: Iterable):
         yield iterable
 
-    async def update(self, progress_bar = None) -> Tuple[int, int, int, int]:
+    async def update(self, progress_bar=None) -> Tuple[int, int, int, int]:
         if not progress_bar:
             progress_bar = self._no_progress_bar
         cnt_added = 0
@@ -33,7 +35,8 @@ class ReputationUpdater:
         async with aiohttp.request("get", self.reputation_uri) as response:
             if not response.status == 200:
                 raise ReputationUpdaterException(
-                    f"Error {response.status} while updating reputation from {self.reputation_uri}")
+                    f"Error {response.status} while updating reputation from {self.reputation_uri}"
+                )
 
             data = await response.json()
             with progress_bar(data.get("providers")) as providers:
@@ -53,7 +56,10 @@ class ReputationUpdater:
                         updated = False
                         success_rate = scores.get("successRate")
                         uptime = scores.get("uptime")
-                        if success_rate is not None and node_reputation.success_rate != success_rate:
+                        if (
+                            success_rate is not None
+                            and node_reputation.success_rate != success_rate
+                        ):
                             node_reputation.success_rate = success_rate
                             updated = True
                         if uptime is not None and node_reputation.uptime != uptime:
