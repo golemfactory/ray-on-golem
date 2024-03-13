@@ -107,6 +107,9 @@ def unblock(datadir, network, node_id):
 @with_datadir
 def update(datadir, network):
     async def _update():
-        await ReputationUpdater(network).update()
+        async with ReputationService(datadir):
+            cnt_added, cnt_updated, cnt_ignored, cnt_total = await ReputationUpdater(network).update()
+
+        print(f"Reputation DB updated. Total scores={cnt_total} (added={cnt_added}, updated={cnt_updated}, ignored={cnt_ignored}).")
 
     asyncio.run(_update())
