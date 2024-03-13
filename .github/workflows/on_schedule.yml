@@ -8,6 +8,7 @@ on:
 
 jobs:
   nightly_tests:
+    name: Nightly tests
     strategy:
       fail-fast: false
       matrix:
