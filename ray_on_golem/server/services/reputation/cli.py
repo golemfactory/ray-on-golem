@@ -1,5 +1,6 @@
 import asyncio
 import click
+from functools import partial
 from prettytable import PrettyTable
 from tortoise.exceptions import DoesNotExist
 
@@ -25,7 +26,7 @@ def reputation_cli():
 @with_datadir
 def list_(datadir, node_id):
     async def list_records():
-        table = PrettyTable(["id", "name", "network", "blacklisted?"])
+        table = PrettyTable(["ID", "Name", "Network", "Blacklisted?", "Success Rate", "Uptime score"])
 
         async with ReputationService(datadir):
             qs = m.NodeReputation.all()
@@ -39,6 +40,8 @@ def list_(datadir, node_id):
                         node.name or "",
                         node_reputation.network.network_name,
                         node_reputation.is_blacklisted(),
+                        node_reputation.success_rate if node_reputation.success_rate is not None else "",
+                        node_reputation.uptime if node_reputation.uptime is not None else "",
                     ]
                 )
 
@@ -108,7 +111,7 @@ def unblock(datadir, network, node_id):
 def update(datadir, network):
     async def _update():
         async with ReputationService(datadir):
-            cnt_added, cnt_updated, cnt_ignored, cnt_total = await ReputationUpdater(network).update()
+            cnt_added, cnt_updated, cnt_ignored, cnt_total = await ReputationUpdater(network).update(partial(click.progressbar, label="Updating scores"))
 
         print(f"Reputation DB updated. Total scores={cnt_total} (added={cnt_added}, updated={cnt_updated}, ignored={cnt_ignored}).")
 
