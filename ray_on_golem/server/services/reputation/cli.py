@@ -1,5 +1,6 @@
 import asyncio
 from functools import partial
+from typing import Optional
 
 import click
 from prettytable import PrettyTable
@@ -19,23 +20,57 @@ from ray_on_golem.server.services.reputation.updater import ReputationUpdater
 def reputation_cli():
     ...
 
+def with_network(cli_func=None, *, default: Optional[str] = "polygon"):
+
+    def _with_network(_cli_func):
+        return click.option(
+            "--network",
+            type=click.Choice(
+                ["polygon", "mainnet", "goerli", "holesky"],
+            ),
+            default=default,
+            help="The network for the score",
+        )(_cli_func)
+
+    if cli_func is None:
+        return _with_network
+
+    return _with_network(cli_func)
+
 
 @reputation_cli.command(name="list", help="List reputation records.")
 @click.argument(
     "node_id",
     nargs=-1,
 )
+
+@click.option(
+    "--blacklist",
+    is_flag=True,
+    help="Show only the blacklisted nodes",
+)
+@with_network(default=None)
 @with_datadir
-def list_(datadir, node_id):
+def list_(datadir, network, node_id, blacklist):
     async def list_records():
+        print(click.style("Node reputation{}".format(f" for network: {network}" if network else ""), fg="bright_cyan"))
+
         table = PrettyTable(
             ["ID", "Name", "Network", "Blacklisted?", "Success Rate", "Uptime score"]
         )
 
         async with ReputationService(datadir):
-            qs = m.NodeReputation.all()
+            if blacklist:
+                qs = m.NodeReputation.get_blacklisted()
+            else:
+                qs = m.NodeReputation.all()
+
+            if network:
+                qs = qs.filter(network__network_name=network)
+
             if node_id:
                 qs = qs.filter(node__node_id__in=node_id)
+
             async for node_reputation in qs.prefetch_related("node", "network"):
                 node: m.Node = node_reputation.node
                 table.add_row(
@@ -61,14 +96,7 @@ def list_(datadir, node_id):
     "node_id",
     nargs=1,
 )
-@click.option(
-    "--network",
-    type=click.Choice(
-        ["polygon"],
-    ),
-    default="polygon",
-    help="The network for the score",
-)
+@with_network
 @with_datadir
 def block(datadir, network, node_id):
     async def _block():
@@ -90,14 +118,7 @@ def block(datadir, network, node_id):
     "node_id",
     nargs=1,
 )
-@click.option(
-    "--network",
-    type=click.Choice(
-        ["polygon"],
-    ),
-    default="polygon",
-    help="The network for the score",
-)
+@with_network
 @with_datadir
 def unblock(datadir, network, node_id):
     async def _unblock():
@@ -116,14 +137,7 @@ def unblock(datadir, network, node_id):
 
 
 @reputation_cli.command(help="Update local reputation data from the global Reputation System.")
-@click.option(
-    "--network",
-    type=click.Choice(
-        ["polygon"],
-    ),
-    default="polygon",
-    help="The network for the score",
-)
+@with_network
 @with_datadir
 def update(datadir, network):
     async def _update():

@@ -1,6 +1,9 @@
+"""Reputation system DB models."""
 from datetime import datetime, timezone
+from typing_extensions import Self
 
 from tortoise import Model, fields
+from tortoise.queryset import QuerySet, ExistsQuery
 
 BLACKLISTED_NEVER = datetime.fromtimestamp(0, tz=timezone.utc)
 BLACKLISTED_FOREVER = datetime.fromtimestamp(2**32, tz=timezone.utc)
@@ -30,7 +33,18 @@ class NodeReputation(Model):
         unique_together = (("node", "network"),)
 
     def is_blacklisted(self):
+        """Return `True` if the node is currently blacklisted, `False` otherwise."""
         return self.blacklisted_until >= datetime.now(timezone.utc)
+
+    @classmethod
+    def get_blacklisted(cls) -> QuerySet[Self]:
+        """Retrieve the currently blacklisted nodes."""
+        return cls.all().filter(blacklisted_until__gt=datetime.now(timezone.utc))
+
+    @classmethod
+    def check_blacklisted(cls, node_id: str, network_name: str) -> ExistsQuery:
+        """Run a query to check if the given node is currently blacklisted."""
+        return cls.get_blacklisted().filter(node__node_id=node_id, network__network_name=network_name).exists()
 
 
 class Network(Model):

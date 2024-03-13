@@ -13,6 +13,7 @@ from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
 from ray_on_golem.server.settings import YAGNA_PATH, get_logging_config
+from ray_on_golem.server.services.reputation.service import ReputationService
 
 
 def validate_config_file(ctx, param, value):
@@ -93,18 +94,19 @@ async def network_stats_service(
     service = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
-        datadir=datadirdatadir,
+        datadir=datadir,
     )
 
-    await yagna_service.init()
-    await yagna_service.run_payment_fund(network, driver)
+    async with ReputationService(datadir):
+        await yagna_service.init()
+        await yagna_service.run_payment_fund(network, driver)
 
-    await service.init(yagna_appkey=yagna_service.yagna_appkey)
+        await service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield service
+        yield service
 
-    await service.shutdown()
-    await yagna_service.shutdown()
+        await service.shutdown()
+        await yagna_service.shutdown()
 
 
 if __name__ == "__main__":

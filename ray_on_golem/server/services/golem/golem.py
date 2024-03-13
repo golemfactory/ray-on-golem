@@ -34,7 +34,8 @@ from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST, PROVIDERS_SCORED
+from ray_on_golem.server.services.golem.provider_data import PROVIDERS_SCORED
+from ray_on_golem.server.services.reputation.plugins import ProviderBlacklistPlugin
 from ray_on_golem.server.services.utils import get_ssh_command
 
 logger = logging.getLogger(__name__)
@@ -219,7 +220,7 @@ class GolemService:
                 self._golem,
                 demand_manager.get_initial_proposal,
                 plugins=(
-                    BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
+                    ProviderBlacklistPlugin(payment_network),
                     *extra_proposal_plugins.values(),
                     ProposalScoringBuffer(
                         min_size=50,

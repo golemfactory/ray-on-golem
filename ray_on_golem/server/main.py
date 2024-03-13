@@ -12,7 +12,7 @@ from aiohttp import web
 
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
-from ray_on_golem.server.services import GolemService, RayService, YagnaService
+from ray_on_golem.server.services import GolemService, RayService, ReputationService, YagnaService
 from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
     WEBSOCAT_PATH,
@@ -102,7 +102,10 @@ def create_application(
         datadir=datadir,
     )
 
+    app["reputation_service"] = ReputationService(datadir=datadir)
+
     app.add_routes(routes)
+    app.cleanup_ctx.append(reputation_service_ctx)
     app.cleanup_ctx.append(yagna_service_ctx)
     app.cleanup_ctx.append(golem_service_ctx)
     app.cleanup_ctx.append(ray_service_ctx)
@@ -151,6 +154,14 @@ async def ray_service_ctx(app: web.Application) -> None:
 
     await ray_service.shutdown()
 
+async def reputation_service_ctx(app: web.Application) -> None:
+    reputation_service: ReputationService = app["reputation_service"]
+
+    await reputation_service.start()
+
+    yield
+
+    await reputation_service.stop()
 
 @click.command(
     help="Start Ray on Golem's webserver and the yagna daemon.",
