@@ -188,18 +188,16 @@ class YagnaService:
                 logger.error("Preparing `%s` funds failed with error: %s", platform, e)
             else:
                 output = json.loads(
-                    await asyncio.wait_for(
-                        run_subprocess_output(
-                            self._yagna_path,
-                            "payment",
-                            "status",
-                            "--network",
-                            network,
-                            "--driver",
-                            driver,
-                            "--json",
-                        ),
-                        timeout=timedelta(seconds=30).total_seconds(),
+                    await run_subprocess_output(
+                        self._yagna_path,
+                        "payment",
+                        "status",
+                        "--network",
+                        network,
+                        "--driver",
+                        driver,
+                        "--json",
+                        timeout=timedelta(seconds=30),
                     )
                 )
 
@@ -226,11 +224,15 @@ class YagnaService:
         )
 
     async def fetch_payment_status(self, network: str, driver: str) -> str:
-        output = await asyncio.wait_for(
-            run_subprocess_output(
-                self._yagna_path, "payment", "status", "--network", network, "--driver", driver
-            ),
-            timeout=timedelta(seconds=30).total_seconds(),
+        output = await run_subprocess_output(
+            self._yagna_path,
+            "payment",
+            "status",
+            "--network",
+            network,
+            "--driver",
+            driver,
+            timeout=timedelta(seconds=30),
         )
         return output.decode()
 
