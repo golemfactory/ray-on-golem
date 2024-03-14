@@ -154,6 +154,7 @@ async def ray_service_ctx(app: web.Application) -> None:
 
     await ray_service.shutdown()
 
+
 async def reputation_service_ctx(app: web.Application) -> None:
     reputation_service: ReputationService = app["reputation_service"]
 
@@ -162,6 +163,7 @@ async def reputation_service_ctx(app: web.Application) -> None:
     yield
 
     await reputation_service.stop()
+
 
 @click.command(
     help="Start Ray on Golem's webserver and the yagna daemon.",

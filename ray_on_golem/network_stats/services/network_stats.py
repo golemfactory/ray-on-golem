@@ -30,7 +30,6 @@ from ray_on_golem.server.services.golem.golem import DEFAULT_DEMAND_LIFETIME
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-
 from ray_on_golem.server.services.reputation.plugins import ProviderBlacklistPlugin
 
 logger = logging.getLogger(__name__)

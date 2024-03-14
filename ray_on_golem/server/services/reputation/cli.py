@@ -20,8 +20,8 @@ from ray_on_golem.server.services.reputation.updater import ReputationUpdater
 def reputation_cli():
     ...
 
-def with_network(cli_func=None, *, default: Optional[str] = "polygon"):
 
+def with_network(cli_func=None, *, default: Optional[str] = "polygon"):
     def _with_network(_cli_func):
         return click.option(
             "--network",
@@ -43,7 +43,6 @@ def with_network(cli_func=None, *, default: Optional[str] = "polygon"):
     "node_id",
     nargs=-1,
 )
-
 @click.option(
     "--blacklist",
     is_flag=True,
@@ -53,7 +52,12 @@ def with_network(cli_func=None, *, default: Optional[str] = "polygon"):
 @with_datadir
 def list_(datadir, network, node_id, blacklist):
     async def list_records():
-        print(click.style("Node reputation{}".format(f" for network: {network}" if network else ""), fg="bright_cyan"))
+        print(
+            click.style(
+                "Node reputation{}".format(f" for network: {network}" if network else ""),
+                fg="bright_cyan",
+            )
+        )
 
         table = PrettyTable(
             ["ID", "Name", "Network", "Blacklisted?", "Success Rate", "Uptime score"]

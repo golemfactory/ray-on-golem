@@ -12,8 +12,8 @@ from ray_on_golem.cli import with_datadir
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
-from ray_on_golem.server.settings import YAGNA_PATH, get_logging_config
 from ray_on_golem.server.services.reputation.service import ReputationService
+from ray_on_golem.server.settings import YAGNA_PATH, get_logging_config
 
 
 def validate_config_file(ctx, param, value):
