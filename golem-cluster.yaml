@@ -20,6 +20,7 @@ provider:
     # `holesky` means running free nodes on testnet,
     # `polygon` is for mainnet operations.
     payment_network: "holesky"
+    payment_driver: "erc20next"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
