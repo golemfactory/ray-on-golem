@@ -71,7 +71,9 @@ def list_(datadir, network, node_id, blacklist):
             if node_id:
                 qs = qs.filter(node__node_id__in=node_id)
 
-            async for node_reputation in qs.prefetch_related("node", "network"):
+            qs = qs.select_related("node", "network")
+
+            async for node_reputation in qs:
                 node: m.Node = node_reputation.node
                 table.add_row(
                     [

@@ -8,7 +8,6 @@ from typing import Awaitable, Callable, DefaultDict, Dict, Optional, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers import (
-    BlacklistProviderIdPlugin,
     DefaultAgreementManager,
     DefaultPaymentManager,
     DefaultProposalManager,

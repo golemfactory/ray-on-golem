@@ -6,7 +6,6 @@ from datetime import timedelta
 from typing import Dict, Optional, Sequence
 
 from golem.managers import (
-    BlacklistProviderIdPlugin,
     DefaultPaymentManager,
     DefaultProposalManager,
     NegotiatingPlugin,
