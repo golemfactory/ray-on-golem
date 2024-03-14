@@ -20,7 +20,7 @@ from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState
 from ray_on_golem.server.settings import (
     PAYMENT_DRIVER_ERC20,
-    PAYMENT_NETWORK_GOERLI,
+    PAYMENT_NETWORK_HOLESKY,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
     TMP_PATH,
@@ -41,7 +41,7 @@ PROVIDER_DEFAULTS = {
     "webserver_port": 4578,
     "webserver_datadir": None,
     "enable_registry_stats": True,
-    "payment_network": PAYMENT_NETWORK_GOERLI,
+    "payment_network": PAYMENT_NETWORK_HOLESKY,
     "payment_driver": PAYMENT_DRIVER_ERC20,
     "node_config": {
         "subnet_tag": "public",

@@ -17,9 +17,9 @@ provider:
     webserver_port: 4578
 
     # Blockchain used for payments.
-    # Goerli means running free nodes on testnet,
-    # Polygon is for mainnet operations.
-    payment_network: "goerli"
+    # `holesky` means running free nodes on testnet,
+    # `polygon` is for mainnet operations.
+    payment_network: "holesky"
 
     # Maximum amount of GML that's going to be spent (not supported yet)
     total_budget: 2
