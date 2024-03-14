@@ -37,9 +37,21 @@ class NodeReputation(Model):
         return self.blacklisted_until >= datetime.now(timezone.utc)
 
     @classmethod
-    def get_blacklisted(cls) -> QuerySet[Self]:
-        """Retrieve the currently blacklisted nodes."""
-        return cls.all().filter(blacklisted_until__gt=datetime.now(timezone.utc))
+    def get_blacklisted(cls, blacklisted: bool = True) -> QuerySet[Self]:
+        """
+        Retrieve the currently blacklisted/not blacklisted nodes.
+
+        :param blacklisted: if `True` (the default), return all the blacklisted nodes,
+                            if `False`, return all the non-blacklisted nodes.
+        """
+        now = datetime.now(timezone.utc)
+        qs = cls.all()
+        if blacklisted:
+            qs = qs.filter(blacklisted_until__gt=now)
+        else:
+            qs = qs.filter(blacklisted_until__lte=now)
+
+        return qs
 
     @classmethod
     def check_blacklisted(cls, node_id: str, network_name: str) -> ExistsQuery:

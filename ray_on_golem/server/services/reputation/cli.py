@@ -157,3 +157,20 @@ def update(datadir, network):
         )
 
     asyncio.run(_update())
+
+
+@reputation_cli.command()
+@with_network
+@with_datadir
+def test(datadir, network):
+    async def _test():
+        async with ReputationService(datadir):
+            cnt_added, cnt_updated, cnt_ignored, cnt_total = await ReputationUpdater(
+                network
+            ).update(partial(click.progressbar, label="Updating scores"))
+
+        print(
+            f"Reputation DB updated. Total scores={cnt_total} (added={cnt_added}, updated={cnt_updated}, ignored={cnt_ignored})."
+        )
+
+    asyncio.run(_testx())
