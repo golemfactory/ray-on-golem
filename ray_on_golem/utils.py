@@ -35,12 +35,10 @@ async def run_subprocess_output(*args, timeout: Optional[timedelta] = None) -> b
         stderr=asyncio.subprocess.PIPE,
     )
 
-    coro = process.communicate()
-
-    if timeout is not None:
-        coro = asyncio.wait_for(coro, timeout.total_seconds())
-
-    stdout, stderr = await coro
+    stdout, stderr = await asyncio.wait_for(
+        process.communicate(),
+        timeout.total_seconds() if timeout else None
+    )
 
     if process.returncode != 0:
         raise RayOnGolemError(
