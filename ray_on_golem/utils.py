@@ -37,7 +37,7 @@ async def run_subprocess_output(*args, timeout: Optional[timedelta] = None) -> b
 
     stdout, stderr = await asyncio.wait_for(
         process.communicate(),
-        timeout.total_seconds() if timeout else None
+        timeout.total_seconds() if timeout else None,
     )
 
     if process.returncode != 0:
