@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from asyncio.subprocess import Process
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -197,6 +197,7 @@ class YagnaService:
                         "--driver",
                         driver,
                         "--json",
+                        timeout=timedelta(seconds=30),
                     )
                 )
 
@@ -224,7 +225,14 @@ class YagnaService:
 
     async def fetch_payment_status(self, network: str, driver: str) -> str:
         output = await run_subprocess_output(
-            self._yagna_path, "payment", "status", "--network", network, "--driver", driver
+            self._yagna_path,
+            "payment",
+            "status",
+            "--network",
+            network,
+            "--driver",
+            driver,
+            timeout=timedelta(seconds=30),
         )
         return output.decode()
 

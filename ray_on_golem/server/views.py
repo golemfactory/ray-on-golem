@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from ray_on_golem.server import models, settings
 from ray_on_golem.server.models import ShutdownState
 from ray_on_golem.server.services import RayService
+from ray_on_golem.server.services.ray import RayServiceError
 from ray_on_golem.utils import raise_graceful_exit
 from ray_on_golem.version import get_version
 
@@ -18,7 +19,7 @@ routes = web.RouteTableDef()
 def reject_if_shutting_down(func):
     async def wrapper(request: web.Request) -> web.Response:
         if request.app.get("shutting_down"):
-            return web.HTTPBadRequest(text="Action not allowed while server is shutting down!")
+            return web.HTTPBadRequest(reason="Action not allowed while server is shutting down!")
 
         return await func(request)
 
@@ -43,21 +44,26 @@ async def status(request: web.Request) -> web.Response:
     )
 
 
-@routes.post(settings.URL_CREATE_CLUSTER)
-async def create_cluster(request: web.Request) -> web.Response:
+@routes.post(settings.URL_BOOTSTRAP_CLUSTER)
+async def bootstrap_cluster(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
 
-    request_data = models.CreateClusterRequestData.parse_raw(await request.text())
+    request_data = models.BootstrapClusterRequestData.parse_raw(await request.text())
 
-    (
-        is_cluster_just_created,
-        wallet_address,
-        yagna_payment_status_output,
-        yagna_payment_status,
-    ) = await ray_service.create_cluster(provider_config=request_data)
+    try:
+        (
+            is_cluster_just_created,
+            wallet_address,
+            yagna_payment_status_output,
+            yagna_payment_status,
+        ) = await ray_service.create_cluster(
+            request_data.provider_config, request_data.cluster_name
+        )
+    except RayServiceError as e:
+        raise web.HTTPBadRequest(reason=str(e))
 
     return json_response(
-        models.CreateClusterResponseData(
+        models.BootstrapClusterResponseData(
             is_cluster_just_created=is_cluster_just_created,
             wallet_address=wallet_address,
             yagna_payment_status_output=yagna_payment_status_output,
