@@ -167,6 +167,7 @@ class YagnaService:
             YAGNA_FUND_TIMEOUT,
         )
 
+        is_mainnet = network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON)
         fund_deadline = datetime.now() + YAGNA_FUND_TIMEOUT
         check_seconds = int(YAGNA_CHECK_INTERVAL.total_seconds())
         while datetime.now() < fund_deadline:
@@ -174,7 +175,7 @@ class YagnaService:
                 await run_subprocess_output(
                     self._yagna_path,
                     "payment",
-                    "fund",
+                    "fund" if not is_mainnet else "init",
                     "--network",
                     network,
                     "--driver",
@@ -198,7 +199,7 @@ class YagnaService:
 
                 amount = float(output["amount"])
 
-                if amount or network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON):
+                if amount or is_mainnet:
                     logger.debug(
                         "Preparing `%s` funds done with balance of %.2f %s",
                         platform,
