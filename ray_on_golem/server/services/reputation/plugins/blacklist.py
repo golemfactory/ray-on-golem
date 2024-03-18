@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 class ProviderBlacklistPlugin(ProposalManagerPlugin):
+    """A proposal manager plugin which rejects providers based on the local blacklist."""
+
     def __init__(self, payment_network: str):
         self._payment_network = payment_network
 

@@ -2,7 +2,6 @@ import asyncio
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from functools import partial
 from pathlib import Path
 from typing import Awaitable, Callable, DefaultDict, Dict, Optional, Tuple
 
@@ -11,7 +10,6 @@ from golem.managers import (
     DefaultAgreementManager,
     DefaultPaymentManager,
     DefaultProposalManager,
-    MapScore,
     MidAgreementPaymentsNegotiator,
     NegotiatingPlugin,
     PaymentManager,
@@ -26,15 +24,17 @@ from golem.managers import (
 from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
-from golem.resources import Activity, Network, Proposal, ProposalData
+from golem.resources import Activity, Network, Proposal
 from yarl import URL
 
 from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.golem.provider_data import PROVIDERS_SCORED
-from ray_on_golem.server.services.reputation.plugins import ProviderBlacklistPlugin
+from ray_on_golem.server.services.reputation.plugins import (
+    ProviderBlacklistPlugin,
+    ReputationScorer,
+)
 from ray_on_golem.server.services.utils import get_ssh_command
 
 logger = logging.getLogger(__name__)
@@ -227,11 +227,7 @@ class GolemService:
                         fill_at_start=True,
                         proposal_scorers=(
                             *extra_proposal_scorers.values(),
-                            MapScore(
-                                partial(
-                                    self._score_with_provider_data, payment_network=payment_network
-                                )
-                            ),
+                            ReputationScorer(payment_network=payment_network),
                             (0.1, RandomScore()),
                         ),
                         scoring_debounce=timedelta(seconds=10),
@@ -256,20 +252,6 @@ class GolemService:
 
     async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
         return await proposal.get_expiration_date() - datetime.now(timezone.utc)
-
-    def _score_with_provider_data(
-        self, proposal_data: ProposalData, payment_network: str
-    ) -> Optional[float]:
-        provider_id = proposal_data.issuer_id
-
-        try:
-            prescored_providers = PROVIDERS_SCORED[payment_network]
-            provider_pos = prescored_providers.index(provider_id)
-        except (KeyError, ValueError):
-            return 0
-
-        # Gives pre-scored providers from 0.5 to 1.0 score
-        return 0.5 + (0.5 * (provider_pos / len(prescored_providers)))
 
     @staticmethod
     async def _get_provider_desc(context: WorkContext):
