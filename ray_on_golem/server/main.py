@@ -12,7 +12,7 @@ from aiohttp import web
 
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
-from ray_on_golem.server.services import GolemService, RayService, ReputationService, YagnaService
+from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
     WEBSOCAT_PATH,
@@ -74,6 +74,8 @@ def create_application(
     registry_stats: bool,
     datadir: Path,
 ) -> web.Application:
+    from ray_on_golem.reputation.service import ReputationService
+
     app = web.Application(
         middlewares=[
             trace_id_middleware,

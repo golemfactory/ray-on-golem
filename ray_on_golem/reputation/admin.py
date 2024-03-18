@@ -4,7 +4,7 @@ import click
 from aerich import Migrate
 
 from ray_on_golem.cli import with_datadir
-from ray_on_golem.server.services.reputation.service import ReputationService
+from ray_on_golem.reputation.service import ReputationService
 
 
 @click.group(help="Reputation subsystem admin.", context_settings={"show_default": True})
@@ -30,7 +30,6 @@ def migrate(datadir, name, empty):
         return
 
     async def _migrate():
-        migration_name = None
         async with ReputationService(datadir, auto_apply_migrations=False) as service:
             await service.migrations.init()
             if empty:

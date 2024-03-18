@@ -162,11 +162,11 @@ def get_logging_config(datadir: Optional[Path] = None):
 def get_reputation_db_config(datadir: Optional[Path] = None):
     db_dir = get_datadir(datadir) / "db"
     db_dir.mkdir(parents=True, exist_ok=True)
-    migrations_dir = Path(__file__).parent / "services" / "reputation" / "migrations"
+    migrations_dir = Path(__file__).parent.parent / "reputation" / "migrations"
 
     db_file = db_dir / "reputation.sqlite3"
 
-    models_path = "ray_on_golem.server.services.reputation.models"
+    models_path = "ray_on_golem.reputation.models"
 
     tortoise_config = {
         "connections": {

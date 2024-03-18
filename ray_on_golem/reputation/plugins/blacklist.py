@@ -3,7 +3,7 @@ import logging
 from golem.managers import ProposalManagerPlugin
 from golem.resources import Proposal
 
-from ray_on_golem.server.services.reputation import models as m
+from ray_on_golem.reputation import models as m
 
 logger = logging.getLogger(__name__)
 

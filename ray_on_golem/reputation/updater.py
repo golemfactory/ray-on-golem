@@ -3,7 +3,7 @@ from typing import Iterable, Tuple
 
 import aiohttp
 
-from ray_on_golem.server.services.reputation import models as m
+from ray_on_golem.reputation import models as m
 
 REPUTATION_SYSTEM_URI = "https://reputation.dev-test.golem.network/v1/"
 REPUTATION_SYSTEM_PROVIDER_SCORES = "providers/scores"

@@ -27,14 +27,11 @@ from golem.payload import PaymentInfo
 from golem.resources import Activity, Network, Proposal
 from yarl import URL
 
+from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin, ReputationScorer
 from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.reputation.plugins import (
-    ProviderBlacklistPlugin,
-    ReputationScorer,
-)
 from ray_on_golem.server.services.utils import get_ssh_command
 
 logger = logging.getLogger(__name__)

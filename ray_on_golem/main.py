@@ -1,9 +1,9 @@
 import click
 
 from ray_on_golem.network_stats import main as network_stats
+from ray_on_golem.reputation.cli import reputation_cli
 from ray_on_golem.server import main as webserver
 from ray_on_golem.server import start, status, stop
-from ray_on_golem.server.services.reputation.cli import reputation_cli
 from ray_on_golem.version import version
 
 

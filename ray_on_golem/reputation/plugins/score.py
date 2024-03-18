@@ -5,7 +5,7 @@ from golem.managers.base import ProposalScorer, ProposalScoringResult
 from golem.utils.typing import MaybeAwaitable
 from tortoise.exceptions import DoesNotExist
 
-from ray_on_golem.server.services.reputation import models as m
+from ray_on_golem.reputation import models as m
 
 if TYPE_CHECKING:
     from golem.resources import ProposalData
