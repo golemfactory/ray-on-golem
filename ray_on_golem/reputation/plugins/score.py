@@ -25,7 +25,6 @@ class ReputationScorer(ProposalScorer):
         min_score: float = 0.0,
         max_score: float = 1.0,
     ):
-        super().__init__()
         self.payment_network = payment_network
         self.uptime_weight = uptime_weight
         self.success_rate_weight = success_rate_weight
@@ -61,9 +60,8 @@ class ReputationScorer(ProposalScorer):
             logger.debug("Provider `%s` not found. Assuming zero scores.", provider_id)
 
         score = (
-            uptime * self.uptime_weight
-            + success_rate * self.success_rate_weight / self.total_weight
-        )
+            uptime * self.uptime_weight + success_rate * self.success_rate_weight
+        ) / self.total_weight
         score_clamped = max(self.min_score, min(self.max_score, score))
 
         logger.debug(
