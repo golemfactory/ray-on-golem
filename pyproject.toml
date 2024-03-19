@@ -9,10 +9,10 @@ packages = [{include = "ray_on_golem"}]
 [tool.poetry.dependencies]
 python = "^3.8.1"
 
-ray = {version="~2.9.3", extras=["default"]}
-#golem-core = {path="../golem-core-python", develop=true}
-#golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.2"
+ray = {version = "~2.9.3", extras = ["default"]}
+#golem-core = {path = "../golem-core-python", develop = true}
+golem-core = {git = "https://github.com/golemfactory/golem-core-python.git", branch = "main"}
+#golem-core = "^0.6.2"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"
@@ -35,10 +35,10 @@ setuptools = "*"
 [tool.poetry.group.ray.dependencies]
 python = "^3.8.1"
 
-ray = {version="==2.9.3", extras=["default"]}
-#golem-core = {path="../golem-core-python", develop=true}
-#golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.2"
+ray = {version = "==2.9.3", extras = ["default"]}
+#golem-core = {path = "../golem-core-python", develop = true}
+golem-core = {git = "https://github.com/golemfactory/golem-core-python.git", branch = "main"}
+#golem-core = "^0.6.2"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"

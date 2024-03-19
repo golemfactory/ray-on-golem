@@ -41,7 +41,7 @@ class YagnaService:
         self._yagna_early_exit_task: Optional[asyncio.Task] = None
         self._datadir = datadir
 
-    async def init(self) -> None:
+    async def start(self) -> None:
         logger.info("Starting YagnaService...")
 
         if await self._check_if_yagna_is_running():
@@ -53,7 +53,7 @@ class YagnaService:
 
         logger.info("Starting YagnaService done")
 
-    async def shutdown(self) -> None:
+    async def stop(self) -> None:
         logger.info("Stopping YagnaService...")
 
         await self._stop_yagna_service()
@@ -163,14 +163,37 @@ class YagnaService:
 
         logger.info("Stopping Yagna done")
 
-    async def run_payment_fund(self, network: str, driver: str) -> Dict:
+    async def prepare_funds(self, network: str, driver: str) -> Dict:
         platform = f"{driver}/{network}"
+
+        # FIXME: Uncomment this block on yagna 0.15+
+        # if network not in (PAYMENT_NETWORK_HOLESKY, PAYMENT_NETWORK_GOERLI):
+        #     logger.debug(
+        #         "No need to prepare funds as `%s` does not support automatic funding",
+        #         platform,
+        #     )
+        #
+        #     return json.loads(
+        #         await run_subprocess_output(
+        #             self._yagna_path,
+        #             "payment",
+        #             "status",
+        #             "--network",
+        #             network,
+        #             "--driver",
+        #             driver,
+        #             "--json",
+        #             timeout=timedelta(seconds=30),
+        #         )
+        #     )
+
         logger.debug(
             "Preparing `%s` funds with a timeout up to %s...",
             platform,
             YAGNA_FUND_TIMEOUT,
         )
 
+        # FIXME: is_mainnet not needed on yagna 0.15+
         is_mainnet = network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON)
         fund_deadline = datetime.now() + YAGNA_FUND_TIMEOUT
         check_seconds = int(YAGNA_CHECK_INTERVAL.total_seconds())
@@ -179,7 +202,7 @@ class YagnaService:
                 await run_subprocess_output(
                     self._yagna_path,
                     "payment",
-                    "fund" if not is_mainnet else "init",
+                    *(["init", "--sender"] if is_mainnet else ["fund"]),
                     "--network",
                     network,
                     "--driver",
