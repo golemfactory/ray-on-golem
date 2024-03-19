@@ -171,16 +171,15 @@ class NetworkStatsService:
                 duration_minutes, node_type, " (head node)" if is_head_node else ""
             )
         )
-        consume_proposals_task = asyncio.create_task(self._consume_draft_proposals(stack))
+
         try:
-            await asyncio.wait(
-                [consume_proposals_task],
+            await asyncio.wait_for(
+                self._consume_draft_proposals(stack),
                 timeout=timedelta(minutes=duration_minutes).total_seconds(),
             )
+        except (asyncio.TimeoutError, KeyboardInterrupt):
+            pass
         finally:
-            consume_proposals_task.cancel()
-            await consume_proposals_task
-
             await stack.stop()
             await self._payment_manager.stop()
             self._payment_manager = None
@@ -193,8 +192,6 @@ class NetworkStatsService:
             while True:
                 draft = await stack._managers[-1].get_draft_proposal()
                 drafts.append(draft)
-        except asyncio.CancelledError:
-            return
         finally:
             await asyncio.gather(
                 # FIXME better reason message
@@ -211,6 +208,7 @@ class NetworkStatsService:
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
+            # TODO: Use DeviceListAllocationPayMentManager in yanga 0.15+
             self._payment_manager = DefaultPaymentManager(
                 self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
@@ -229,6 +227,9 @@ class NetworkStatsService:
         )
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
             extra_proposal_plugins, node_config
+        )
+        ManagerStackNodeConfigHelper.apply_priority_head_node_scoring(
+            extra_proposal_scorers, node_config
         )
 
         demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(

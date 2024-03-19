@@ -101,7 +101,7 @@ async def network_stats_service(
     )
 
     await yagna_service.init()
-    await yagna_service.run_payment_fund(network, driver)
+    await yagna_service.prepare_funds(network, driver)
 
     await service.init(yagna_appkey=yagna_service.yagna_appkey)
 
