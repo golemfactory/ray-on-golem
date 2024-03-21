@@ -131,7 +131,7 @@ setup_commands: []
 # Custom commands that will be run on the head node after common setup.
 #head_setup_commands: []
 head_setup_commands: [
-   "pip install ray[serve]",
+#   "pip install ray[serve]",
 ]
 
 # Custom commands that will be run on worker nodes after common setup.

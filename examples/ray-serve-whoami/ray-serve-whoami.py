@@ -12,6 +12,7 @@ class WhoamiDeployment:
     def __init__(self, msg: str):
         # Initialize model state: could be very large neural net weights.
         #self._msg = msg
+        pass
 
     async def __call__(self, request: Request) -> Dict:
         #return {"result": await request.body()}
