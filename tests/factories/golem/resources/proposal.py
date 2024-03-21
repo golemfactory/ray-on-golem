@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from functools import partial
-from typing import Optional, Type, Union
+from typing import Dict, Optional, Sequence, Type, Union
 
 import factory
+import pytest
 from golem.resources import Demand, Proposal, ProposalData
 
 from tests.factories.golem.resources.base import ResourceFactory
@@ -65,3 +66,31 @@ class ProposalFactory(ResourceFactory):
             obj.demand = extracted
         elif kwargs:
             obj.demand = DemandFactory(**kwargs)
+
+
+class ProposalGenerator:
+    """Generates the required Proposals with specified factory parameters.
+
+    We provide kwargs, not direct Proposal objects to allow passing them as test parameters.
+    As initialization of Proposal object requires an asyncio loop to be runnning, we cannot
+    do this declaratively.
+    """
+
+    def __init__(self, factory_kwargs: Optional[Sequence[Dict]] = None):
+        self.proposals = list()
+        self.generator = (ProposalFactory(**kwargs) for kwargs in factory_kwargs or (dict(),))
+
+    async def get_proposal(self) -> Proposal:
+        proposal = next(self.generator)
+        self.proposals.append(proposal)
+        return proposal
+
+
+@pytest.fixture
+def proposal_generator(request):
+    factory_kwargs: Sequence[Dict] = ({},)
+    try:
+        factory_kwargs = request.param
+    except AttributeError:
+        pass
+    return ProposalGenerator(factory_kwargs).get_proposal
