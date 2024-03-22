@@ -19,13 +19,13 @@ provider:
     # Blockchain used for payments.
     # Goerli means running free nodes on testnet,
     # Polygon is for mainnet operations.
-    payment_network: "goerli"
+    payment_network: "holesky"
     #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
 
-    # Common parameters for all node types. Can be overriden in available_node_types
+    # Common parameters for all node types. Can be overridden in available_node_types
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
@@ -35,7 +35,7 @@ provider:
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
         # If not provided demand will not use Computation Manifest
-        outbound_urls: ["https://pypi.dev.golem.network"]
+        # outbound_urls: ["https://pypi.dev.golem.network"]
 
         # Minimal values of parameters offered by Golem provider 
         min_mem_gib: 1

@@ -352,7 +352,7 @@ class GolemService:
                     await asyncio.sleep(retry_interval)
                     continue
                 else:
-                    raise
+                    raise GolemException("SSH connection check failed!") from e
 
         logger.info(
             "SSH connection check successful on "

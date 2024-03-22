@@ -66,16 +66,20 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters = self._map_ssh_config(provider_parameters)
         self._payment_network = provider_parameters["payment_network"].lower().strip()
 
-        cluster_creation_response = self._ray_on_golem_client.create_cluster(provider_parameters)
-
-        self._wallet_address = cluster_creation_response.wallet_address
-        self._is_cluster_just_created = cluster_creation_response.is_cluster_just_created
-
-        self._print_mainnet_onboarding_message(
-            cluster_creation_response.yagna_payment_status_output
+        cluster_bootstrap_response = self._ray_on_golem_client.bootstrap_cluster(
+            provider_parameters, cluster_name
         )
 
-        wallet_glm_amount = float(cluster_creation_response.yagna_payment_status.get("amount", "0"))
+        self._wallet_address = cluster_bootstrap_response.wallet_address
+        self._is_cluster_just_created = cluster_bootstrap_response.is_cluster_just_created
+
+        self._print_mainnet_onboarding_message(
+            cluster_bootstrap_response.yagna_payment_status_output
+        )
+
+        wallet_glm_amount = float(
+            cluster_bootstrap_response.yagna_payment_status.get("amount", "0")
+        )
         if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
