@@ -1,9 +1,10 @@
+import asyncio
 import logging
 import logging.config
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import click
 import colorful
@@ -11,6 +12,7 @@ import psutil
 from aiohttp import web
 
 from ray_on_golem.cli import with_datadir
+from ray_on_golem.reputation.updater import ReputationUpdater
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
@@ -21,6 +23,10 @@ from ray_on_golem.server.settings import (
     get_logging_config,
 )
 from ray_on_golem.server.views import routes
+
+if TYPE_CHECKING:
+    from ray_on_golem.reputation.service import ReputationService
+
 
 logger = logging.getLogger(__name__)
 
@@ -161,9 +167,17 @@ async def reputation_service_ctx(app: web.Application) -> None:
     reputation_service: ReputationService = app["reputation_service"]
 
     await reputation_service.start()
+    updaters = [
+        ReputationUpdater(network) for network in ["polygon", "mainnet", "goerli", "holesky"]
+    ]
+    update_tasks = [asyncio.create_task(updater.update()) for updater in updaters]
 
     yield
 
+    for t in update_tasks:
+        t.cancel()
+
+    await asyncio.gather(*update_tasks)
     await reputation_service.stop()
 
 
