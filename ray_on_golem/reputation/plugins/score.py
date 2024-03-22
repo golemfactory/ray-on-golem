@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Final, Sequence
+from typing import TYPE_CHECKING, Dict, Final, Optional, Sequence, Tuple
 
 from golem.managers.base import ProposalScorer, ProposalScoringResult
 from golem.utils.typing import MaybeAwaitable
@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+PARAM_UPTIME = "uptime"
+PARAM_SUCCESS_RATE = "success_rate"
 DEFAULT_UPTIME_WEIGHT: Final[float] = 1.0
 DEFAULT_SUCCESS_RATE_WEIGHT: Final[float] = 0.5
 
@@ -20,27 +22,27 @@ class ReputationScorer(ProposalScorer):
     def __init__(
         self,
         payment_network: str,
-        uptime_weight: float = DEFAULT_UPTIME_WEIGHT,
-        success_rate_weight: float = DEFAULT_SUCCESS_RATE_WEIGHT,
-        min_score: float = 0.0,
-        max_score: float = 1.0,
+        weights: Optional[Dict[str, float]] = None,
+        score_range: Tuple[float, float] = (0.0, 1.0),
     ):
         self.payment_network = payment_network
-        self.uptime_weight = uptime_weight
-        self.success_rate_weight = success_rate_weight
-        self.total_weight = self.uptime_weight + self.success_rate_weight
-        self.min_score = min_score
-        self.max_score = max_score
+        self.weights = weights or self._default_weights()
+        self.total_weight = sum(self.weights.values())
+        self.score_range = score_range
         logger.debug(
             f"Initialized {self.__class__.__name__}: "
-            "payment_network=%s, uptime_weight=%s, "
-            "success_rate_weight=%s, min_score=%s, max_score=%s",
+            "payment_network=%s, weights=%s, score_range=%s",
             self.payment_network,
-            self.uptime_weight,
-            self.success_rate_weight,
-            self.min_score,
-            self.max_score,
+            self.weights,
+            self.score_range,
         )
+
+    @staticmethod
+    def _default_weights() -> Dict[str, float]:
+        return {
+            PARAM_UPTIME: DEFAULT_UPTIME_WEIGHT,
+            PARAM_SUCCESS_RATE: DEFAULT_SUCCESS_RATE_WEIGHT,
+        }
 
     async def calculate_score(
         self,
@@ -52,25 +54,27 @@ class ReputationScorer(ProposalScorer):
             node_reputation = await m.NodeReputation.get_blacklisted(False).get(
                 network__network_name=self.payment_network, node__node_id=provider_id
             )
-            uptime = node_reputation.uptime or 0.0
-            success_rate = node_reputation.success_rate or 0.0
         except DoesNotExist:
-            uptime = 0.0
-            success_rate = 0.0
+            node_reputation = m.NodeReputation()
             logger.debug("Provider `%s` not found. Assuming zero scores.", provider_id)
 
         score = (
-            uptime * self.uptime_weight + success_rate * self.success_rate_weight
-        ) / self.total_weight
-        score_clamped = max(self.min_score, min(self.max_score, score))
+            sum(
+                [
+                    (getattr(node_reputation, attr) or 0.0) * weight
+                    for attr, weight in self.weights.items()
+                ]
+            )
+            / self.total_weight
+        )
+        score_clamped = max(self.score_range[0], min(self.score_range[1], score))
 
         logger.debug(
-            "Provider `%s`'s score: %s (score=%s, uptime=%s, success_rate=%s).",
+            "Provider `%s`'s score: %s (score=%s, node_reputation=%s).",
             provider_id,
             score_clamped,
             score,
-            uptime,
-            success_rate,
+            node_reputation,
         )
 
         return score_clamped
