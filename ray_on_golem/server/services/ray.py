@@ -243,11 +243,12 @@ class RayService:
                         f"Something is wrong with node {node_id} activity. {activity_state=}"
                     )
             except Exception:
-                logger.warning(
+                msg = (
                     f"Activity {activity} is no longer accessible."
-                    f"Terminating {node_id} {is_head_node=}",
-                    exc_info=True,
+                    f"Terminating {node_id} {is_head_node=}"
                 )
+                logger.warning(msg)
+                logger.debug(msg, exc_info=True)
                 del self._node_monitoring_tasks[node_id]
                 if is_head_node:
                     await self.shutdown()

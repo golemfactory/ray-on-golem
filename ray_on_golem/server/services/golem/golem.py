@@ -309,10 +309,9 @@ class GolemService:
                 f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=} done"
             )
         except Exception:
-            logger.warning(
-                f"Failed to restart SSH server {provider_desc}, {ip=}, {context.activity=}",
-                exc_info=True,
-            )
+            msg = f"Failed to restart SSH server {provider_desc}, {ip=}, {context.activity=}"
+            logger.warning(msg)
+            logger.debug(msg, exc_info=True)
 
     @staticmethod
     async def _verify_ssh_connection_check(activity_id, ssh_command):
@@ -351,10 +350,9 @@ class GolemService:
                 fails_count += 1
                 if fails_count >= 5:
                     # Ray's autoscaler won't notice but we will at least save some GLMs
-                    logger.warning(
-                        f"Destroying activity due to no SSH connection to {provider_desc}",
-                        exc_info=True,
-                    )
+                    msg = f"Destroying activity due to no SSH connection to {provider_desc}"
+                    logger.warning(msg)
+                    logger.debug(msg, exc_info=True)
                     try:
                         await context.activity.destroy()
                     except Exception:
@@ -446,7 +444,8 @@ class GolemService:
                 msg = "Failed to create activity, retrying."
                 error = f"{type(e).__module__}.{type(e).__name__}: {e}"
                 await add_state_log(f"{msg} {error=}")
-                logger.warning(msg, exc_info=True)
+                logger.warning(msg)
+                logger.debug(msg, exc_info=True)
 
     async def _create_activity(
         self,
