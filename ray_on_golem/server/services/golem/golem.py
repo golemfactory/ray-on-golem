@@ -25,6 +25,7 @@ from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
 from golem.resources import Activity, Network, Proposal
+from golem.utils.asyncio import ensure_cancelled_many
 from yarl import URL
 
 from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin, ReputationScorer
@@ -85,9 +86,7 @@ class GolemService:
 
     # FIXME: Remove this method in case of multiple cluster support
     async def clear(self) -> None:
-        for sentry_task in self._ssh_sentry_tasks:
-            sentry_task.cancel()
-        await asyncio.gather(*self._ssh_sentry_tasks, return_exceptions=True)
+        await ensure_cancelled_many(self._ssh_sentry_tasks)
         self._ssh_sentry_tasks.clear()
 
         await asyncio.gather(
