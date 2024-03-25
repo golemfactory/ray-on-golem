@@ -2,10 +2,12 @@ import asyncio
 import logging
 from asyncio.subprocess import Process
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
+from golem.resources import Activity
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled, ensure_cancelled_many
 from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
@@ -34,6 +36,9 @@ from ray_on_golem.utils import (
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_NODE_MONITORING_TIMEOUT = timedelta(seconds=15)
+
+
 class RayServiceError(RayOnGolemError):
     pass
 
@@ -60,6 +65,8 @@ class RayService:
         self._nodes_id_counter = 0
 
         self._create_node_tasks: Dict[NodeId, asyncio.Task] = {}
+        self._node_monitoring_tasks: Dict[NodeId, asyncio.Task] = {}
+        self._node_monitoring_timeout: timedelta = DEFAULT_NODE_MONITORING_TIMEOUT
 
         self._head_node_to_webserver_tunnel_process: Optional[Process] = None
         self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
@@ -71,7 +78,7 @@ class RayService:
 
     async def shutdown(self) -> None:
         logger.info("Stopping RayService...")
-
+        await self._stop_node_monitoring_tasks()
         await self._stop_head_node_to_webserver_tunnel()
         await self._stop_create_node_tasks()
         await self._destroy_nodes()
@@ -196,6 +203,11 @@ class RayService:
             # TODO: check if node is a head node
             if not self._is_head_node_to_webserver_tunnel_running():
                 await self._start_head_node_to_webserver_tunnel()
+
+            # monitor activity state
+            self._node_monitoring_tasks[node_id] = asyncio.create_task(
+                self._monitor_node(node_id, activity)
+            )
         except Exception as e:
             async with self._get_node_context(node_id) as node:  # type: Node
                 node.state = NodeState.terminated
@@ -215,6 +227,33 @@ class RayService:
         node_id = f"node{self._nodes_id_counter}"
         self._nodes_id_counter += 1
         return node_id
+
+    async def _monitor_node(self, node_id: NodeId, activity: Activity) -> None:
+        async with self._get_node_context(node_id) as node:  # type: Node
+            is_head_node = self._is_head_node(node.tags)
+        while True:
+            try:
+                activity_state = await activity.get_state()
+                if (
+                    "Terminated" in activity_state.state
+                    or "Unresponsive" in activity_state.state
+                    or activity_state.error_message is not None
+                ):
+                    raise RayServiceError(
+                        f"Something is wrong with node {node_id} activity. {activity_state=}"
+                    )
+            except Exception:
+                logger.warning(
+                    f"Activity is no longer accessible. Terminating {node_id} {is_head_node=}",
+                    exc_info=True,
+                )
+                del self._node_monitoring_tasks[node_id]
+                if is_head_node:
+                    await self.shutdown()
+                else:
+                    await self.terminate_node(node_id)
+                break
+            await asyncio.sleep(self._node_monitoring_timeout.total_seconds())
 
     async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         logger.info("Terminating node `%s`...", node_id)
@@ -417,3 +456,16 @@ class RayService:
         self._create_node_tasks.clear()
 
         logger.info("Canceling %d pending node creation tasks done", task_count)
+
+    async def _stop_node_monitoring_tasks(self) -> None:
+        task_count = len(self._node_monitoring_tasks)
+        if not task_count:
+            logger.info("Not canceling pending node monitoring tasks, as there are no tasks")
+            return
+
+        logger.info("Canceling %d node monitoring tasks...", task_count)
+
+        await ensure_cancelled_many(self._node_monitoring_tasks.values())
+        self._node_monitoring_tasks.clear()
+
+        logger.info("Canceling %d node monitoring tasks done", task_count)
