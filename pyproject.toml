@@ -10,9 +10,9 @@ packages = [{include = "ray_on_golem"}]
 python = "^3.8.1"
 
 ray = {version="~2.9.3", extras=["default"]}
-#golem-core = {path="../golem-core-python", develop=true}
-#golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.0"
+#golem-core = {path = "../golem-core-python", develop = true}
+golem-core = {git = "https://github.com/golemfactory/golem-core-python.git", branch = "ld/observ-ssh-tunel"}
+# golem-core = "^0.6.0"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"
@@ -22,7 +22,8 @@ dpath = "^2.1.6"
 appdirs = "^1.4.4"
 
 websocat = "^1.12.0"
-golem-node = {version = "0.15.0a18", source = "test-pypi"}
+golem-node = "0.13.2"
+#golem-node = {version = "0.15.0a18", source = "test-pypi"}
 
 tortoise-orm = "^0.20.0"
 aerich = "^0.7.2"
@@ -35,10 +36,10 @@ setuptools = "*"
 [tool.poetry.group.ray.dependencies]
 python = "^3.8.1"
 
-ray = {version="==2.9.3", extras=["default"]}
-#golem-core = {path="../golem-core-python", develop=true}
-#golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.0"
+ray = {version="~2.9.3", extras=["default"]}
+#golem-core = {path = "../golem-core-python", develop = true}
+golem-core = {git = "https://github.com/golemfactory/golem-core-python.git", branch = "ld/observ-ssh-tunel"}
+# golem-core = "^0.6.0"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"
