@@ -244,7 +244,8 @@ class RayService:
                     )
             except Exception:
                 logger.warning(
-                    f"Activity is no longer accessible. Terminating {node_id} {is_head_node=}",
+                    f"Activity {activity} is no longer accessible."
+                    f"Terminating {node_id} {is_head_node=}",
                     exc_info=True,
                 )
                 del self._node_monitoring_tasks[node_id]
