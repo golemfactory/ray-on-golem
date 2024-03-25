@@ -36,7 +36,7 @@ from ray_on_golem.utils import (
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_NODE_MONITORING_TIMEOUT = timedelta(seconds=15)
+DEFAULT_NODE_MONITORING_TIMEOUT = timedelta(minutes=1, seconds=30)
 
 
 class RayServiceError(RayOnGolemError):

@@ -42,7 +42,7 @@ DEFAULT_LONG_RUNNING_DEMAND_LIFETIME = timedelta(days=365)
 DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
 DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
 DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
-DEFAULT_SSH_SENTRY_TIMEOUT = timedelta(seconds=30)
+DEFAULT_SSH_SENTRY_TIMEOUT = timedelta(minutes=2)
 
 
 class GolemService:
