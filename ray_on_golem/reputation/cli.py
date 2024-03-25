@@ -26,7 +26,7 @@ def with_network(cli_func=None, *, default: Optional[str] = "polygon"):
         return click.option(
             "--network",
             type=click.Choice(
-                ["polygon", "mainnet", "goerli", "holesky"],
+                ["polygon", "mainnet", "mumbai", "goerli", "holesky"],
             ),
             default=default,
             help="The network for the score",
@@ -38,17 +38,39 @@ def with_network(cli_func=None, *, default: Optional[str] = "polygon"):
     return _with_network(cli_func)
 
 
-@reputation_cli.command(name="list", help="List reputation records.")
+@reputation_cli.command(
+    name="list",
+    help="""
+List reputation scores for all unblocked providers.
+
+With the `--blacklist` option, list all currently blocked providers.
+
+Providers are rated using two criteria: `Uptime` and `Success Rate`, the values of which are
+pulled from Golem's Reputation System, which regularly runs benchmarks against all the available 
+providers.
+
+`Uptime`:
+
+   How often is the given node present and ready to pick up work for the requestors.
+
+
+`Success Rate`
+
+    What is the ratio of benchmark tasks successfully completed by each provider to the number of
+tasks they had been assigned.
+""",
+)
 @click.argument(
     "node_id",
     nargs=-1,
 )
 @click.option(
-    "--blacklist",
+    "--blacklist/--no-blacklist",
     is_flag=True,
     help="Show only the blacklisted nodes",
+    default=False,
 )
-@with_network(default=None)
+@with_network(default="polygon")
 @with_datadir
 def list_(datadir, network, node_id, blacklist):
     async def list_records():
@@ -60,14 +82,11 @@ def list_(datadir, network, node_id, blacklist):
         )
 
         table = PrettyTable(
-            ["ID", "Name", "Network", "Blacklisted?", "Success Rate", "Uptime score"]
+            ["Provider ID", "Payment Network", "Blacklisted?", "Uptime score", "Success Rate"]
         )
 
         async with ReputationService(datadir):
-            if blacklist:
-                qs = m.NodeReputation.get_blacklisted()
-            else:
-                qs = m.NodeReputation.all()
+            qs = m.NodeReputation.get_blacklisted(blacklist)
 
             if network:
                 qs = qs.filter(network__network_name=network)
@@ -77,18 +96,21 @@ def list_(datadir, network, node_id, blacklist):
 
             qs = qs.select_related("node", "network")
 
+            qs = qs.order_by("-uptime", "-success_rate", "node__node_id")
+
             async for node_reputation in qs:
                 node: m.Node = node_reputation.node
                 table.add_row(
                     [
                         node.node_id,
-                        node.name or "",
                         node_reputation.network.network_name,
                         node_reputation.is_blacklisted(),
-                        node_reputation.success_rate
+                        "{:.3}".format(node_reputation.uptime)
+                        if node_reputation.uptime is not None
+                        else "",
+                        "{:.3}".format(node_reputation.success_rate)
                         if node_reputation.success_rate is not None
                         else "",
-                        node_reputation.uptime if node_reputation.uptime is not None else "",
                     ]
                 )
 

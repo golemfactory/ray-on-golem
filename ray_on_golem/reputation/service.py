@@ -42,6 +42,12 @@ class ReputationService(AbstractAsyncContextManager):
 
         migrations_performed = await self.migrations.upgrade(True)
         logger.info("Migrations performed: %s.", migrations_performed)
+        return migrations_performed
+
+    async def downgrade_migrations(self, version: int):
+        migrations_performed = await self.migrations.downgrade(version, False)
+        logger.info("Migrations performed: %s.", migrations_performed)
+        return migrations_performed
 
     async def start(self):
         await self.migrations.init()

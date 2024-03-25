@@ -1,10 +1,14 @@
 import asyncio
 
 import click
-from aerich import Migrate
+from aerich import DowngradeError, Migrate
 
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.reputation.service import ReputationService
+
+
+def _format_migrations(migrations):
+    return [f"    {m}\n" for m in migrations]
 
 
 @click.group(help="Reputation subsystem admin.", context_settings={"show_default": True})
@@ -59,15 +63,18 @@ def updates(datadir, show_full):
                 print("DB uninitialized.")
                 return
 
-            print("Current DB version: ", db_version.version)
+            print("Current DB version: ", db_version.version, "\n")
 
             migrations_available = await service.migrations_available()
             if migrations_available:
-                print("Available updates: ", migrations_available)
+                print("Available updates: \n", *_format_migrations(migrations_available))
             else:
                 print("The DB seems to be up to date :)")
             if show_full:
-                print("Full migration history: ", await service.migrations.history())
+                print(
+                    "Full migration history: \n",
+                    *_format_migrations(await service.migrations.history()),
+                )
 
     asyncio.run(_updates())
 
@@ -77,6 +84,26 @@ def updates(datadir, show_full):
 def upgrade(datadir):
     async def _upgrade():
         async with ReputationService(datadir, auto_apply_migrations=False) as service:
-            await service.apply_migrations()
+            applied_migrations = await service.apply_migrations()
+            if applied_migrations:
+                print("Applied migrations: \n", *_format_migrations(applied_migrations))
+            else:
+                print("No new migrations found.")
 
     asyncio.run(_upgrade())
+
+
+@admin.command(help="Rollback all the migrations up to and including the given version.")
+@with_datadir
+@click.argument("version", type=int)
+def rollback(datadir, version: int):
+    async def _downgrade():
+        async with ReputationService(datadir, auto_apply_migrations=False) as service:
+            try:
+                rolled_back_migrations = await service.downgrade_migrations(version)
+                if rolled_back_migrations:
+                    print("Rolled-back migrations: \n", *_format_migrations(rolled_back_migrations))
+            except DowngradeError:
+                print("Migration not found in the DB.")
+
+    asyncio.run(_downgrade())

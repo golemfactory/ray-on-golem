@@ -169,7 +169,7 @@ async def reputation_service_ctx(app: web.Application) -> None:
 
     await reputation_service.start()
     updaters = [
-        ReputationUpdater(network) for network in ["polygon", "mainnet", "goerli", "holesky"]
+        ReputationUpdater(network) for network in ["polygon", "mumbai", "goerli", "holesky"]
     ]
     update_tasks = [asyncio.create_task(updater.update()) for updater in updaters]
 
