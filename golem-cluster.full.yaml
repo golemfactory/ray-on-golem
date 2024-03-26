@@ -102,6 +102,9 @@ available_node_types:
     resources: {}
     node_config: {}
 
+# Specify the node type of the head node (as configured above).
+head_node_type: ray.head.default
+
 # The files or directories to copy to the head and worker nodes
 # Remote workdir is /root/
 file_mounts: {
