@@ -35,9 +35,6 @@ file_mounts: {}
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: []
 
-# Specify the node type of the head node (as configured above).
-head_node_type: ray.head.default
-
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
 initialization_commands: []
 
