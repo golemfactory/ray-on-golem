@@ -21,9 +21,9 @@ provider:
     webserver_port: 4578
 
     # Blockchain used for payments.
-    # Goerli means running free nodes on testnet,
+    # Holesky means running free nodes on testnet,
     # Polygon is for mainnet operations.
-    payment_network: "goerli"
+    payment_network: "holesky"
     #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
@@ -76,8 +76,7 @@ provider:
         # If not provided payment will be sent only after cluster is stopped. Note: cluster will then run for maximum of 8 hours
         # Required for long running clusters
         payment_interval_hours:
-          minimal: 1
-          optimal: 12 # optional defaults to `minimal`
+          minimal: 12
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -139,14 +138,6 @@ head_start_ray_commands: [
 worker_start_ray_commands: [
   "ray start --address $RAY_HEAD_IP:6379",
 ]
-
-# Authentication credentials that Ray will use to launch nodes
-# auth:
-  # Custom username for ssh
-  # ssh_user: "root"
-
-  # If ssh_private_key will be not provided, temporary key will be created and used
-  # ssh_private_key: "~/.ssh/id_rsa"
 
 # Satisfy checks to disable warning about legacy fields at `ray up`.
 # This will be removed by ray-on-golem on the fly.
