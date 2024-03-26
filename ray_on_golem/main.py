@@ -4,10 +4,11 @@ from ray_on_golem.network_stats import main as network_stats
 from ray_on_golem.reputation.cli import reputation_cli
 from ray_on_golem.server import main as webserver
 from ray_on_golem.server import start, status, stop
-from ray_on_golem.version import version
+from ray_on_golem.version import get_version, version
 
 
 @click.group()
+@click.version_option(get_version(), "--version", "-V")
 def cli():
     pass
 
