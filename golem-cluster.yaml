@@ -72,14 +72,6 @@ provider:
         # Amount of GLMs for each hour that worker runs which Golem provider offer will be rejected if exceeded.
         max_env_per_hour_price: 0.5
 
-<<<<<<< HEAD
-=======
-        # If not provided payment will be sent only after cluster is stopped. Note: cluster will then run for maximum of 8 hours
-        # Required for long running clusters
-        payment_interval_hours:
-          minimal: 1
-          optimal: 12 # optional defaults to `minimal`
->>>>>>> develop
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
