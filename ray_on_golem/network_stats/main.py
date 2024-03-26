@@ -2,13 +2,12 @@ import asyncio
 import logging
 import logging.config
 import pathlib
-from contextlib import asynccontextmanager
 from typing import Dict, Optional
 
 import click
 import yaml
-
 from golem.utils.asyncio import ensure_cancelled
+
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
 from ray_on_golem.server.services import YagnaService
@@ -82,12 +81,14 @@ def main(
     )
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(_start_services(
-        stats_service,
-        yagna_service,
-        provider_params["payment_network"],
-        provider_params["payment_driver"]
-    ))
+    loop.run_until_complete(
+        _start_services(
+            stats_service,
+            yagna_service,
+            provider_params["payment_network"],
+            provider_params["payment_driver"],
+        )
+    )
 
     run_task = loop.create_task(stats_service.run(cluster_config_file, node_type, duration))
 
@@ -97,10 +98,13 @@ def main(
         print("Received CTRL-C, exiting...")
         loop.run_until_complete(ensure_cancelled(run_task))
 
-    loop.run_until_complete(_stop_services(
-        stats_service,
-        yagna_service,
-    ))
+    loop.run_until_complete(
+        _stop_services(
+            stats_service,
+            yagna_service,
+        )
+    )
+
 
 async def _start_services(
     stats_service: NetworkStatsService,
@@ -112,6 +116,7 @@ async def _start_services(
     await yagna_service.prepare_funds(network, driver)
 
     await stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
+
 
 async def _stop_services(
     stats_service: NetworkStatsService,
