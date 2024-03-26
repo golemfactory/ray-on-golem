@@ -59,6 +59,7 @@ class DemandConfigData(BaseModel):
     min_cpu_threads: int = 0
     min_storage_gib: float = 0.0
     max_cpu_threads: Optional[int] = None
+    runtime: str = "vm"
 
 
 class PerCpuExpectedUsageData(BaseModel):
@@ -91,6 +92,7 @@ class BudgetControlData(BaseModel):
 
 class NodeConfigData(BaseModel):
     subnet_tag: str
+    priority_head_subnet_tag: Optional[str]
     demand: DemandConfigData = Field(default_factory=DemandConfigData)
     budget_control: Optional[BudgetControlData] = Field(default_factory=BudgetControlData)
 

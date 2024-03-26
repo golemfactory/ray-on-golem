@@ -7,22 +7,27 @@ from typing import Dict, Optional, Sequence
 
 from golem.managers import (
     BlacklistProviderIdPlugin,
+    DefaultPaymentManager,
     DefaultProposalManager,
     NegotiatingPlugin,
-    PayAllPaymentManager,
     PaymentPlatformNegotiator,
     ProposalBuffer,
     ProposalManagerPlugin,
     ProposalScoringBuffer,
-    RefreshingDemandManager,
 )
-from golem.managers.base import ManagerPluginException, PaymentManager, ProposalNegotiator
+from golem.managers.base import (
+    ManagerPluginException,
+    PaymentManager,
+    ProposalNegotiator,
+    ProposalScorer,
+)
 from golem.node import GolemNode
 from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
 
 from ray_on_golem.server.models import NodeConfigData
+from ray_on_golem.server.services.golem.golem import DEFAULT_DEMAND_LIFETIME
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
@@ -146,13 +151,26 @@ class NetworkStatsService:
         provider_parameters: Dict = config["provider"]["parameters"]
 
         payment_network: str = provider_parameters["payment_network"]
+        payment_driver: str = provider_parameters["payment_driver"]
         total_budget: float = provider_parameters["total_budget"]
         node_config = NodeConfigData(**config["available_node_types"][node_type]["node_config"])
 
-        stack = await self._create_stack(node_config, total_budget, payment_network)
+        is_head_node = node_type == config.get("head_node_type")
+
+        stack = await self._create_stack(
+            node_config=node_config,
+            total_budget=total_budget,
+            payment_network=payment_network,
+            payment_driver=payment_driver,
+            is_head_node=is_head_node,
+        )
         await stack.start()
 
-        print(f"Gathering stats data for {duration_minutes} minutes for `{node_type}`...")
+        print(
+            "Gathering stats data for {} minutes for `{}`{}...".format(
+                duration_minutes, node_type, " (head node)" if is_head_node else ""
+            )
+        )
         consume_proposals_task = asyncio.create_task(self._consume_draft_proposals(stack))
         try:
             await asyncio.wait(
@@ -173,7 +191,7 @@ class NetworkStatsService:
         drafts = []
         try:
             while True:
-                draft = await stack.proposal_manager.get_draft_proposal()
+                draft = await stack._managers[-1].get_draft_proposal()
                 drafts.append(draft)
         except asyncio.CancelledError:
             return
@@ -189,28 +207,38 @@ class NetworkStatsService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
+        is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            self._payment_manager = PayAllPaymentManager(
-                self._golem, budget=total_budget, network=payment_network
+            self._payment_manager = DefaultPaymentManager(
+                self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()
 
         stack = ManagerStack()
+        extra_proposal_plugins: Dict[str, ProposalManagerPlugin] = {}
+        extra_proposal_scorers: Dict[str, ProposalScorer] = {}
 
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
 
-        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(
+            extra_proposal_plugins, extra_proposal_scorers, node_config
+        )
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
+            extra_proposal_plugins, node_config
+        )
 
-        stack.demand_manager = RefreshingDemandManager(
-            self._golem,
-            self._payment_manager.get_allocation,
+        demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
+            stack,
             payloads,
-            demand_lifetime=timedelta(hours=8),
-            subnet_tag=node_config.subnet_tag,
+            DEFAULT_DEMAND_LIFETIME,
+            node_config,
+            is_head_node,
+            self._golem,
+            self._payment_manager,
         )
 
         plugins = [
@@ -219,7 +247,7 @@ class NetworkStatsService:
             self._stats_plugin_factory.create_counter_plugin("Not blacklisted"),
         ]
 
-        for plugin_tag, plugin in stack.extra_proposal_plugins.items():
+        for plugin_tag, plugin in extra_proposal_plugins.items():
             plugins.append(plugin)
             plugins.append(self._stats_plugin_factory.create_counter_plugin(f"Passed {plugin_tag}"))
 
@@ -229,7 +257,7 @@ class NetworkStatsService:
                     min_size=500,
                     max_size=1000,
                     fill_at_start=True,
-                    proposal_scorers=(*stack.extra_proposal_scorers.values(),),
+                    proposal_scorers=(*extra_proposal_scorers.values(),),
                     scoring_debounce=timedelta(seconds=10),
                 ),
                 self._stats_plugin_factory.create_counter_plugin("Negotiation initialized"),
@@ -238,10 +266,12 @@ class NetworkStatsService:
                 ProposalBuffer(min_size=800, max_size=1000, fill_concurrency_size=16),
             ]
         )
-        stack.proposal_manager = DefaultProposalManager(
-            self._golem,
-            stack.demand_manager.get_initial_proposal,
-            plugins=plugins,
+        stack.add_manager(
+            DefaultProposalManager(
+                self._golem,
+                demand_manager.get_initial_proposal,
+                plugins=plugins,
+            )
         )
 
         return stack

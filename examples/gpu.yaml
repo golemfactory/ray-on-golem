@@ -1,5 +1,5 @@
 # Ray on Golem cluster name
-cluster_name: golem-cluster
+cluster_name: gpu-cluster
 
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10
@@ -13,7 +13,14 @@ provider:
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
-        image_tag: "golem/ray-on-golem:0.9.0-py3.10.13-ray2.9.3"
+        image_tag: "blueshade/ray-on-golem:0.9.0-py3.10-ray2.9.2-cuda11.8"
+        outbound_urls: []
+        runtime: "vm-nvidia"
+      subnet_tag: "ray"
+
+file_mounts: {
+  # <remote_path>: <local_path>
+}
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -24,13 +31,6 @@ available_node_types:
   ray.worker.default:
     resources: {}
     node_config: {}
-
-# Specify the node type of the head node (as configured above).
-head_node_type: ray.head.default
-
-file_mounts: {
-  # <remote_path>: <local_path>
-}
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
 initialization_commands: []

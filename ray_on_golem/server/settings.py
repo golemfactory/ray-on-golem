@@ -30,7 +30,6 @@ RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
 
 RAY_ON_GOLEM_PID_FILENAME = "ray_on_golem.pid"
 
-
 URL_STATUS = "/"
 URL_CREATE_CLUSTER = "/create_cluster"
 URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
@@ -49,6 +48,7 @@ URL_SHUTDOWN = "/shutdown"
 PAYMENT_NETWORK_MAINNET = "mainnet"
 PAYMENT_NETWORK_POLYGON = "polygon"
 PAYMENT_NETWORK_GOERLI = "goerli"
+PAYMENT_NETWORK_HOLESKY = "holesky"
 PAYMENT_DRIVER_ERC20 = "erc20"
 
 RAY_ON_GOLEM_PATH = Path(os.getenv("RAY_ON_GOLEM_PATH", "ray-on-golem"))

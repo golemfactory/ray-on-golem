@@ -1,27 +1,27 @@
 import asyncio
-import hashlib
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Optional, Tuple
+from typing import Awaitable, Callable, DefaultDict, Dict, Optional, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers import (
     BlacklistProviderIdPlugin,
     DefaultAgreementManager,
+    DefaultPaymentManager,
     DefaultProposalManager,
     MapScore,
     MidAgreementPaymentsNegotiator,
     NegotiatingPlugin,
-    PayAllPaymentManager,
     PaymentManager,
     PaymentPlatformNegotiator,
     ProposalBuffer,
+    ProposalManagerPlugin,
+    ProposalScorer,
     ProposalScoringBuffer,
     RandomScore,
-    RefreshingDemandManager,
     WorkContext,
 )
 from golem.managers.base import ManagerException
@@ -54,8 +54,8 @@ class GolemService:
         self._golem: Optional[GolemNode] = None
         self._network: Optional[Network] = None
         self._yagna_appkey: Optional[str] = None
-        self._stacks: Dict[str, ManagerStack] = {}
-        self._stacks_locks = defaultdict(asyncio.Lock)
+        self._stacks: Dict[(str, bool), ManagerStack] = {}
+        self._stacks_locks: DefaultDict[(str, bool), asyncio.Lock] = defaultdict(asyncio.Lock)
         self._payment_manager: Optional[PaymentManager] = None
 
     async def init(self, yagna_appkey: str) -> None:
@@ -108,49 +108,67 @@ class GolemService:
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
+        node_type: str,
+        is_head_node: bool,
     ) -> ManagerStack:
-        stack_hash = self._get_hash_from_node_config(node_config)
+        stack_key = (node_type, is_head_node)
 
-        async with self._stacks_locks[stack_hash]:
-            stack = self._stacks.get(stack_hash)
+        async with self._stacks_locks[stack_key]:
+            stack = self._stacks.get(stack_key)
             if stack is None:
                 logger.info(
-                    f"Creating new stack `{stack_hash}`... {total_budget=}, {payment_network=}"
+                    "Creating new stack `{%s}`: {%s}/{%s}, total_budget={%s}",
+                    stack_key,
+                    payment_driver,
+                    payment_network,
+                    total_budget,
                 )
-                self._stacks[stack_hash] = stack = await self._create_stack(
-                    node_config, total_budget, payment_network
+                self._stacks[stack_key] = stack = await self._create_stack(
+                    node_config=node_config,
+                    total_budget=total_budget,
+                    payment_network=payment_network,
+                    payment_driver=payment_driver,
+                    is_head_node=is_head_node,
                 )
                 await stack.start()
 
-                logger.info(f"Creating new stack `{stack_hash}` done")
+                logger.info(f"Creating new stack `{stack_key}` done")
 
             return stack
-
-    @staticmethod
-    def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
-        return hashlib.md5(node_config.json().encode()).hexdigest()
 
     async def _create_stack(
         self,
         node_config: NodeConfigData,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
+        is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            self._payment_manager = PayAllPaymentManager(
-                self._golem, budget=total_budget, network=payment_network
+            self._payment_manager = DefaultPaymentManager(
+                self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()
 
         stack = ManagerStack()
+        extra_proposal_plugins: Dict[str, ProposalManagerPlugin] = {}
+        extra_proposal_scorers: Dict[str, ProposalScorer] = {}
 
         payloads = await self._demand_config_helper.get_payloads_from_demand_config(
             node_config.demand
         )
         demand_lifetime = DEFAULT_DEMAND_LIFETIME
 
-        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(stack, node_config)
-        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(stack, node_config)
+        ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(
+            extra_proposal_plugins, extra_proposal_scorers, node_config
+        )
+        ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
+            extra_proposal_plugins, node_config
+        )
+        ManagerStackNodeConfigHelper.apply_priority_head_node_scoring(
+            extra_proposal_scorers, node_config
+        )
 
         proposal_negotiators = [PaymentPlatformNegotiator()]
         if node_config.budget_control.payment_interval_hours is not None:
@@ -186,48 +204,53 @@ class GolemService:
                 )
             )
 
-        stack.demand_manager = RefreshingDemandManager(
-            self._golem,
-            self._payment_manager.get_allocation,
+        demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
+            stack,
             payloads,
-            demand_lifetime=demand_lifetime,
-            subnet_tag=node_config.subnet_tag,
-        )
-        stack.proposal_manager = DefaultProposalManager(
+            demand_lifetime,
+            node_config,
+            is_head_node,
             self._golem,
-            stack.demand_manager.get_initial_proposal,
-            plugins=(
-                BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
-                *stack.extra_proposal_plugins.values(),
-                ProposalScoringBuffer(
-                    min_size=50,
-                    max_size=1000,
-                    fill_at_start=True,
-                    proposal_scorers=(
-                        *stack.extra_proposal_scorers.values(),
-                        MapScore(
-                            partial(self._score_with_provider_data, payment_network=payment_network)
+            self._payment_manager,
+        )
+
+        proposal_manager = stack.add_manager(
+            DefaultProposalManager(
+                self._golem,
+                demand_manager.get_initial_proposal,
+                plugins=(
+                    BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
+                    *extra_proposal_plugins.values(),
+                    ProposalScoringBuffer(
+                        min_size=50,
+                        max_size=1000,
+                        fill_at_start=True,
+                        proposal_scorers=(
+                            *extra_proposal_scorers.values(),
+                            MapScore(
+                                partial(
+                                    self._score_with_provider_data, payment_network=payment_network
+                                )
+                            ),
+                            (0.1, RandomScore()),
                         ),
-                        (0.1, RandomScore()),
+                        scoring_debounce=timedelta(seconds=10),
+                        get_expiration_func=self._get_proposal_expiration,
                     ),
-                    scoring_debounce=timedelta(seconds=10),
-                    get_expiration_func=self._get_proposal_expiration,
+                    NegotiatingPlugin(
+                        proposal_negotiators=proposal_negotiators,
+                        proposal_response_timeout=DEFAULT_PROPOSAL_RESPONSE_TIMEOUT,
+                    ),
+                    ProposalBuffer(
+                        min_size=0,
+                        max_size=4,
+                        fill_concurrency_size=4,
+                        get_expiration_func=self._get_proposal_expiration,
+                    ),
                 ),
-                NegotiatingPlugin(
-                    proposal_negotiators=proposal_negotiators,
-                    proposal_response_timeout=DEFAULT_PROPOSAL_RESPONSE_TIMEOUT,
-                ),
-                ProposalBuffer(
-                    min_size=0,
-                    max_size=4,
-                    fill_concurrency_size=4,
-                    get_expiration_func=self._get_proposal_expiration,
-                ),
-            ),
+            )
         )
-        stack.agreement_manager = DefaultAgreementManager(
-            self._golem, stack.proposal_manager.get_draft_proposal
-        )
+        stack.add_manager(DefaultAgreementManager(self._golem, proposal_manager.get_draft_proposal))
 
         return stack
 
@@ -367,10 +390,18 @@ class GolemService:
         ssh_private_key_path: Path,
         total_budget: float,
         payment_network: str,
+        payment_driver: str,
         add_state_log: Callable[[str], Awaitable[None]],
+        node_type: str,
+        is_head_node: bool,
     ) -> Tuple[Activity, str, str]:
         stack = await self._get_or_create_stack_from_node_config(
-            node_config, total_budget, payment_network
+            node_config=node_config,
+            total_budget=total_budget,
+            payment_network=payment_network,
+            payment_driver=payment_driver,
+            node_type=node_type,
+            is_head_node=is_head_node,
         )
 
         while True:
@@ -404,7 +435,7 @@ class GolemService:
         await add_state_log("[1/9] Getting agreement...")
 
         try:
-            agreement = await stack.agreement_manager.get_agreement()
+            agreement = await stack._managers[-1].get_agreement()
         except Exception as e:
             logger.error(f"Creating new activity failed with `{e}`")
             raise
