@@ -6,9 +6,9 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
+from golem.utils.asyncio import create_task_with_logging, ensure_cancelled, ensure_cancelled_many
 from golem.utils.logging import get_trace_id_name
-from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND
+from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.exceptions import NodeNotFound
@@ -52,13 +52,14 @@ class RayService:
         self._datadir = datadir
 
         self._provider_config: Optional[ProviderConfigData] = None
+        self._cluster_name: Optional[str] = None
         self._wallet_address: Optional[str] = None
 
         self._nodes: Dict[NodeId, Node] = {}
         self._nodes_lock = asyncio.Lock()
         self._nodes_id_counter = 0
 
-        self._create_node_tasks: List[asyncio.Task] = []
+        self._create_node_tasks: Dict[NodeId, asyncio.Task] = {}
 
         self._head_node_to_webserver_tunnel_process: Optional[Process] = None
         self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
@@ -78,11 +79,17 @@ class RayService:
         logger.info("Stopping RayService done")
 
     async def create_cluster(
-        self, provider_config: ProviderConfigData
+        self, provider_config: ProviderConfigData, cluster_name: str
     ) -> Tuple[bool, str, str, Dict]:
         is_cluster_just_created = self._provider_config is None
 
+        if not is_cluster_just_created and self._cluster_name != cluster_name:
+            raise RayServiceError(
+                f"Webserver is running only for `{self._cluster_name}` cluster, not for `{cluster_name}`!"
+            )
+
         self._provider_config = provider_config
+        self._cluster_name = cluster_name
 
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
@@ -142,11 +149,14 @@ class RayService:
                     tags=tags,
                 )
 
-                self._create_node_tasks.append(
-                    create_task_with_logging(
-                        self._create_node(node_id, NodeConfigData(**node_config)),
-                        trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
-                    )
+                self._create_node_tasks[node_id] = create_task_with_logging(
+                    self._create_node(
+                        node_id,
+                        NodeConfigData(**node_config),
+                        node_type=self._get_node_type(tags),
+                        is_head_node=self._is_head_node(tags),
+                    ),
+                    trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
                 )
 
         logger.info(f"Requested {count} nodes")
@@ -154,7 +164,9 @@ class RayService:
 
         return created_node_ids
 
-    async def _create_node(self, node_id: NodeId, node_config: NodeConfigData) -> None:
+    async def _create_node(
+        self, node_id: NodeId, node_config: NodeConfigData, node_type: str, is_head_node: bool
+    ) -> None:
         logger.info("Creating node `%s`...", node_id)
 
         try:
@@ -165,7 +177,10 @@ class RayService:
                 ssh_private_key_path=self._ssh_private_key_path,
                 total_budget=self._provider_config.total_budget,
                 payment_network=self._provider_config.payment_network,
+                payment_driver=self._provider_config.payment_driver,
                 add_state_log=partial(self._add_node_state_log, node_id),
+                node_type=node_type,
+                is_head_node=is_head_node,
             )
 
             self._print_ssh_command(
@@ -184,9 +199,11 @@ class RayService:
         except Exception as e:
             async with self._get_node_context(node_id) as node:  # type: Node
                 node.state = NodeState.terminated
-                node.state_log.append(f"Failed to create activity: {type(e).__name__}({e})")
+                node.state_log.append(
+                    f"Failed to create activity: {type(e).__module__}.{type(e).__name__}: {e}"
+                )
         finally:
-            self._create_node_tasks.remove(asyncio.current_task())
+            del self._create_node_tasks[node_id]
 
         logger.info("Creating node `%s` done", node_id)
 
@@ -201,6 +218,11 @@ class RayService:
 
     async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         logger.info("Terminating node `%s`...", node_id)
+
+        if node_id in self._create_node_tasks:
+            logger.debug("Cancelling node `%s` creation request...")
+            await ensure_cancelled(self._create_node_tasks[node_id])
+            logger.debug("Cancelling node `%s` creation request done")
 
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminating
@@ -305,10 +327,18 @@ class RayService:
     async def _get_head_node(self) -> Node:
         async with self._nodes_lock:
             for node in self._nodes.values():
-                if node.tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD:
+                if self._is_head_node(node.tags):
                     return node
 
             raise NodeNotFound
+
+    @staticmethod
+    def _is_head_node(tags: Tags) -> bool:
+        return tags.get(TAG_RAY_NODE_KIND) == NODE_KIND_HEAD
+
+    @staticmethod
+    def _get_node_type(tags: Tags) -> str:
+        return tags.get(TAG_RAY_USER_NODE_TYPE)
 
     def _print_ssh_command(
         self, ip: str, ssh_proxy_command: str, ssh_user: str, ssh_private_key_path: Path
@@ -383,7 +413,7 @@ class RayService:
 
         logger.info("Canceling %d pending node creation tasks...", task_count)
 
-        await ensure_cancelled_many(self._create_node_tasks)
+        await ensure_cancelled_many(self._create_node_tasks.values())
         self._create_node_tasks.clear()
 
         logger.info("Canceling %d pending node creation tasks done", task_count)

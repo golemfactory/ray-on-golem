@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from asyncio.subprocess import Process
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -79,11 +79,15 @@ class YagnaService:
         return False
 
     async def _check_if_yagna_is_running(self) -> bool:
+        logger.debug("Checking yagna instance at %s...", YAGNA_API_URL)
+
         try:
             async with aiohttp.ClientSession() as client:
                 async with client.get(YAGNA_API_URL):
+                    logger.debug("Checking yagna instance at %s done", YAGNA_API_URL)
                     return True
         except aiohttp.ClientError:
+            logger.debug("Checking yagna instance at %s failed", YAGNA_API_URL)
             return False
 
     async def _run_yagna(self) -> None:
@@ -160,7 +164,12 @@ class YagnaService:
         logger.info("Stopping Yagna done")
 
     async def run_payment_fund(self, network: str, driver: str) -> Dict:
-        logger.debug("Preparing `%s` funds with a timeout up to %s...", network, YAGNA_FUND_TIMEOUT)
+        platform = f"{driver}/{network}"
+        logger.debug(
+            "Preparing `%s` funds with a timeout up to %s...",
+            platform,
+            YAGNA_FUND_TIMEOUT,
+        )
 
         fund_deadline = datetime.now() + YAGNA_FUND_TIMEOUT
         check_seconds = int(YAGNA_CHECK_INTERVAL.total_seconds())
@@ -176,7 +185,7 @@ class YagnaService:
                     driver,
                 )
             except RayOnGolemError as e:
-                logger.error("Preparing `%s` funds failed with error: %s", network, e)
+                logger.error("Preparing `%s` funds failed with error: %s", platform, e)
             else:
                 output = json.loads(
                     await run_subprocess_output(
@@ -188,6 +197,7 @@ class YagnaService:
                         "--driver",
                         driver,
                         "--json",
+                        timeout=timedelta(seconds=30),
                     )
                 )
 
@@ -196,7 +206,7 @@ class YagnaService:
                 if amount or network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON):
                     logger.debug(
                         "Preparing `%s` funds done with balance of %.2f %s",
-                        network,
+                        platform,
                         amount,
                         output["token"],
                     )
@@ -210,12 +220,19 @@ class YagnaService:
             await asyncio.sleep(check_seconds)
 
         raise YagnaServiceError(
-            f"Can't prepare `{network}` funds! Timeout of `{YAGNA_FUND_TIMEOUT}` reached."
+            f"Can't prepare `{platform}` funds! Timeout of `{YAGNA_FUND_TIMEOUT}` reached."
         )
 
     async def fetch_payment_status(self, network: str, driver: str) -> str:
         output = await run_subprocess_output(
-            self._yagna_path, "payment", "status", "--network", network, "--driver", driver
+            self._yagna_path,
+            "payment",
+            "status",
+            "--network",
+            network,
+            "--driver",
+            driver,
+            timeout=timedelta(seconds=30),
         )
         return output.decode()
 

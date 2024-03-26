@@ -26,7 +26,7 @@ provider:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.7.0-py3.10.13-ray2.7.1"
+        image_tag: "golem/ray-on-golem:0.8.0-py3.10.13-ray2.9.2"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs

@@ -3,8 +3,9 @@ import hashlib
 import os
 from asyncio.subprocess import Process
 from collections import deque
+from datetime import timedelta
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from aiohttp.web_runner import GracefulExit
 
@@ -27,14 +28,24 @@ async def run_subprocess(
     return process
 
 
-async def run_subprocess_output(*args) -> bytes:
+async def run_subprocess_output(*args, timeout: Optional[timedelta] = None) -> bytes:
     process = await run_subprocess(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
 
-    stdout, stderr = await process.communicate()
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout.total_seconds() if timeout else None,
+        )
+    except asyncio.TimeoutError as e:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
+
+        raise RayOnGolemError(f"Process could not finish in timeout of {timeout}!") from e
 
     if process.returncode != 0:
         raise RayOnGolemError(

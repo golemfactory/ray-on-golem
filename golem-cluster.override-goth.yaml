@@ -1,0 +1,5 @@
+provider:
+  parameters:
+    node_config:
+      subnet_tag: "goth"
+      priority_head_subnet_tag: "goth"

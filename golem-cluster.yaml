@@ -28,17 +28,17 @@ provider:
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
 
-    # Common parameters for all node types. Can be overriden in available_node_types
+    # Common parameters for all node types. Can be overridden in available_node_types
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.7.0-py3.10.13-ray2.7.1"
+        image_tag: "golem/ray-on-golem:0.8.0-py3.10.13-ray2.9.2"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
         # If not provided demand will not use Computation Manifest
-        outbound_urls: ["https://pypi.dev.golem.network"]
+        # outbound_urls: ["https://pypi.dev.golem.network"]
 
         # Minimal values of parameters offered by Golem provider 
         #min_mem_gib: 1
@@ -72,6 +72,14 @@ provider:
         # Amount of GLMs for each hour that worker runs which Golem provider offer will be rejected if exceeded.
         max_env_per_hour_price: 0.5
 
+<<<<<<< HEAD
+=======
+        # If not provided payment will be sent only after cluster is stopped. Note: cluster will then run for maximum of 8 hours
+        # Required for long running clusters
+        payment_interval_hours:
+          minimal: 1
+          optimal: 12 # optional defaults to `minimal`
+>>>>>>> develop
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -96,6 +104,9 @@ available_node_types:
     max_workers: 10
     resources: {}
     node_config: {}
+
+# Specify the node type of the head node (as configured above).
+head_node_type: ray.head.default
 
 # The files or directories to copy to the head and worker nodes
 # Remote workdir is /root/
