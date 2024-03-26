@@ -65,7 +65,7 @@ class NoMatchingPlatform(AllocationException):
 
 # FIXME: Rework this into the golem-core's DefaultPaymentManager and Allocation on yagna 0.16+,
 #  as until then there is no api call available to get driver lists and golem-core is api-only
-class DeviceListAllocationPayMentManager(DefaultPaymentManager):
+class DeviceListAllocationPaymentManager(DefaultPaymentManager):
     @trace_span(show_arguments=True, show_results=True)
     async def _create_allocation(self, budget: Decimal, network: str, driver: str) -> Allocation:
         output = json.loads(
@@ -198,7 +198,7 @@ class GolemService:
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            self._payment_manager = DeviceListAllocationPayMentManager(
+            self._payment_manager = DeviceListAllocationPaymentManager(
                 self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()
