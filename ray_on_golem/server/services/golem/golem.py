@@ -307,7 +307,7 @@ class GolemService:
         provider_desc = await self.get_provider_desc(context.activity)
         logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}")
         try:
-            context.run("service ssh restart", timeout=120)
+            await context.run("service ssh restart", timeout=120)
             logger.debug(
                 f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=} done"
             )
