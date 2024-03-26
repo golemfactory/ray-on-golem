@@ -15,6 +15,7 @@ class ReputationUpdaterException(Exception):
 
 class ReputationUpdater:
     """Simple service updating the reputation data from the remote Reputation System."""
+
     def __init__(self, network: str = "polygon"):
         self._network = network
 
@@ -65,10 +66,7 @@ class ReputationUpdater:
                 updated = False
                 success_rate = scores.get("successRate")
                 uptime = scores.get("uptime")
-                if (
-                    success_rate is not None
-                    and node_reputation.success_rate != success_rate
-                ):
+                if success_rate is not None and node_reputation.success_rate != success_rate:
                     node_reputation.success_rate = success_rate
                     updated = True
                 if uptime is not None and node_reputation.uptime != uptime:

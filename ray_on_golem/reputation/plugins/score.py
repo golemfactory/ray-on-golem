@@ -22,18 +22,18 @@ class ReputationScorer(ProposalScorer):
     def __init__(
         self,
         payment_network: str,
-        weights: Optional[Dict[str, float]] = None,
+        param_weights: Optional[Dict[str, float]] = None,
         score_range: Tuple[float, float] = (0.0, 1.0),
     ):
         self.payment_network = payment_network
-        self.weights = weights or self._default_weights()
-        self.total_weight = sum(self.weights.values())
+        self.param_weights = param_weights or self._default_weights()
+        self.total_weight = sum(self.param_weights.values())
         self.score_range = score_range
         logger.debug(
             f"Initialized {self.__class__.__name__}: "
             "payment_network=%s, weights=%s, score_range=%s",
             self.payment_network,
-            self.weights,
+            self.param_weights,
             self.score_range,
         )
 
@@ -62,7 +62,7 @@ class ReputationScorer(ProposalScorer):
             sum(
                 [
                     (getattr(node_reputation, attr) or 0.0) * weight
-                    for attr, weight in self.weights.items()
+                    for attr, weight in self.param_weights.items()
                 ]
             )
             / self.total_weight

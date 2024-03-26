@@ -20,7 +20,7 @@ def mock_node_reputation(**kwargs):
 
 
 @pytest.mark.parametrize(
-    "node_reputation, weights, score_range,   side_effect, expected_score",
+    "node_reputation, param_weights, score_range,   side_effect, expected_score",
     (
         # regular scores
         (mock_node_reputation(uptime=0.0, success_rate=0.0), None, (0.0, 1.0), None, 0.0),
@@ -56,9 +56,9 @@ def mock_node_reputation(**kwargs):
 )
 @pytest.mark.asyncio
 async def test_reputation_scorer(
-    node_reputation, weights, score_range, side_effect, expected_score
+    node_reputation, param_weights, score_range, side_effect, expected_score
 ):
-    scorer = ReputationScorer("some-network", weights=weights, score_range=score_range)
+    scorer = ReputationScorer("some-network", param_weights=param_weights, score_range=score_range)
     with mock.patch(
         "ray_on_golem.reputation.models.NodeReputation.get_blacklisted",
         mock.Mock(return_value=node_reputation, side_effect=side_effect),
