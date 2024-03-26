@@ -38,7 +38,7 @@ provider:
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
         # If not provided demand will not use Computation Manifest
-        # outbound_urls: ["https://pypi.dev.golem.network"]
+        outbound_urls: ["https://pypi.dev.golem.network"]
 
         # Minimal values of parameters offered by Golem provider 
         #min_mem_gib: 1
