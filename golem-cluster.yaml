@@ -20,13 +20,13 @@ provider:
   parameters:
     
     # Blockchain used for payments.
-    # Goerli means running free nodes on testnet,
+    # Holesky means running free nodes on testnet,
     # Polygon is for mainnet operations.
-    payment_network: "goerli"
+    payment_network: "holesky"
     #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
-    #total_budget: 5
+    total_budget: 5
 
     # Common parameters for all node types. Can be overriden in available_node_types
     node_config:
@@ -38,7 +38,7 @@ provider:
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
         # If not provided demand will not use Computation Manifest
-        #outbound_urls: ["https://pypi.dev.golem.network"]
+        outbound_urls: ["https://pypi.dev.golem.network"]
 
         # Minimal values of parameters offered by Golem provider 
         #min_mem_gib: 1
@@ -57,20 +57,20 @@ provider:
         
           # Estimated expected load and duration for worker that tells budget control to pick the least expensive Golem provider offers first.
           # If not provided, offers will be picked at random.
-          #cpu_load: 0.8
-          #duration_hours: 0.5 # 30 minutes
+          cpu_load: 0.8
+          duration_hours: 0.5 # 30 minutes
 
           # Amount of GLMs for expected usage which Golem provider offer will be rejected if exceeded.
-          #max_cost: 1.5
+          max_cost: 1.5
 
         # Amount of GLMs for worker initiation which Golem provider offer will be rejected if exceeded.
-        #max_start_price: 0.5
+        max_start_price: 0.5
 
         # Amount of GLMs for CPU utilisation per hour which Golem provider offer will be rejected if exceeded.
-        #max_cpu_per_hour_price: 0.5
+        max_cpu_per_hour_price: 0.5
 
         # Amount of GLMs for each hour that worker runs which Golem provider offer will be rejected if exceeded.
-        #max_env_per_hour_price: 0.5
+        max_env_per_hour_price: 0.5
 
 
 # Tells the autoscaler the allowed node types and the resources they provide
