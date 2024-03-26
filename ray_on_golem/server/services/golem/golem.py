@@ -259,14 +259,17 @@ class GolemService:
         return await proposal.get_expiration_date() - datetime.now(timezone.utc)
 
     @staticmethod
-    async def _get_provider_desc(context: WorkContext):
-        return f"{await context.get_provider_name()} ({await context.get_provider_id()})"
+    async def get_provider_desc(activity: Activity):
+        return (
+            f"{await activity.agreement.proposal.get_provider_name()}"
+            f"({await activity.agreement.proposal.get_provider_id()})"
+        )
 
     async def _start_activity(
         self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
     ):
         activity = context.activity
-        provider_desc = await self._get_provider_desc(context)
+        provider_desc = await self.get_provider_desc(activity)
 
         logger.info(f"Deploying image on {provider_desc}, {ip=}, {activity=}")
 
@@ -284,7 +287,7 @@ class GolemService:
         ip: str,
         ssh_public_key_data: str,
     ):
-        provider_desc = await self._get_provider_desc(context)
+        provider_desc = await self.get_provider_desc(context.activity)
         logger.info(f"Running initial commands on {provider_desc}, {ip=}, {context.activity=}")
         hostname = ip.replace(".", "-")
         await context.run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
@@ -296,12 +299,12 @@ class GolemService:
         await context.run(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
 
     async def _start_ssh_server(self, context: WorkContext, ip: str):
-        provider_desc = await self._get_provider_desc(context)
+        provider_desc = await self.get_provider_desc(context.activity)
         logger.info("Starting ssh service on " f"{provider_desc}, {ip=}, {context.activity=}")
         await context.run("service ssh start")
 
     async def _restart_ssh_server(self, context: WorkContext, ip: str):
-        provider_desc = await self._get_provider_desc(context)
+        provider_desc = await self.get_provider_desc(context.activity)
         logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}")
         try:
             context.run("service ssh restart", timeout=120)
@@ -337,7 +340,7 @@ class GolemService:
         ssh_user: str,
         ssh_private_key_path: Path,
     ):
-        provider_desc = await self._get_provider_desc(context)
+        provider_desc = await self.get_provider_desc(context.activity)
         ssh_command = (
             f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
         )
@@ -383,7 +386,7 @@ class GolemService:
 
         logger.debug(
             "SSH connection check started on "
-            f"{await self._get_provider_desc(context)}, {ip=}, {activity=}: cmd={ssh_command}."
+            f"{await self.get_provider_desc(activity)}, {ip=}, {activity=}: cmd={ssh_command}."
         )
 
         retry = num_retries
@@ -403,7 +406,7 @@ class GolemService:
 
         logger.info(
             "SSH connection check successful on "
-            f"{await self._get_provider_desc(context)}, {ip=}, {activity=}."
+            f"{await self.get_provider_desc(activity)}, {ip=}, {activity=}."
         )
 
     async def create_activity(
@@ -510,7 +513,7 @@ class GolemService:
         await add_state_log(f"[9/9] Activity ready on provider: {provider_desc}")
         logger.info(
             "Creating new activity done on "
-            f"{await self._get_provider_desc(work_context)}, {ip=}, {activity=}"
+            f"{await self.get_provider_desc(activity)}, {ip=}, {activity=}"
         )
 
         return activity, ip, ssh_proxy_command

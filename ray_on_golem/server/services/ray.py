@@ -244,8 +244,8 @@ class RayService:
                     )
             except Exception:
                 msg = (
-                    f"Activity {activity} is no longer accessible."
-                    f"Terminating {node_id} {is_head_node=}"
+                    f"Activity on {await self._golem_service.get_provider_desc(activity)} "
+                    f"is no longer accessible. Terminating {node_id} {is_head_node=}"
                 )
                 logger.warning(msg)
                 logger.debug(msg, exc_info=True)
