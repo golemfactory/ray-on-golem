@@ -63,8 +63,8 @@ class NoMatchingPlatform(AllocationException):
     ...
 
 
-# FIXME: Rework this into the Allocation on yagna 0.16+, as until then there is no api call
-#  available to get driver lists
+# FIXME: Rework this into the golem-core's DefaultPaymentManager and Allocation on yagna 0.16+,
+#  as until then there is no api call available to get driver lists and golem-core is api-only
 class DeviceListAllocationPayMentManager(DefaultPaymentManager):
     @trace_span(show_arguments=True, show_results=True)
     async def _create_allocation(self, budget: Decimal, network: str, driver: str) -> Allocation:

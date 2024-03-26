@@ -7,7 +7,6 @@ from typing import Dict, Optional, Sequence
 
 from golem.managers import (
     BlacklistProviderIdPlugin,
-    DefaultPaymentManager,
     DefaultProposalManager,
     NegotiatingPlugin,
     PaymentPlatformNegotiator,
@@ -27,7 +26,10 @@ from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
 
 from ray_on_golem.server.models import NodeConfigData
-from ray_on_golem.server.services.golem.golem import DEFAULT_DEMAND_LIFETIME
+from ray_on_golem.server.services.golem.golem import (
+    DEFAULT_DEMAND_LIFETIME,
+    DeviceListAllocationPayMentManager,
+)
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
@@ -177,7 +179,7 @@ class NetworkStatsService:
                 self._consume_draft_proposals(stack),
                 timeout=timedelta(minutes=duration_minutes).total_seconds(),
             )
-        except (asyncio.TimeoutError, KeyboardInterrupt):
+        except asyncio.TimeoutError:
             pass
         finally:
             await stack.stop()
@@ -208,8 +210,7 @@ class NetworkStatsService:
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            # TODO: Use DeviceListAllocationPayMentManager in yanga 0.15+
-            self._payment_manager = DefaultPaymentManager(
+            self._payment_manager = DeviceListAllocationPayMentManager(
                 self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()

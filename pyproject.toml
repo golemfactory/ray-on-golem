@@ -22,7 +22,7 @@ dpath = "^2.1.6"
 appdirs = "^1.4.4"
 
 websocat = "^1.12.0"
-golem-node = {version = "0.13.3a1", source = "test-pypi"}
+golem-node = "0.13.3"
 
 setuptools = "*"
 psutil = "^5.9.8"
