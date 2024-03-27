@@ -20,8 +20,8 @@ provider:
   parameters:
     
     # Blockchain used for payments.
-    # Holesky means running free nodes on testnet,
-    # Polygon is for mainnet operations.
+    # `holesky` means running free nodes on testnet,
+    # `polygon` is for mainnet operations.
     payment_network: "holesky"
     #payment_network: "polygon"
 
@@ -33,7 +33,7 @@ provider:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.8.0-py3.10.13-ray2.9.2"
+        image_tag: "golem/ray-on-golem:0.9.0-py3.10.13-ray2.9.3"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
