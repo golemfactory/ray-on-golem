@@ -2,11 +2,11 @@ import asyncio
 import logging
 import logging.config
 import pathlib
-from contextlib import asynccontextmanager
 from typing import Dict, Optional
 
 import click
 import yaml
+from golem.utils.asyncio import ensure_cancelled
 
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
@@ -60,11 +60,7 @@ def validate_node_type(ctx, param, value):
     help=f"Ray on Golem's data directory. [default: {DEFAULT_DATADIR}"
     " (unless `webserver_datadir` is defined in the cluster config file)]",
 )
-def main(*args, **kwargs):
-    asyncio.run(_network_stats(*args, **kwargs))
-
-
-async def _network_stats(
+def main(
     cluster_config_file: Dict,
     node_type: str,
     duration: int,
@@ -78,36 +74,56 @@ async def _network_stats(
     if enable_logging:
         logging.config.dictConfig(get_logging_config(datadir=datadir))
 
-    async with network_stats_service(
-        provider_params["enable_registry_stats"],
-        provider_params["payment_network"],
-        provider_params["payment_driver"],
-        datadir,
-    ) as stats_service:
-        await stats_service.run(cluster_config_file, node_type, duration)
-
-
-@asynccontextmanager
-async def network_stats_service(
-    registry_stats: bool,
-    network: str,
-    driver: str,
-    datadir: Optional[pathlib.Path],
-) -> NetworkStatsService:
-    service = NetworkStatsService(registry_stats)
+    stats_service = NetworkStatsService(provider_params["enable_registry_stats"])
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
         datadir=datadir,
     )
 
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(
+        _start_services(
+            stats_service,
+            yagna_service,
+            provider_params["payment_network"],
+            provider_params["payment_driver"],
+        )
+    )
+
+    run_task = loop.create_task(stats_service.run(cluster_config_file, node_type, duration))
+
+    try:
+        loop.run_until_complete(run_task)
+    except KeyboardInterrupt:
+        print("Received CTRL-C, exiting...")
+        loop.run_until_complete(ensure_cancelled(run_task))
+
+    loop.run_until_complete(
+        _stop_services(
+            stats_service,
+            yagna_service,
+        )
+    )
+
+
+async def _start_services(
+    stats_service: NetworkStatsService,
+    yagna_service: YagnaService,
+    network: str,
+    driver: str,
+) -> None:
     await yagna_service.init()
-    await yagna_service.run_payment_fund(network, driver)
+    await yagna_service.prepare_funds(network, driver)
 
-    await service.init(yagna_appkey=yagna_service.yagna_appkey)
+    await stats_service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield service
 
-    await service.shutdown()
+async def _stop_services(
+    stats_service: NetworkStatsService,
+    yagna_service: YagnaService,
+) -> None:
+    await stats_service.shutdown()
+
     await yagna_service.shutdown()
 
 
