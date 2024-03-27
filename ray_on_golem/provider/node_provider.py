@@ -7,7 +7,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable, List, Optional
 
-import dpath.util
+import dpath
 from ray.autoscaler._private.cli_logger import cli_logger
 from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
 from ray.autoscaler.command_runner import CommandRunnerInterface
@@ -20,7 +20,7 @@ from ray_on_golem.provider.ssh_command_runner import SSHCommandRunner
 from ray_on_golem.server.models import NodeData, NodeId, NodeState
 from ray_on_golem.server.settings import (
     PAYMENT_DRIVER_ERC20,
-    PAYMENT_NETWORK_GOERLI,
+    PAYMENT_NETWORK_HOLESKY,
     PAYMENT_NETWORK_MAINNET,
     PAYMENT_NETWORK_POLYGON,
     TMP_PATH,
@@ -41,7 +41,7 @@ PROVIDER_DEFAULTS = {
     "webserver_port": 4578,
     "webserver_datadir": None,
     "enable_registry_stats": True,
-    "payment_network": PAYMENT_NETWORK_GOERLI,
+    "payment_network": PAYMENT_NETWORK_HOLESKY,
     "payment_driver": PAYMENT_DRIVER_ERC20,
     "node_config": {
         "subnet_tag": "public",
@@ -66,16 +66,20 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters = self._map_ssh_config(provider_parameters)
         self._payment_network = provider_parameters["payment_network"].lower().strip()
 
-        cluster_creation_response = self._ray_on_golem_client.create_cluster(provider_parameters)
-
-        self._wallet_address = cluster_creation_response.wallet_address
-        self._is_cluster_just_created = cluster_creation_response.is_cluster_just_created
-
-        self._print_mainnet_onboarding_message(
-            cluster_creation_response.yagna_payment_status_output
+        cluster_bootstrap_response = self._ray_on_golem_client.bootstrap_cluster(
+            provider_parameters, cluster_name
         )
 
-        wallet_glm_amount = float(cluster_creation_response.yagna_payment_status.get("amount", "0"))
+        self._wallet_address = cluster_bootstrap_response.wallet_address
+        self._is_cluster_just_created = cluster_bootstrap_response.is_cluster_just_created
+
+        self._print_mainnet_onboarding_message(
+            cluster_bootstrap_response.yagna_payment_status_output
+        )
+
+        wallet_glm_amount = float(
+            cluster_bootstrap_response.yagna_payment_status.get("amount", "0")
+        )
         if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
@@ -277,7 +281,7 @@ class GolemNodeProvider(NodeProvider):
     def _apply_config_defaults(config: Dict[str, Any]) -> None:
         provider_parameters: Dict = deepcopy(PROVIDER_DEFAULTS)
 
-        dpath.util.merge(
+        dpath.merge(
             provider_parameters,
             config["provider"]["parameters"],
         )
@@ -286,7 +290,7 @@ class GolemNodeProvider(NodeProvider):
 
         for node_type in config.get("available_node_types", {}).values():
             node_config = deepcopy(config["provider"]["parameters"]["node_config"])
-            dpath.util.merge(
+            dpath.merge(
                 node_config,
                 node_type["node_config"],
             )

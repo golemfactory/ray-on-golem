@@ -52,6 +52,7 @@ class RayService:
         self._datadir = datadir
 
         self._provider_config: Optional[ProviderConfigData] = None
+        self._cluster_name: Optional[str] = None
         self._wallet_address: Optional[str] = None
 
         self._nodes: Dict[NodeId, Node] = {}
@@ -78,11 +79,17 @@ class RayService:
         logger.info("Stopping RayService done")
 
     async def create_cluster(
-        self, provider_config: ProviderConfigData
+        self, provider_config: ProviderConfigData, cluster_name: str
     ) -> Tuple[bool, str, str, Dict]:
         is_cluster_just_created = self._provider_config is None
 
+        if not is_cluster_just_created and self._cluster_name != cluster_name:
+            raise RayServiceError(
+                f"Webserver is running only for `{self._cluster_name}` cluster, not for `{cluster_name}`!"
+            )
+
         self._provider_config = provider_config
+        self._cluster_name = cluster_name
 
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")

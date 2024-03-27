@@ -14,7 +14,7 @@ from ray_on_golem.server.middlewares import error_middleware, trace_id_middlewar
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
     DEFAULT_DATADIR,
-    RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
+    RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT,
     WEBSOCAT_PATH,
     YAGNA_PATH,
     get_datadir,
@@ -65,7 +65,7 @@ def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
             app,
             port=app["port"],
             print=None,
-            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT.total_seconds(),
+            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT.total_seconds(),
         )
     except Exception:
         logger.info("Server unexpectedly died, bye!")
@@ -124,7 +124,8 @@ async def startup_print(app: web.Application) -> None:
 async def shutdown_print(app: web.Application) -> None:
     print("")  # explicit new line to console to visually better handle ^C
     logger.info(
-        "Waiting up to `%s` for current connections to close...", RAY_ON_GOLEM_SHUTDOWN_TIMEOUT
+        "Waiting up to `%s` for current connections to close...",
+        RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT,
     )
 
 

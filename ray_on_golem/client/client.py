@@ -9,7 +9,7 @@ from yarl import URL
 
 from ray_on_golem.client.exceptions import RayOnGolemClientError, RayOnGolemClientValidationError
 from ray_on_golem.server import models, settings
-from ray_on_golem.server.models import CreateClusterResponseData
+from ray_on_golem.server.models import BootstrapClusterResponseData
 
 TResponseModel = TypeVar("TResponseModel")
 
@@ -22,15 +22,19 @@ class RayOnGolemClient:
         self.base_url = URL("http://127.0.0.1").with_port(self.port)
         self._session = requests.Session()
 
-    def create_cluster(
+    def bootstrap_cluster(
         self,
-        cluster_config: Dict[str, Any],
-    ) -> CreateClusterResponseData:
+        provider_config: Dict[str, Any],
+        cluster_name: str,
+    ) -> BootstrapClusterResponseData:
         return self._make_request(
-            url=settings.URL_CREATE_CLUSTER,
-            request_data=models.CreateClusterRequestData(**cluster_config),
-            response_model=models.CreateClusterResponseData,
-            error_message="Couldn't create cluster",
+            url=settings.URL_BOOTSTRAP_CLUSTER,
+            request_data=models.BootstrapClusterRequestData(
+                provider_config=provider_config,
+                cluster_name=cluster_name,
+            ),
+            response_model=models.BootstrapClusterResponseData,
+            error_message="Couldn't bootstrap cluster",
         )
 
     def request_nodes(
@@ -222,7 +226,9 @@ class RayOnGolemClient:
                 data=request_data.json() if request_data else None,
             )
         except requests.ConnectionError as e:
-            raise RayOnGolemClientError(f"{error_message or f'Connection failed: {url}'}: {e}")
+            raise RayOnGolemClientError(
+                "{}: {}".format(error_message or f"Connection failed: {url}", e)
+            )
 
         if response.status_code != 200:
             raise RayOnGolemClientError(

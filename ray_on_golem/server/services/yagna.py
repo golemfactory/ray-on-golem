@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from asyncio.subprocess import Process
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -171,6 +171,7 @@ class YagnaService:
             YAGNA_FUND_TIMEOUT,
         )
 
+        is_mainnet = network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON)
         fund_deadline = datetime.now() + YAGNA_FUND_TIMEOUT
         check_seconds = int(YAGNA_CHECK_INTERVAL.total_seconds())
         while datetime.now() < fund_deadline:
@@ -178,7 +179,7 @@ class YagnaService:
                 await run_subprocess_output(
                     self._yagna_path,
                     "payment",
-                    "fund",
+                    "fund" if not is_mainnet else "init",
                     "--network",
                     network,
                     "--driver",
@@ -197,12 +198,13 @@ class YagnaService:
                         "--driver",
                         driver,
                         "--json",
+                        timeout=timedelta(seconds=30),
                     )
                 )
 
                 amount = float(output["amount"])
 
-                if amount or network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON):
+                if amount or is_mainnet:
                     logger.debug(
                         "Preparing `%s` funds done with balance of %.2f %s",
                         platform,
@@ -224,7 +226,14 @@ class YagnaService:
 
     async def fetch_payment_status(self, network: str, driver: str) -> str:
         output = await run_subprocess_output(
-            self._yagna_path, "payment", "status", "--network", network, "--driver", driver
+            self._yagna_path,
+            "payment",
+            "status",
+            "--network",
+            network,
+            "--driver",
+            driver,
+            timeout=timedelta(seconds=30),
         )
         return output.decode()
 
