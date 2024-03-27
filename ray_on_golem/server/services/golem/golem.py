@@ -486,4 +486,4 @@ class GolemService:
 
     def _get_ssh_proxy_command(self, connection_uri: URL) -> str:
         # Using single quotes for the authentication token as double quotes are causing problems with CLI character escaping in ray
-        return f"{self._websocat_path} asyncstdio: {connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
+        return f"{self._websocat_path} -v asyncstdio: {connection_uri}/22 --binary -H=Authorization:'Bearer {self._yagna_appkey}'"
