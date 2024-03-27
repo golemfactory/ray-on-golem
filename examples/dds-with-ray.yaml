@@ -1,5 +1,4 @@
-# This is Ray on Golem Mini yaml - the smallest config for testnet cluster of up to 10 nodes
-
+# This is Ray on Golem DDS yaml - the config used by dds-with-ray.py example 
 
 # Ray on Golem cluster name
 cluster_name: golem-cluster
@@ -17,16 +16,11 @@ provider:
       # Parameters for golem demands (same for head and workers)
       demand:
         image_tag: "golem/ray-on-golem:0.9.0-py3.10.13-ray2.9.3"
-
-# Tells the autoscaler the allowed node types and the resources they provide
-available_node_types:
-  ray.head.default:
-    resources: {}
-    node_config: {}
-
-  ray.worker.default:
-    resources: {}
-    node_config: {}
+        
+        # List of urls which will be added to the Computation Manifest
+        # Requires protocol to be defined in all URLs
+        # If not provided demand will not use Computation Manifest
+        outbound_urls: ["https://pypi.dev.golem.network"]
 
 # The files or directories to copy to the head and worker nodes
 # Remote workdir is /root/
@@ -40,8 +34,21 @@ file_mounts: {
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: []
 
+# Tells the autoscaler the allowed node types and the resources they provide
+available_node_types:
+  ray.head.default:
+    resources: {}
+    node_config: {}
+
+  ray.worker.default:
+    resources: {}
+    node_config: {}
+
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
-initialization_commands: []
+#initialization_commands: []
+initialization_commands: [
+  "pip install endplay",
+]
 
 # List of shell commands to run to set up nodes
 setup_commands: []

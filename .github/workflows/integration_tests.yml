@@ -20,7 +20,7 @@ jobs:
             args: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
 
           - example_name: mandelbrot_image
-            base_yaml_path: examples/mandelbrot-golem-cluster.yaml
+            base_yaml_path: examples/mandelbrot.yaml
 
           - example_name: simple-actor
 
@@ -28,6 +28,7 @@ jobs:
 
           # Commented out as Goth does not support outbound yet
           # - example_name: dds-with-ray
+          #   base_yaml_path: examples/dds-with-ray.yaml
           # - example_name: outbound
           #   base_yaml_path: examples/outbound.yaml
           # - example_name: outbound_tester
