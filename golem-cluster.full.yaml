@@ -74,7 +74,6 @@ provider:
         max_env_per_hour_price: 0.5
 
         # If not provided payment will be sent only after cluster is stopped. 
-        # Note: cluster will then run for maximum of 8 hours
         # Required for long running clusters
         payment_interval_hours:
           minimal: 12
