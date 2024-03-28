@@ -114,7 +114,10 @@ def list_(datadir, network, node_id, blacklist):
                     ]
                 )
 
+            count = await qs.count()
+
         print(table)
+        print(click.style(f"{count} nodes found.", fg="bright_cyan"))
 
     asyncio.run(list_records())
 
