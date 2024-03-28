@@ -54,7 +54,6 @@ def mock_node_reputation(**kwargs):
         (None, None, (0.0, 1.0), DoesNotExist(), 0.0),
     ),
 )
-@pytest.mark.asyncio
 async def test_reputation_scorer(
     node_reputation, param_weights, score_range, side_effect, expected_score
 ):

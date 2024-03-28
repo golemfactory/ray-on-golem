@@ -2,14 +2,16 @@ from contextlib import contextmanager
 from typing import Iterable, Tuple
 
 import aiohttp
+from yarl import URL
 
+from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.reputation import models as m
 
 REPUTATION_SYSTEM_URI = "https://reputation.dev-test.golem.network/v1/"
 REPUTATION_SYSTEM_PROVIDER_SCORES = "providers/scores"
 
 
-class ReputationUpdaterException(Exception):
+class ReputationUpdaterException(RayOnGolemError):
     ...
 
 
@@ -18,10 +20,11 @@ class ReputationUpdater:
 
     def __init__(self, network: str = "polygon"):
         self._network = network
-
-    @property
-    def reputation_uri(self):
-        return f"{REPUTATION_SYSTEM_URI}{REPUTATION_SYSTEM_PROVIDER_SCORES}?network={self._network}"
+        self.reputation_uri = (
+            URL(REPUTATION_SYSTEM_URI)
+            / REPUTATION_SYSTEM_PROVIDER_SCORES
+            % {"network": self._network}
+        )
 
     @contextmanager
     def _no_progress_bar(self, iterable: Iterable):

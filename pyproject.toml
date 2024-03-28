@@ -28,6 +28,7 @@ tortoise-orm = "^0.20.0"
 aerich = "^0.7.2"
 prettytable = "^3.10.0"
 psutil = "^5.9.8"
+yarl = "^1.9.4"
 
 setuptools = "*"
 
@@ -132,3 +133,6 @@ authorized_licenses = [
   "ISC License (ISCL)",
   "The Unlicense (Unlicense)",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

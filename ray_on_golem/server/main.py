@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import logging.config
 import os
@@ -10,6 +9,7 @@ import click
 import colorful
 import psutil
 from aiohttp import web
+from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
 
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.reputation.updater import ReputationUpdater
@@ -171,14 +171,14 @@ async def reputation_service_ctx(app: web.Application) -> None:
     updaters = [
         ReputationUpdater(network) for network in ["polygon", "mumbai", "goerli", "holesky"]
     ]
-    update_tasks = [asyncio.create_task(updater.update()) for updater in updaters]
+    update_tasks = [
+        create_task_with_logging(updater.update(), trace_id="reputation_service_ctx")
+        for updater in updaters
+    ]
 
     yield
 
-    for t in update_tasks:
-        t.cancel()
-
-    await asyncio.gather(*update_tasks)
+    await ensure_cancelled_many(update_tasks)
     await reputation_service.stop()
 
 

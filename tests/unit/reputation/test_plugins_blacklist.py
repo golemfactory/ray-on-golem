@@ -16,7 +16,6 @@ from tests.factories.golem.resources.proposal import ProposalGenerator
         (({"initial": True},), False, 0, Proposal),
     ),
 )
-@pytest.mark.asyncio
 async def test_blacklist(
     blacklisted, proposal_factory_kwargs, expected_num_rejects, expected_return_type
 ):
