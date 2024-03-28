@@ -60,14 +60,12 @@ class ReputationScorer(ProposalScorer):
 
         score = (
             sum(
-                [
-                    (getattr(node_reputation, attr) or 0.0) * weight
-                    for attr, weight in self.param_weights.items()
-                ]
+                (getattr(node_reputation, attr) or 0.0) * weight
+                for attr, weight in self.param_weights.items()
             )
             / self.total_weight
         )
-        score_clamped = max(self.score_range[0], min(self.score_range[1], score))
+        score_clamped = max(self.score_range[0], min(score, self.score_range[1]))
 
         logger.debug(
             "Provider `%s`'s score: %s (score=%s, node_reputation=%s).",

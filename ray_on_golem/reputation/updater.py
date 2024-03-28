@@ -31,7 +31,7 @@ class ReputationUpdater:
     async def get_reputation_data(self):
         """Download the reputation data from the Reputation System endpoint."""
         async with aiohttp.request("get", self.reputation_uri) as response:
-            if not response.status == 200:
+            if response.status != 200:
                 raise ReputationUpdaterException(
                     f"Error {response.status} while updating reputation from {self.reputation_uri}"
                 )

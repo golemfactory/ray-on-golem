@@ -224,7 +224,7 @@ class GolemService:
                         fill_at_start=True,
                         proposal_scorers=(
                             *extra_proposal_scorers.values(),
-                            ReputationScorer(payment_network=payment_network),
+                            ReputationScorer(payment_network),
                             (0.1, RandomScore()),
                         ),
                         scoring_debounce=timedelta(seconds=10),
