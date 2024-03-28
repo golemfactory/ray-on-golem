@@ -20,7 +20,9 @@ class ReputationUpdater:
 
     def __init__(self, network: str = "polygon"):
         self._network = network
-        self.reputation_uri = REPUTATION_SYSTEM_URI / REPUTATION_SYSTEM_PROVIDER_SCORES % {"network": self._network}
+        self.reputation_uri = (
+            REPUTATION_SYSTEM_URI / REPUTATION_SYSTEM_PROVIDER_SCORES % {"network": self._network}
+        )
 
     @contextmanager
     def _no_progress_bar(self, iterable: Iterable):
