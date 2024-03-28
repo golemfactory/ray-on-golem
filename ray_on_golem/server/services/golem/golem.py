@@ -43,7 +43,7 @@ DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
 DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
 DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
 DEFAULT_SSH_SENTRY_TIMEOUT = timedelta(minutes=2)
-DEFAULT_MAX_SENTRY_FAILS_COUNT = 5
+DEFAULT_MAX_SENTRY_FAILS_COUNT = 3
 
 
 class GolemService:
@@ -359,9 +359,8 @@ class GolemService:
         fails_count = 0
         while True:
             try:
-                await self._verify_ssh_connection_check(
-                    context.activity.id,
-                    provider_desc,
+                await self._verify_ssh_connection(
+                    context,
                     ip,
                     ssh_proxy_command,
                     ssh_user,
