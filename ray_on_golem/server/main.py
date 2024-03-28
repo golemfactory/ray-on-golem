@@ -168,12 +168,13 @@ async def reputation_service_ctx(app: web.Application) -> None:
     reputation_service: ReputationService = app["reputation_service"]
 
     await reputation_service.start()
-    updaters = [
-        ReputationUpdater(network) for network in ["polygon", "mumbai", "goerli", "holesky"]
-    ]
+
     update_tasks = [
-        create_task_with_logging(updater.update(), trace_id="reputation_service_ctx")
-        for updater in updaters
+        create_task_with_logging(
+            ReputationUpdater(network).update(),
+            trace_id=f"reputation_service_ctx-{network}",
+        )
+        for network in ["polygon", "mumbai", "goerli", "holesky"]
     ]
 
     yield
