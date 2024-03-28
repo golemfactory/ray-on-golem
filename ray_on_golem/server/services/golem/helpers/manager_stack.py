@@ -118,7 +118,7 @@ class ManagerStackNodeConfigHelper:
             proposal_data.properties.get("golem.node.debug.subnet") == priority_head_subnet_tag
         )
 
-        return 0.5 if add_scoring else 0
+        return 100.0 if add_scoring else 0.0
 
     @staticmethod
     def prepare_demand_manager_for_node_type(

@@ -8,10 +8,12 @@ from typing import Dict, Optional
 import click
 import yaml
 
+from ray_on_golem.cli import with_datadir
 from ray_on_golem.network_stats.services import NetworkStatsService
 from ray_on_golem.provider.node_provider import GolemNodeProvider
+from ray_on_golem.reputation.service import ReputationService
 from ray_on_golem.server.services import YagnaService
-from ray_on_golem.server.settings import DEFAULT_DATADIR, YAGNA_PATH, get_logging_config
+from ray_on_golem.server.settings import YAGNA_PATH, get_logging_config
 
 
 def validate_config_file(ctx, param, value):
@@ -54,12 +56,7 @@ def validate_node_type(ctx, param, value):
     default=False,
     help="Enable verbose logging.",
 )
-@click.option(
-    "--datadir",
-    type=pathlib.Path,
-    help=f"Ray on Golem's data directory. [default: {DEFAULT_DATADIR}"
-    " (unless `webserver_datadir` is defined in the cluster config file)]",
-)
+@with_datadir
 def main(*args, **kwargs):
     asyncio.run(_network_stats(*args, **kwargs))
 
@@ -100,15 +97,16 @@ async def network_stats_service(
         datadir=datadir,
     )
 
-    await yagna_service.init()
-    await yagna_service.run_payment_fund(network, driver)
+    async with ReputationService(datadir):
+        await yagna_service.init()
+        await yagna_service.run_payment_fund(network, driver)
 
-    await service.init(yagna_appkey=yagna_service.yagna_appkey)
+        await service.init(yagna_appkey=yagna_service.yagna_appkey)
 
-    yield service
+        yield service
 
-    await service.shutdown()
-    await yagna_service.shutdown()
+        await service.shutdown()
+        await yagna_service.shutdown()
 
 
 if __name__ == "__main__":
