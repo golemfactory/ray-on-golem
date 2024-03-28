@@ -34,3 +34,5 @@ RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 RUN pip install pillow
 
 COPY ray_on_golem /app/ray_on_golem/
+
+VOLUME /root
