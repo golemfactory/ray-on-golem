@@ -50,6 +50,7 @@ class RayService:
         golem_service: GolemService,
         yagna_service: YagnaService,
         datadir: Path,
+        node_monitoring_timeout: timedelta = DEFAULT_NODE_MONITORING_TIMEOUT,
     ):
         self._ray_on_golem_port = ray_on_golem_port
         self._golem_service = golem_service
@@ -67,7 +68,7 @@ class RayService:
 
         self._create_node_tasks: Dict[NodeId, asyncio.Task] = {}
         self._node_monitoring_tasks: Dict[NodeId, asyncio.Task] = {}
-        self._node_monitoring_timeout: timedelta = DEFAULT_NODE_MONITORING_TIMEOUT
+        self._node_monitoring_timeout: timedelta = node_monitoring_timeout
 
         self._head_node_to_webserver_tunnel_process: Optional[Process] = None
         self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
@@ -209,7 +210,7 @@ class RayService:
                 await self._start_head_node_to_webserver_tunnel()
 
             # monitor activity state
-            self._node_monitoring_tasks[node_id] = asyncio.create_task(
+            self._node_monitoring_tasks[node_id] = create_task_with_logging(
                 self._monitor_node(node_id, activity)
             )
         except Exception as e:
@@ -423,7 +424,7 @@ class RayService:
             str(self._ssh_private_key_path),
             f"{self._ssh_user}@{str(head_node.internal_ip)}",
         )
-        self._head_node_to_webserver_tunnel_early_exit_task = asyncio.create_task(
+        self._head_node_to_webserver_tunnel_early_exit_task = create_task_with_logging(
             self._on_head_node_to_webserver_tunnel_early_exit()
         )
 

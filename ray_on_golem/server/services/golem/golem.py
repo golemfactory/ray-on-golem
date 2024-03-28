@@ -43,6 +43,7 @@ DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
 DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
 DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
 DEFAULT_SSH_SENTRY_TIMEOUT = timedelta(minutes=2)
+DEFAULT_MAX_SENTRY_FAILS_COUNT = 5
 
 
 class GolemService:
@@ -306,13 +307,14 @@ class GolemService:
         logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}")
         try:
             await context.run("service ssh restart", timeout=120)
-            logger.debug(
-                f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=} done"
-            )
         except Exception:
             msg = f"Failed to restart SSH server {provider_desc}, {ip=}, {context.activity=}"
             logger.warning(msg)
             logger.debug(msg, exc_info=True)
+        else:
+            logger.debug(
+                f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=} done"
+            )
 
     @staticmethod
     async def _verify_ssh_connection_check(
@@ -367,7 +369,7 @@ class GolemService:
                 )
             except Exception:
                 fails_count += 1
-                if fails_count >= 5:
+                if fails_count >= DEFAULT_MAX_SENTRY_FAILS_COUNT:
                     msg = f"Destroying activity due to no SSH connection to {provider_desc}"
                     logger.warning(msg)
                     logger.debug(msg, exc_info=True)
@@ -515,7 +517,7 @@ class GolemService:
                 ssh_private_key_path,
             )
 
-            self._ssh_sentry_tasks[activity.id] = asyncio.create_task(
+            self._ssh_sentry_tasks[activity.id] = create_task_with_logging(
                 self._sentry_ssh_connection(
                     work_context, ip, ssh_proxy_command, ssh_user, ssh_private_key_path
                 )
