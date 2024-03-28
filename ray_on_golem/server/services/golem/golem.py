@@ -47,7 +47,12 @@ DEFAULT_MAX_SENTRY_FAILS_COUNT = 3
 
 
 class GolemService:
-    def __init__(self, websocat_path: Path, registry_stats: bool):
+    def __init__(
+        self,
+        websocat_path: Path,
+        registry_stats: bool,
+        ssh_sentry_timeout: timedelta = DEFAULT_SSH_SENTRY_TIMEOUT,
+    ):
         self._websocat_path = websocat_path
 
         self._demand_config_helper: DemandConfigHelper = DemandConfigHelper(registry_stats)
@@ -59,7 +64,7 @@ class GolemService:
         self._payment_manager: Optional[PaymentManager] = None
 
         self._ssh_sentry_tasks: Dict[str, asyncio.Task] = {}
-        self._ssh_sentry_timeout: timedelta = DEFAULT_SSH_SENTRY_TIMEOUT
+        self._ssh_sentry_timeout: timedelta = ssh_sentry_timeout
 
     async def init(self, yagna_appkey: str) -> None:
         logger.info("Starting GolemService...")
