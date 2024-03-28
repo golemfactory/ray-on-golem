@@ -3,7 +3,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Awaitable, Callable, DefaultDict, Dict, List, Optional, Tuple
+from typing import Awaitable, Callable, DefaultDict, Dict, Optional, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers import (
@@ -25,7 +25,7 @@ from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
 from golem.resources import Activity, Network, Proposal
-from golem.utils.asyncio import ensure_cancelled_many
+from golem.utils.asyncio import create_task_with_logging, ensure_cancelled, ensure_cancelled_many
 from yarl import URL
 
 from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin, ReputationScorer
@@ -57,7 +57,7 @@ class GolemService:
         self._stacks_locks: DefaultDict[(str, bool), asyncio.Lock] = defaultdict(asyncio.Lock)
         self._payment_manager: Optional[PaymentManager] = None
 
-        self._ssh_sentry_tasks: List[asyncio.Task] = []
+        self._ssh_sentry_tasks: Dict[str, asyncio.Task] = {}
         self._ssh_sentry_timeout: timedelta = DEFAULT_SSH_SENTRY_TIMEOUT
 
     async def init(self, yagna_appkey: str) -> None:
@@ -86,7 +86,7 @@ class GolemService:
 
     # FIXME: Remove this method in case of multiple cluster support
     async def clear(self) -> None:
-        await ensure_cancelled_many(self._ssh_sentry_tasks)
+        await ensure_cancelled_many(self._ssh_sentry_tasks.values())
         self._ssh_sentry_tasks.clear()
 
         await asyncio.gather(
@@ -259,11 +259,9 @@ class GolemService:
         return await proposal.get_expiration_date() - datetime.now(timezone.utc)
 
     @staticmethod
-    async def get_provider_desc(activity: Activity):
-        return (
-            f"{await activity.agreement.proposal.get_provider_name()}"
-            f"({await activity.agreement.proposal.get_provider_id()})"
-        )
+    async def get_provider_desc(activity: Activity) -> str:
+        proposal = activity.agreement.proposal
+        return f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
 
     async def _start_activity(
         self, context: WorkContext, ip: str, *, add_state_log: Callable[[str], Awaitable[None]]
@@ -317,7 +315,21 @@ class GolemService:
             logger.debug(msg, exc_info=True)
 
     @staticmethod
-    async def _verify_ssh_connection_check(activity_id, ssh_command):
+    async def _verify_ssh_connection_check(
+        activity_id: str,
+        provider_desc: str,
+        ip: str,
+        ssh_proxy_command: str,
+        ssh_user: str,
+        ssh_private_key_path: Path,
+    ):
+        ssh_command = (
+            f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
+        )
+        logger.debug(
+            "SSH connection check started on "
+            f"{provider_desc}, {ip=}, {activity_id=}: cmd={ssh_command}."
+        )
         process = await asyncio.create_subprocess_shell(
             ssh_command,
             stdout=asyncio.subprocess.PIPE,
@@ -326,7 +338,7 @@ class GolemService:
 
         stdout, stderr = await process.communicate()
 
-        debug_data = f"{activity_id=}, exitcode={process.returncode}, {stdout=}, {stderr=}"
+        debug_data = f"{provider_desc=}, exitcode={process.returncode}, {stdout=}, {stderr=}"
         logger.debug(debug_data)
 
         if process.returncode != 0:
@@ -341,25 +353,25 @@ class GolemService:
         ssh_private_key_path: Path,
     ):
         provider_desc = await self.get_provider_desc(context.activity)
-        ssh_command = (
-            f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
-        )
 
         fails_count = 0
         while True:
             try:
-                await self._verify_ssh_connection_check(context.activity.id, ssh_command)
+                await self._verify_ssh_connection_check(
+                    context.activity.id,
+                    provider_desc,
+                    ip,
+                    ssh_proxy_command,
+                    ssh_user,
+                    ssh_private_key_path,
+                )
             except Exception:
                 fails_count += 1
                 if fails_count >= 5:
-                    # Ray's autoscaler won't notice but we will at least save some GLMs
                     msg = f"Destroying activity due to no SSH connection to {provider_desc}"
                     logger.warning(msg)
                     logger.debug(msg, exc_info=True)
-                    try:
-                        await context.activity.destroy()
-                    except Exception:
-                        logger.debug(f"Cannot destroy activity {provider_desc}", exc_info=True)
+                    create_task_with_logging(self.stop_activity(context.activity))
                     break
 
                 logger.debug(
@@ -380,20 +392,20 @@ class GolemService:
         retry_interval=1,
     ) -> None:
         activity = context.activity
-        ssh_command = (
-            f"{get_ssh_command(ip, ssh_proxy_command, ssh_user, ssh_private_key_path)} uptime"
-        )
-
-        logger.debug(
-            "SSH connection check started on "
-            f"{await self.get_provider_desc(activity)}, {ip=}, {activity=}: cmd={ssh_command}."
-        )
+        provider_desc = await self.get_provider_desc(context.activity)
 
         retry = num_retries
 
         while retry > 0:
             try:
-                await self._verify_ssh_connection_check(activity.id, ssh_command)
+                await self._verify_ssh_connection_check(
+                    activity.id,
+                    provider_desc,
+                    ip,
+                    ssh_proxy_command,
+                    ssh_user,
+                    ssh_private_key_path,
+                )
                 break
             except Exception as e:
                 retry -= 1
@@ -404,10 +416,7 @@ class GolemService:
                 else:
                     raise GolemException("SSH connection check failed!") from e
 
-        logger.info(
-            "SSH connection check successful on "
-            f"{await self.get_provider_desc(activity)}, {ip=}, {activity=}."
-        )
+        logger.info(f"SSH connection check successful on {provider_desc}, {ip=}, {activity=}.")
 
     async def create_activity(
         self,
@@ -449,6 +458,16 @@ class GolemService:
                 await add_state_log(f"{msg} {error=}")
                 logger.warning(msg)
                 logger.debug(msg, exc_info=True)
+
+    async def stop_activity(self, activity: Activity):
+        if activity.id in self._ssh_sentry_tasks:
+            await ensure_cancelled(self._ssh_sentry_tasks[activity.id])
+
+        provider_desc = await self.get_provider_desc(activity)
+        try:
+            await activity.destroy()
+        except Exception:
+            logger.debug(f"Cannot destroy activity {provider_desc}", exc_info=True)
 
     async def _create_activity(
         self,
@@ -496,18 +515,16 @@ class GolemService:
                 ssh_private_key_path,
             )
 
-            self._ssh_sentry_tasks.append(
-                asyncio.create_task(
-                    self._sentry_ssh_connection(
-                        work_context, ip, ssh_proxy_command, ssh_user, ssh_private_key_path
-                    )
+            self._ssh_sentry_tasks[activity.id] = asyncio.create_task(
+                self._sentry_ssh_connection(
+                    work_context, ip, ssh_proxy_command, ssh_user, ssh_private_key_path
                 )
             )
 
             await self._network.refresh_nodes()
         except Exception as e:
             logger.error(f"Creating new activity failed with `{type(e).__name__}: {e}`")
-            await activity.destroy()
+            await self.stop_activity(activity)
             raise
 
         await add_state_log(f"[9/9] Activity ready on provider: {provider_desc}")
