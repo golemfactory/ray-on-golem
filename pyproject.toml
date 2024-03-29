@@ -12,7 +12,7 @@ python = "^3.8.1"
 ray = {version="~2.9.3", extras=["default"]}
 #golem-core = {path="../golem-core-python", develop=true}
 #golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.0"
+golem-core = "^0.6.2"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"
@@ -38,7 +38,7 @@ python = "^3.8.1"
 ray = {version="==2.9.3", extras=["default"]}
 #golem-core = {path="../golem-core-python", develop=true}
 #golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.0"
+golem-core = "^0.6.2"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"
