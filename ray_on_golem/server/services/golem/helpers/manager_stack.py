@@ -24,6 +24,8 @@ from ray_on_golem.server.services.golem.manager_stack import ManagerStack
 
 logger = logging.getLogger(__name__)
 
+HEAD_NODE_EXTRA_SCORE = 100
+
 
 class ManagerStackNodeConfigHelper:
     @staticmethod
@@ -118,7 +120,7 @@ class ManagerStackNodeConfigHelper:
             proposal_data.properties.get("golem.node.debug.subnet") == priority_head_subnet_tag
         )
 
-        return 100.0 if add_scoring else 0.0
+        return HEAD_NODE_EXTRA_SCORE if add_scoring else 0
 
     @staticmethod
     def prepare_demand_manager_for_node_type(

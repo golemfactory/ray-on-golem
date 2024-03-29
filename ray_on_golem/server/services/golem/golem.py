@@ -4,7 +4,6 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from functools import partial
 from pathlib import Path
 from typing import Awaitable, Callable, DefaultDict, Dict, Optional, Tuple
 
@@ -27,13 +26,7 @@ from golem.managers import (
 from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
-from golem.resources import (
-    Activity,
-    Allocation,
-    AllocationException,
-    Network,
-    Proposal,
-)
+from golem.resources import Activity, Allocation, AllocationException, Network, Proposal
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled, ensure_cancelled_many
 from golem.utils.logging import trace_span
 from ya_payment import models
@@ -57,6 +50,8 @@ DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
 DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
 DEFAULT_SSH_SENTRY_TIMEOUT = timedelta(minutes=2)
 DEFAULT_MAX_SENTRY_FAILS_COUNT = 3
+
+EXPIRATION_TIME_FACTOR = 0.8
 
 
 class NoMatchingPlatform(AllocationException):
@@ -303,7 +298,7 @@ class GolemService:
                     ProposalBuffer(
                         min_size=0,
                         max_size=4,
-                        fill_concurrency_size=2,
+                        fill_concurrency_size=4,
                         get_expiration_func=self._get_proposal_expiration,
                     ),
                 ),
@@ -314,7 +309,9 @@ class GolemService:
         return stack
 
     async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
-        return (await proposal.get_expiration_date() - datetime.now(timezone.utc)) * 0.8
+        return (
+            await proposal.get_expiration_date() - datetime.now(timezone.utc)
+        ) * EXPIRATION_TIME_FACTOR
 
     @staticmethod
     async def get_provider_desc(activity: Activity) -> str:
