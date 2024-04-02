@@ -47,6 +47,8 @@ toml = "^0.10.2"
 dpath = "^2.1.6"
 appdirs = "^1.4.4"
 
+aerich = "^0.7.2"
+
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.main:main"
 rog-db = "ray_on_golem.reputation.admin:admin"
