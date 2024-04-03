@@ -13,6 +13,8 @@ ZOOM_BASE = 2.0
 VSCALE = np.uint8(255)
 NUM_GPUS = 0.1
 
+print_verbose = print
+
 
 class ScrCoords(NamedTuple):
     x: int
@@ -86,7 +88,7 @@ def calculate_mandel_chunk(
     tgt_size_x = tgt_range_x[1] - tgt_range_x[0]
     tgt_size_y = tgt_range_y[1] - tgt_range_y[0]
     buffer = np.zeros((tgt_size_y, tgt_size_x), dtype=np.uint8)
-    print(f"starting chunk: {tgt_range_x}, {tgt_range_y}")
+    print_verbose(f"starting chunk: {tgt_range_x}, {tgt_range_y}")
 
     if use_gpu:
         block = (32, 32)
@@ -106,7 +108,7 @@ def calculate_mandel_chunk(
         np.uint(max_iter),
     )
 
-    print(f"finalized chunk: {tgt_range_x}, {tgt_range_y}")
+    print_verbose(f"finalized chunk: {tgt_range_x}, {tgt_range_y}")
     return buffer
 
 
@@ -146,7 +148,7 @@ def draw_mandelbrot(
         else:
             f = ray.remote(num_gpus=NUM_GPUS)(calculate_mandel_chunk).remote
 
-        print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args[0], calc_args[1]})")
+        print_verbose(f"{datetime.now()}: scheduling: {c}: {f}({calc_args[0], calc_args[1]})")
         chunks.append(f(*calc_args))
 
     print(f"{datetime.now()}: finished scheduling")
@@ -168,12 +170,12 @@ def draw_mandelbrot(
         chunk_img_size = (size.x, end_y - start_y)
         box = (0, start_y)
 
-        print(f"{datetime.now()}: got chunk {c}, size: {chunk_img_size}, box: {box}")
+        print_verbose(f"{datetime.now()}: got chunk {c}, size: {chunk_img_size}, box: {box}")
 
         chunk_img = Image.frombytes("L", size=chunk_img_size, data=bytearray(chunk.data))
         img.paste(chunk_img, box=box)
 
-        print(f"{datetime.now()}: processed chunk {c}")
+        print_verbose(f"{datetime.now()}: processed chunk {c}")
 
     img.show()
 
@@ -245,6 +247,7 @@ def argument_parser():
     parser.add_argument(
         "-G", "--no-use-gpu", dest="use_gpu", action="store_false", help="don't use GPU"
     )
+    parser.add_argument("-q", "--quiet", help="Decrease verbosity", action="store_true")
     parser.set_defaults(use_ray=True, use_gpu=True)
 
     return parser
@@ -257,6 +260,9 @@ start = datetime.now()
 print(f"{start}: starting...")
 
 args = argument_parser().parse_args()
+
+if args.quiet:
+    print_verbose = lambda _: None
 
 if args.use_ray:
     ray.init(num_cpus=args.ray_num_cpus)
