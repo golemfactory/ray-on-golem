@@ -6,7 +6,6 @@ from datetime import timedelta
 from typing import Dict, Optional, Sequence
 
 from golem.managers import (
-    BlacklistProviderIdPlugin,
     DefaultPaymentManager,
     DefaultProposalManager,
     NegotiatingPlugin,
@@ -26,12 +25,12 @@ from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
 
+from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin
 from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.golem import DEFAULT_DEMAND_LIFETIME
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +242,7 @@ class NetworkStatsService:
 
         plugins = [
             self._stats_plugin_factory.create_counter_plugin("Initial"),
-            BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
+            ProviderBlacklistPlugin(payment_network),
             self._stats_plugin_factory.create_counter_plugin("Not blacklisted"),
         ]
 
