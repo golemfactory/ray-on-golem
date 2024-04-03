@@ -8,6 +8,8 @@ from PIL import Image
 
 ZOOM_BASE = 2.0
 
+print_verbose = print
+
 
 class ScrCoords(NamedTuple):
     x: int
@@ -45,7 +47,7 @@ def calculate_mandel(
     y_step = (src_range_y[1] - src_range_y[0]) / tgt_size_y
     buffer = bytearray(b"\xff" * (tgt_size_x * tgt_size_y))
 
-    print(f"{datetime.now()}: starting chunk: {tgt_range_x}, {tgt_range_y}")
+    print_verbose(f"{datetime.now()}: starting chunk: {tgt_range_x}, {tgt_range_y}")
 
     for ys in range(tgt_range_y[0], tgt_range_y[1]):
         y = src_range_y[0] + y_step * (ys - tgt_range_y[0])
@@ -54,7 +56,7 @@ def calculate_mandel(
             r = mandel(x, y, max_iter)
             buffer[tgt_size_x * (ys - tgt_range_y[0]) + xs - tgt_range_x[0]] = r
 
-    print(f"{datetime.now()}: finalized chunk: {tgt_range_x}, {tgt_range_y}")
+    print_verbose(f"{datetime.now()}: finalized chunk: {tgt_range_x}, {tgt_range_y}")
 
     return buffer
 
@@ -89,7 +91,7 @@ def draw_mandelbrot(
         )
         f = ray.remote(calculate_mandel).remote if use_ray else calculate_mandel
 
-        print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args})")
+        print_verbose(f"{datetime.now()}: scheduling: {c}: {f}({calc_args})")
         chunks.append(f(*calc_args))
 
     print(f"{datetime.now()}: finished scheduling")
@@ -111,12 +113,12 @@ def draw_mandelbrot(
         chunk_img_size = (size.x, end_y - start_y)
         box = (0, start_y)
 
-        print(f"{datetime.now()}: got chunk {c}, size: {chunk_img_size}, box: {box}")
+        print_verbose(f"{datetime.now()}: got chunk {c}, size: {chunk_img_size}, box: {box}")
 
         chunk_img = Image.frombytes("L", size=chunk_img_size, data=chunk)
         img.paste(chunk_img, box=box)
 
-        print(f"{datetime.now()}: processed chunk {c}")
+        print_verbose(f"{datetime.now()}: processed chunk {c}")
 
     img.show()
 
@@ -184,6 +186,7 @@ def argument_parser():
     parser.add_argument(
         "-R", "--no-use-ray", dest="use_ray", action="store_false", help="don't use ray"
     )
+    parser.add_argument("-q", "--quiet", help="Decrease verbosity", action="store_true")
     parser.set_defaults(use_ray=True)
 
     return parser
@@ -196,6 +199,9 @@ start = datetime.now()
 print(f"{start}: starting...")
 
 args = argument_parser().parse_args()
+
+if args.quiet:
+    print_verbose = lambda _: None
 
 if args.use_ray:
     ray.init(num_cpus=args.ray_num_cpus)

@@ -13,31 +13,23 @@ provider:
   use_internal_ips: true
   module: "ray_on_golem.provider.node_provider.GolemNodeProvider"
   parameters:
-    # Port of golem webserver that has connection with golem network
-    webserver_port: 4578
 
     # Blockchain used for payments.
     # `holesky` means running free nodes on testnet,
     # `polygon` is for mainnet operations.
     payment_network: "holesky"
 
-    # Maximum amount of GML that's going to be spent (not supported yet)
-    total_budget: 2
-
     # Params for creating golem demands (same for head and workers)
     node_config:
       demand:
         # if not provided, image_tag will be autodetected based on currently used python and ray versions
         # check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.9.0-py3.10.13-ray2.9.3"
+        image_tag: "blueshade/ray-on-golem:0.10.0-dev-240402-1-py3.10.13-ray2.9.3"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
         # If not provided demand will not use Computation Manifest
         # outbound_urls: ["https://pypi.dev.golem.network"]
-
-        # you can also provide the image hash directly (although it is not recommended :)
-        # image_hash: "c6fc9b12da19d56a998eace84b6df961852360b37479e93ef4ce3913" # approxit/ray-test:py3.10.12-ray2.3.1
 
         min_mem_gib: 0
         min_cpu_threads: 0
@@ -95,13 +87,10 @@ worker_start_ray_commands: [
   "ray start --address 192.168.0.3:6379",
 ]
 
-# Authentication credentials that Ray will use to launch nodes
-# auth:
-  # Custom username for ssh
-  # ssh_user: "root"
-
-  # If ssh_private_key will be not provided, temporary key will be created and used
-  # ssh_private_key: '~/.ssh/id_rsa'
-
 # A list of paths to the files or directories to copy from the head node to the worker nodes
 cluster_synced_files: []
+
+# Satisfy checks to disable warning about legacy fields at `ray up`.
+# This will be removed by ray-on-golem on the fly.
+head_node: True
+worker_nodes: True
