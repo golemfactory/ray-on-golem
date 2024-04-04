@@ -95,7 +95,7 @@ jobs:
 
       - name: Prepare artifact name
         run: |
-          echo ARTIFACT_NAME=logs-example-${${{ inputs.BRANCH }}//\//_}-${{ matrix.example_name }} >> $GITHUB_ENV
+          echo ARTIFACT_NAME=logs-example-${{ inputs.BRANCH }}-${{ matrix.example_name }} | sed "s|/|_|g" >> $GITHUB_ENV
 
       - name: Collects logs
         if: always()
