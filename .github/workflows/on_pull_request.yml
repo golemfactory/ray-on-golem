@@ -17,3 +17,6 @@ jobs:
   smoke_tests:
     name: Smoke tests
     uses: ./.github/workflows/smoke_tests.yml
+  ray_deps_test:
+    name: Ray deps test
+    uses: ./.github/workflows/ray_deps_test.yml

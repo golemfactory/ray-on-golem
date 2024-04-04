@@ -24,11 +24,11 @@ from ray_on_golem.server.models import (
     Tags,
 )
 from ray_on_golem.server.services.golem import GolemService
-from ray_on_golem.server.services.utils import get_ssh_command
 from ray_on_golem.server.services.yagna import YagnaService
 from ray_on_golem.utils import (
     are_dicts_equal,
     get_default_ssh_key_name,
+    get_ssh_command,
     run_subprocess,
     run_subprocess_output,
 )

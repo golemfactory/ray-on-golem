@@ -1,8 +1,11 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from golem.resources import Activity
 from pydantic import AnyUrl, BaseModel, Field, validator
+
+if TYPE_CHECKING:
+    from golem.resources import Activity
+
 
 NodeId = str
 Tags = Dict[str, str]
@@ -32,7 +35,7 @@ class NodeData(BaseModel):
 
 
 class Node(NodeData):
-    activity: Optional[Activity] = None
+    activity: Optional["Activity"] = None
 
     class Config:
         arbitrary_types_allowed = True
