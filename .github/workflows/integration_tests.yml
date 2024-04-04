@@ -6,7 +6,7 @@ on:
       BRANCH:
         type: string
         description: Git branch to be used in run
-        default: ${{ github.ref }}
+        default: ${{ github.head_ref }}
 
 jobs:
   examples:
