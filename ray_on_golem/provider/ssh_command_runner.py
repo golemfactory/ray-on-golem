@@ -1,4 +1,5 @@
-from ray.autoscaler._private.command_runner import SSHCommandRunner as BaseSshCommandRunner, SSHOptions
+from ray.autoscaler._private.command_runner import SSHCommandRunner as BaseSshCommandRunner
+from ray.autoscaler._private.command_runner import SSHOptions
 
 from ray_on_golem.server.services.utils import get_ssh_command
 

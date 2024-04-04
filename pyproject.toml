@@ -98,6 +98,7 @@ dev_yaml = {cmd = "python -m utils.apply_overrides -o golem-cluster.dev.yaml gol
 profile = "black"
 py_version = 38
 line_length = 100
+skip_gitignore = true
 
 [tool.autoflake]
 recursive = true
