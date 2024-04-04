@@ -325,14 +325,9 @@ class GolemNodeProvider(NodeProvider):
 
             cli_logger.newline()
             cli_logger.print(
-                "You can use the Golem Onboarding portal to top up: https://golemfactory.github.io"
-                f"/onboarding_production/?yagnaAddress={self._wallet_address}"
-                "\n\n"
-                "DISCLAIMER: Please keep in mind that in its current stage, the Onboarding Portal "
-                "is an EXPERIMENTAL product. Even though it is functional, "
-                "we do not recommend using it unless you wish to help us beta-test this feature. "
-                "You'll find more information on `#Payment UX` discord channel "
-                "https://discord.com/channels/684703559954333727/1136984764197380096",
+                "You can use the Golem Onboarding portal to top up: https://glm.golem.network/"
+                f"#/onboarding/budget?yagnaAddress={self._wallet_address}&network=polygon"
+                "\n\n",
                 no_format=True,
             )
             cli_logger.newline()
