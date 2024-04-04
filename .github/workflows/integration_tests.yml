@@ -6,7 +6,7 @@ on:
       BRANCH:
         type: string
         description: Git branch to be used in run
-        default: main
+        default: ${{ github.ref }}
 
 jobs:
   examples:
@@ -93,11 +93,17 @@ jobs:
       - name: Stop Goth
         run: ./.github/workflows/stop-goth.sh
 
+      - name: Prepare artifact name
+        run: |
+          branch_name = ${{ inputs.BRANCH }}
+          branch_name = ${branch_name//\//_}
+          echo ARTIFACT_NAME=logs-example-${branch_name}-${{ matrix.example_name }} >> $GITHUB_ENV
+
       - name: Collects logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-example-${{ inputs.BRANCH }}-${{ matrix.example_name }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: |
             /root/.local/share/ray_on_golem/webserver_debug.log
             /root/.local/share/ray_on_golem/yagna.log
