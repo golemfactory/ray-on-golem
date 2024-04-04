@@ -14,6 +14,8 @@ def get_ssh_command(
             "-o StrictHostKeyChecking=no",
             "-o UserKnownHostsFile=/dev/null",
             "-o PasswordAuthentication=no",
+            "-o ServerAliveInterval=300",
+            "-o ServerAliveCountMax=5",
             f"-o {quote(proxy_command_str)}",
             f"-i {quote(str(ssh_private_key_path))}" if ssh_private_key_path else "",
             quote(ssh_user_str),

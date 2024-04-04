@@ -44,9 +44,14 @@ jobs:
         with:
           ref: ${{ inputs.BRANCH }}
 
+      - name: Clean up previous runs
+        run: |
+          pkill -f ray-on-golem || true
+          pkill -f goth || true
+
       - name: Start Goth
         env:
-          GOTH_VERSION: 0.15.11
+          GOTH_VERSION: 0.16.0
           GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: ./.github/workflows/start-goth.sh
@@ -59,9 +64,7 @@ jobs:
 
       - name: Prepare `golem-cluster.tests.yaml`
         run: |
-          cat /etc/hosts
-          cat /etc/hostname
-          poetry run python -m utils.apply_overrides -b ${{ matrix.base_yaml_path || './golem-cluster.yaml' }} -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override-goth.yaml
+          poetry run python -m utils.apply_overrides -b ${{ matrix.base_yaml_path || './golem-cluster.yaml' }} golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override-goth.yaml -o golem-cluster.tests.yaml
           cat golem-cluster.tests.yaml 
 
       - name: Call `ray up`
@@ -76,6 +79,7 @@ jobs:
       - name: Print last cluster logs
         if: always()
         continue-on-error: true
+        timeout-minutes: 1
         run: |
           poetry run ray exec golem-cluster.tests.yaml 'ls /tmp/ray/session_latest/logs/'
           poetry run ray exec golem-cluster.tests.yaml 'tail -n 100 /tmp/ray/session_latest/logs/*'

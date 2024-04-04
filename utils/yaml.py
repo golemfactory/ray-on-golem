@@ -24,6 +24,7 @@ def load_yamls(*yaml_paths: Path) -> Dict[str, Any]:
         dpath.merge(
             base_dict,
             data,
+            flags=dpath.MergeType.REPLACE,
         )
 
     return base_dict
