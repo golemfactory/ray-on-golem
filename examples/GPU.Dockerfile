@@ -17,7 +17,8 @@ RUN apt-get update && apt-get install -y \
 
 RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
 	echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
-	echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+	echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config && \
+	echo "StrictModes no" >> /etc/ssh/sshd_config
 
 RUN wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-py310_23.11.0-2-Linux-x86_64.sh
 RUN bash miniconda.sh -b -u
@@ -41,3 +42,8 @@ RUN pip install numpy numba
 RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 
 COPY ray_on_golem /app/ray_on_golem/
+
+RUN rm -r /root/.cache
+RUN mv /root /root_copy
+
+VOLUME /root

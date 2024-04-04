@@ -291,16 +291,22 @@ class GolemService:
         ip: str,
         ssh_public_key_data: str,
     ):
+        async def run_command(cmd: str):
+            result = await context.run(cmd)
+            await result.wait()
+            logger.debug("Command executed: %s: %s",cmd, [e.to_dict() for e in result.events])
+
         provider_desc = await self.get_provider_desc(context.activity)
         logger.info(f"Running initial commands on {provider_desc}, {ip=}, {context.activity=}")
         hostname = ip.replace(".", "-")
-        await context.run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
-        await context.run(f"echo 'NODE_IP={ip}' >> /etc/environment")
-        await context.run(f"hostname '{hostname}'")
-        await context.run(f"echo '{hostname}' > /etc/hostname")
-        await context.run(f"echo '{ip} {hostname}' >> /etc/hosts")
-        await context.run("mkdir -p /root/.ssh")
-        await context.run(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
+        await run_command("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
+        await run_command(f"echo 'NODE_IP={ip}' >> /etc/environment")
+        await run_command(f"hostname '{hostname}'")
+        await run_command(f"echo '{hostname}' > /etc/hostname")
+        await run_command(f"echo '{ip} {hostname}' >> /etc/hosts")
+        await run_command("mv /root_copy/.bashrc /root_copy/.profile /root 2> /dev/null")
+        await run_command("mkdir -p /root/.ssh")
+        await run_command(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
 
     async def _start_ssh_server(self, context: WorkContext, ip: str):
         provider_desc = await self.get_provider_desc(context.activity)
@@ -313,7 +319,7 @@ class GolemService:
         try:
             await context.run("service ssh restart", timeout=120)
         except Exception:
-            msg = f"Failed to restart SSH server {provider_desc}, {ip=}, {context.activity=}"
+            msg = f"Failed to restart the SSH server {provider_desc}, {ip=}, {context.activity=}"
             logger.warning(msg)
             logger.debug(msg, exc_info=True)
         else:
