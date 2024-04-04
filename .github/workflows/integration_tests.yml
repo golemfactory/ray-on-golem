@@ -95,9 +95,7 @@ jobs:
 
       - name: Prepare artifact name
         run: |
-          branch_name = ${{ inputs.BRANCH }}
-          branch_name = ${branch_name//\//_}
-          echo ARTIFACT_NAME=logs-example-${branch_name}-${{ matrix.example_name }} >> $GITHUB_ENV
+          echo ARTIFACT_NAME=logs-example-${${{ inputs.BRANCH }}//\//_}-${{ matrix.example_name }} >> $GITHUB_ENV
 
       - name: Collects logs
         if: always()
