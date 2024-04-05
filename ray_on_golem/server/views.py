@@ -4,10 +4,10 @@ import logging
 from aiohttp import web
 from pydantic import BaseModel
 
+from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server import models, settings
 from ray_on_golem.server.models import ShutdownState
 from ray_on_golem.server.services import RayService
-from ray_on_golem.server.services.ray import RayServiceError
 from ray_on_golem.utils import raise_graceful_exit
 from ray_on_golem.version import get_version
 
@@ -59,7 +59,7 @@ async def bootstrap_cluster(request: web.Request) -> web.Response:
         ) = await ray_service.create_cluster(
             request_data.provider_config, request_data.cluster_name
         )
-    except RayServiceError as e:
+    except RayOnGolemError as e:
         raise web.HTTPBadRequest(reason=str(e))
 
     return json_response(
