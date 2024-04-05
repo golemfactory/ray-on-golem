@@ -10,7 +10,7 @@ cluster_name: golem-cluster
 max_workers: 10
 
 # The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
-#idle_timeout_minutes: 2
+idle_timeout_minutes: 5
 
 # The cloud provider-specific configuration properties.
 provider:

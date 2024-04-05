@@ -138,11 +138,11 @@ async def shutdown_print(app: web.Application) -> None:
 async def yagna_service_ctx(app: web.Application) -> None:
     yagna_service: YagnaService = app["yagna_service"]
 
-    await yagna_service.init()
+    await yagna_service.start()
 
     yield
 
-    await yagna_service.shutdown()
+    await yagna_service.stop()
 
 
 async def golem_service_ctx(app: web.Application) -> None:

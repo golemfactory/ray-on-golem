@@ -107,7 +107,7 @@ class RayService:
         with self._ssh_public_key_path.open() as f:
             self._ssh_public_key = f.readline().strip()
 
-        payment_status = await self._yagna_service.run_payment_fund(
+        payment_status = await self._yagna_service.prepare_funds(
             self._provider_config.payment_network,
             self._provider_config.payment_driver,
         )
