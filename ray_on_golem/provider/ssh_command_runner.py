@@ -2,6 +2,7 @@ from ray.autoscaler._private.command_runner import SSHCommandRunner as BaseSshCo
 from ray.autoscaler._private.command_runner import SSHOptions
 
 from ray_on_golem.server.services.utils import get_ssh_command
+from ray_on_golem.server.settings import SSH_SERVER_ALIVE_COUNT_MAX, SSH_SERVER_ALIVE_INTERVAL
 
 
 class SSHCommandRunner(BaseSshCommandRunner):
@@ -12,8 +13,8 @@ class SSHCommandRunner(BaseSshCommandRunner):
             self.ssh_private_key,
             self.ssh_control_path,
             ProxyCommand=self.ssh_proxy_command,
-            ServerAliveInterval=300,
-            ServerAliveCountMax=5,
+            ServerAliveInterval=SSH_SERVER_ALIVE_INTERVAL,
+            ServerAliveCountMax=SSH_SERVER_ALIVE_COUNT_MAX,
         )
 
     def remote_shell_command_str(self):
