@@ -1,8 +1,8 @@
 from ray.autoscaler._private.command_runner import SSHCommandRunner as BaseSshCommandRunner
 from ray.autoscaler._private.command_runner import SSHOptions
 
-from ray_on_golem.server.services.utils import get_ssh_command
 from ray_on_golem.server.settings import SSH_SERVER_ALIVE_COUNT_MAX, SSH_SERVER_ALIVE_INTERVAL
+from ray_on_golem.utils import get_ssh_command
 
 
 class SSHCommandRunner(BaseSshCommandRunner):

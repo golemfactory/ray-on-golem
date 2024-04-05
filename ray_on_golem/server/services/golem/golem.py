@@ -37,9 +37,8 @@ from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.utils import get_ssh_command
 from ray_on_golem.server.settings import YAGNA_PATH
-from ray_on_golem.utils import run_subprocess_output
+from ray_on_golem.utils import get_ssh_command, run_subprocess_output
 
 logger = logging.getLogger(__name__)
 

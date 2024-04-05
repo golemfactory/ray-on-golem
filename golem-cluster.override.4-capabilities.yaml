@@ -1,7 +1,0 @@
-provider:
-  parameters:
-    node_config:
-      demand:
-        # Defaults to `["vpn", "inet"]`
-        # If outbound_urls is specified `"manifest-support"` will be added
-        capabilities: ["vpn", "inet", "manifest-support"]
