@@ -64,8 +64,7 @@ class DeviceListAllocationPaymentManager(DefaultPaymentManager):
     @trace_span(show_arguments=True, show_results=True)
     async def _create_allocation(self, budget: Decimal, network: str, driver: str) -> Allocation:
         output = json.loads(
-            # await run_subprocess_output(YAGNA_PATH, "payment", "driver", "list", "--json")  # yagna 0.15+
-            await run_subprocess_output(YAGNA_PATH, "payment", "drivers", "--json")  # yagna 0.13
+            await run_subprocess_output(YAGNA_PATH, "payment", "driver", "list", "--json")
         )
 
         try:
@@ -82,9 +81,9 @@ class DeviceListAllocationPaymentManager(DefaultPaymentManager):
             total_amount=str(budget),
             timestamp=timestamp,
             timeout=timeout,
-            #   This will probably be removed one day (consent-related thing)
+            # This will probably be removed one day (consent-related thing)
             make_deposit=False,
-            #   We must set this here because of the ya_client interface
+            # We must set this here because of the ya_client interface
             allocation_id="",
             spent_amount="",
             remaining_amount="",

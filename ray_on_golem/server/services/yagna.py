@@ -12,8 +12,8 @@ from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.log import ZippingRotatingFileHandler
 from ray_on_golem.server.settings import (
     LOGGING_BACKUP_COUNT,
-    PAYMENT_NETWORK_MAINNET,
-    PAYMENT_NETWORK_POLYGON,
+    PAYMENT_NETWORK_GOERLI,
+    PAYMENT_NETWORK_HOLESKY,
     RAY_ON_GOLEM_CHECK_INTERVAL,
     YAGNA_API_URL,
     YAGNA_APPKEY,
@@ -166,26 +166,25 @@ class YagnaService:
     async def prepare_funds(self, network: str, driver: str) -> Dict:
         platform = f"{driver}/{network}"
 
-        # FIXME: Uncomment this block on yagna 0.15+
-        # if network not in (PAYMENT_NETWORK_HOLESKY, PAYMENT_NETWORK_GOERLI):
-        #     logger.debug(
-        #         "No need to prepare funds as `%s` does not support automatic funding",
-        #         platform,
-        #     )
-        #
-        #     return json.loads(
-        #         await run_subprocess_output(
-        #             self._yagna_path,
-        #             "payment",
-        #             "status",
-        #             "--network",
-        #             network,
-        #             "--driver",
-        #             driver,
-        #             "--json",
-        #             timeout=timedelta(seconds=30),
-        #         )
-        #     )
+        if network not in (PAYMENT_NETWORK_HOLESKY, PAYMENT_NETWORK_GOERLI):
+            logger.debug(
+                "No need to prepare funds as `%s` does not support automatic funding",
+                platform,
+            )
+
+            return json.loads(
+                await run_subprocess_output(
+                    self._yagna_path,
+                    "payment",
+                    "status",
+                    "--network",
+                    network,
+                    "--driver",
+                    driver,
+                    "--json",
+                    timeout=timedelta(seconds=30),
+                )
+            )
 
         logger.debug(
             "Preparing `%s` funds with a timeout up to %s...",
@@ -193,8 +192,6 @@ class YagnaService:
             YAGNA_FUND_TIMEOUT,
         )
 
-        # FIXME: is_mainnet not needed on yagna 0.15+
-        is_mainnet = network in (PAYMENT_NETWORK_MAINNET, PAYMENT_NETWORK_POLYGON)
         fund_deadline = datetime.now() + YAGNA_FUND_TIMEOUT
         check_seconds = int(YAGNA_CHECK_INTERVAL.total_seconds())
         while datetime.now() < fund_deadline:
@@ -202,7 +199,7 @@ class YagnaService:
                 await run_subprocess_output(
                     self._yagna_path,
                     "payment",
-                    *(["init", "--sender"] if is_mainnet else ["fund"]),
+                    "fund",
                     "--network",
                     network,
                     "--driver",
@@ -227,7 +224,7 @@ class YagnaService:
 
                 amount = float(output["amount"])
 
-                if amount or is_mainnet:
+                if amount:
                     logger.debug(
                         "Preparing `%s` funds done with balance of %.2f %s",
                         platform,
