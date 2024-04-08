@@ -26,7 +26,7 @@ jobs:
 
       - name: Prepare `golem-cluster.tests.yaml`
 
-        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml
+        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override.4-subnet.yaml
       - name: Call `ray up`
         env:
           PYTHONUNBUFFERED: 1
