@@ -9,10 +9,10 @@ packages = [{include = "ray_on_golem"}]
 [tool.poetry.dependencies]
 python = "^3.8.1"
 
-ray = {version="~2.9.3", extras=["default"]}
-#golem-core = {path="../golem-core-python", develop=true}
-#golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.2"
+ray = {version = "~2.9.3", extras = ["default"]}
+#golem-core = {path = "../golem-core-python", develop = true}
+golem-core = {git = "https://github.com/golemfactory/golem-core-python.git", branch = "main"}
+#golem-core = "^0.6.2"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"
@@ -20,15 +20,14 @@ pydantic = "<2"
 toml = "^0.10.2"
 dpath = "^2.1.6"
 appdirs = "^1.4.4"
-
-websocat = "^1.12.0"
-golem-node = {version = "0.15.0a31", source = "test-pypi"}
-
 tortoise-orm = "^0.20.0"
 aerich = "^0.7.2"
 prettytable = "^3.10.0"
 psutil = "^5.9.8"
 yarl = "^1.9.4"
+
+websocat = "^1.12.0"
+golem-node = "^0.15.0"
 
 setuptools = "*"
 
@@ -36,18 +35,11 @@ setuptools = "*"
 python = "^3.8.1"
 
 ray = {version="==2.9.3", extras=["default"]}
-#golem-core = {path="../golem-core-python", develop=true}
-#golem-core = {git="https://github.com/golemfactory/golem-core-python.git", branch="main"}
-golem-core = "^0.6.2"
-aiohttp = "^3"
 requests = "^2"
 click = "^8"
 pydantic = "<2"
-toml = "^0.10.2"
 dpath = "^2.1.6"
 appdirs = "^1.4.4"
-
-aerich = "^0.7.2"
 
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.main:main"
@@ -98,6 +90,7 @@ dev_yaml = {cmd = "python -m utils.apply_overrides -o golem-cluster.dev.yaml gol
 profile = "black"
 py_version = 38
 line_length = 100
+skip_gitignore = true
 
 [tool.autoflake]
 recursive = true

@@ -2,11 +2,11 @@ import asyncio
 import logging
 import logging.config
 import pathlib
-from contextlib import asynccontextmanager
 from typing import Dict, Optional
 
 import click
 import yaml
+from golem.utils.asyncio import ensure_cancelled
 
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.network_stats.services import NetworkStatsService
@@ -57,11 +57,7 @@ def validate_node_type(ctx, param, value):
     help="Enable verbose logging.",
 )
 @with_datadir
-def main(*args, **kwargs):
-    asyncio.run(_network_stats(*args, **kwargs))
-
-
-async def _network_stats(
+def main(
     cluster_config_file: Dict,
     node_type: str,
     duration: int,
@@ -75,38 +71,66 @@ async def _network_stats(
     if enable_logging:
         logging.config.dictConfig(get_logging_config(datadir=datadir))
 
-    async with network_stats_service(
-        provider_params["enable_registry_stats"],
-        provider_params["payment_network"],
-        provider_params["payment_driver"],
-        datadir,
-    ) as stats_service:
-        await stats_service.run(cluster_config_file, node_type, duration)
-
-
-@asynccontextmanager
-async def network_stats_service(
-    registry_stats: bool,
-    network: str,
-    driver: str,
-    datadir: Optional[pathlib.Path],
-) -> NetworkStatsService:
-    service = NetworkStatsService(registry_stats)
     yagna_service = YagnaService(
         yagna_path=YAGNA_PATH,
         datadir=datadir,
     )
+    reputation_service = ReputationService(datadir)
+    stats_service = NetworkStatsService(provider_params["enable_registry_stats"])
 
-    async with ReputationService(datadir):
-        await yagna_service.init()
-        await yagna_service.run_payment_fund(network, driver)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(
+        _start_services(
+            yagna_service,
+            reputation_service,
+            stats_service,
+            provider_params["payment_network"],
+            provider_params["payment_driver"],
+        )
+    )
 
-        await service.init(yagna_appkey=yagna_service.yagna_appkey)
+    run_task = loop.create_task(stats_service.run(cluster_config_file, node_type, duration))
 
-        yield service
+    try:
+        loop.run_until_complete(run_task)
+    except KeyboardInterrupt:
+        print("Received CTRL-C, exiting...")
+        loop.run_until_complete(ensure_cancelled(run_task))
 
-        await service.shutdown()
-        await yagna_service.shutdown()
+    loop.run_until_complete(
+        _stop_services(
+            stats_service,
+            reputation_service,
+            yagna_service,
+        )
+    )
+
+
+async def _start_services(
+    yagna_service: YagnaService,
+    reputation_service: ReputationService,
+    stats_service: NetworkStatsService,
+    network: str,
+    driver: str,
+) -> None:
+    await yagna_service.start()
+    await yagna_service.prepare_funds(network, driver)
+
+    await reputation_service.start()
+
+    await stats_service.start(yagna_appkey=yagna_service.yagna_appkey)
+
+
+async def _stop_services(
+    stats_service: NetworkStatsService,
+    reputation_service: ReputationService,
+    yagna_service: YagnaService,
+) -> None:
+    await stats_service.stop()
+
+    await reputation_service.stop()
+
+    await yagna_service.stop()
 
 
 if __name__ == "__main__":

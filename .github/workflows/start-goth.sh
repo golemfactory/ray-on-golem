@@ -13,6 +13,7 @@ rm -rf /tmp/goth-tests/
 
 echo CREATING VENV
 rm -rf .envs/goth
+sudo apt-get install python3.10-venv -y
 python -m venv .envs/goth
 source .envs/goth/bin/activate
 
@@ -21,16 +22,17 @@ python -m pip install --upgrade pip
 python -m pip install --upgrade setuptools wheel
 
 echo INSTALLING DEPENDENCIES
-python -m pip install goth==$GOTH_VERSION pytest pytest-asyncio pexpect
+python -m pip install --extra-index-url https://test.pypi.org/simple/ goth==$GOTH_VERSION
+python -m pip install pytest pytest-asyncio pexpect
 
 echo CREATING ASSETS
 python -m goth create-assets .envs/goth/assets
 # disable use-proxy
-sed -Ezi 's/("\n.*use\-proxy:\s)(True)/\1False/mg' .envs/goth/assets/goth-config.yml
+sed -Ezi 's/("\n.*use\-proxy:\s)(True)/\1False/mg' .envs/goth/assets/goth-config-testing.yml
 
 echo STARTING NETWORK
-cat .envs/goth/assets/goth-config.yml
-python -m goth start .envs/goth/assets/goth-config.yml &
+cat .envs/goth/assets/goth-config-testing.yml
+python -m goth start .envs/goth/assets/goth-config-testing.yml &
 GOTH_PID=$!
 echo "GOTH_PID=$GOTH_PID" | tee -a "$GITHUB_ENV"
 

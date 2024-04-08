@@ -33,6 +33,9 @@ RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
 
 RAY_ON_GOLEM_PID_FILENAME = "ray_on_golem.pid"
 
+SSH_SERVER_ALIVE_INTERVAL = 300
+SSH_SERVER_ALIVE_COUNT_MAX = 3
+
 URL_STATUS = "/"
 URL_BOOTSTRAP_CLUSTER = "/bootstrap_cluster"
 URL_NON_TERMINATED_NODES = "/non_terminated_nodes"

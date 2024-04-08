@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Awaitable, Callable, DefaultDict, Dict, Optional, Tuple
 
@@ -24,8 +26,10 @@ from golem.managers import (
 from golem.managers.base import ManagerException
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
-from golem.resources import Activity, Network, Proposal
+from golem.resources import Activity, Allocation, AllocationException, Network, Proposal
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled, ensure_cancelled_many
+from golem.utils.logging import trace_span
+from ya_payment import models
 from yarl import URL
 
 from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin, ReputationScorer
@@ -33,7 +37,8 @@ from ray_on_golem.server.models import NodeConfigData
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.utils import get_ssh_command
+from ray_on_golem.server.settings import YAGNA_PATH
+from ray_on_golem.utils import get_ssh_command, run_subprocess_output
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +49,46 @@ DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
 DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
 DEFAULT_SSH_SENTRY_TIMEOUT = timedelta(minutes=2)
 DEFAULT_MAX_SENTRY_FAILS_COUNT = 3
+
+EXPIRATION_TIME_FACTOR = 0.8
+
+
+class NoMatchingPlatform(AllocationException):
+    ...
+
+
+# FIXME: Rework this into the golem-core's DefaultPaymentManager and Allocation on yagna 0.16+,
+#  as until then there is no api call available to get driver lists and golem-core is api-only
+class DeviceListAllocationPaymentManager(DefaultPaymentManager):
+    @trace_span(show_arguments=True, show_results=True)
+    async def _create_allocation(self, budget: Decimal, network: str, driver: str) -> Allocation:
+        output = json.loads(
+            await run_subprocess_output(YAGNA_PATH, "payment", "driver", "list", "--json")
+        )
+
+        try:
+            network_output = output[driver]["networks"][network]
+            platform = network_output["tokens"][network_output["default_token"]]
+        except KeyError:
+            raise NoMatchingPlatform(network, driver)
+
+        timestamp = datetime.now(timezone.utc)
+        timeout = timestamp + timedelta(days=365 * 10)
+
+        data = models.Allocation(
+            payment_platform=platform,
+            total_amount=str(budget),
+            timestamp=timestamp,
+            timeout=timeout,
+            # This will probably be removed one day (consent-related thing)
+            make_deposit=False,
+            # We must set this here because of the ya_client interface
+            allocation_id="",
+            spent_amount="",
+            remaining_amount="",
+        )
+
+        return await Allocation.create(self._golem, data)
 
 
 class GolemService:
@@ -157,7 +202,7 @@ class GolemService:
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            self._payment_manager = DefaultPaymentManager(
+            self._payment_manager = DeviceListAllocationPaymentManager(
                 self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()
@@ -262,7 +307,9 @@ class GolemService:
         return stack
 
     async def _get_proposal_expiration(self, proposal: Proposal) -> timedelta:
-        return await proposal.get_expiration_date() - datetime.now(timezone.utc)
+        return (
+            await proposal.get_expiration_date() - datetime.now(timezone.utc)
+        ) * EXPIRATION_TIME_FACTOR
 
     @staticmethod
     async def get_provider_desc(activity: Activity) -> str:
@@ -294,7 +341,7 @@ class GolemService:
         async def run_command(cmd: str):
             result = await context.run(cmd)
             await result.wait()
-            logger.debug("Command executed: %s: %s",cmd, [e.to_dict() for e in result.events])
+            logger.debug("Command executed: %s: %s", cmd, [e.to_dict() for e in result.events])
 
         provider_desc = await self.get_provider_desc(context.activity)
         logger.info(f"Running initial commands on {provider_desc}, {ip=}, {context.activity=}")
