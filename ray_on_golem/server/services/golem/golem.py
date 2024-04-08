@@ -332,39 +332,44 @@ class GolemService:
         logger.info(f"Starting VM container on {provider_desc}, {ip=}, {activity=}")
         await context.start()
 
+    @staticmethod
+    async def _run_command(context: WorkContext, cmd: str, timeout: Optional[float] = None):
+        result = await context.run(cmd, timeout=timeout)
+        await result.wait()
+        logger.debug("Command executed: %s: %s", cmd, [e.to_dict() for e in result.events])
+
     async def _upload_node_configuration(
         self,
         context: WorkContext,
         ip: str,
         ssh_public_key_data: str,
     ):
-        async def run_command(cmd: str):
-            result = await context.run(cmd)
-            await result.wait()
-            logger.debug("Command executed: %s: %s", cmd, [e.to_dict() for e in result.events])
-
         provider_desc = await self.get_provider_desc(context.activity)
         logger.info(f"Running initial commands on {provider_desc}, {ip=}, {context.activity=}")
         hostname = ip.replace(".", "-")
-        await run_command("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
-        await run_command(f"echo 'NODE_IP={ip}' >> /etc/environment")
-        await run_command(f"hostname '{hostname}'")
-        await run_command(f"echo '{hostname}' > /etc/hostname")
-        await run_command(f"echo '{ip} {hostname}' >> /etc/hosts")
-        await run_command("mv /root_copy/.bashrc /root_copy/.profile /root 2> /dev/null")
-        await run_command("mkdir -p /root/.ssh")
-        await run_command(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
+        await self._run_command(context, "echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
+        await self._run_command(context, f"echo 'NODE_IP={ip}' >> /etc/environment")
+        await self._run_command(context, f"echo '{hostname}' > /etc/hostname")
+        await self._run_command(context, f"echo '{ip} {hostname}' >> /etc/hosts")
+        await self._run_command(
+            context, "mv /root_copy/.bashrc /root_copy/.profile /root 2> /dev/null"
+        )
+
+        await self._run_command(context, "mkdir -p /root/.ssh")
+        await self._run_command(
+            context, f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys'
+        )
 
     async def _start_ssh_server(self, context: WorkContext, ip: str):
         provider_desc = await self.get_provider_desc(context.activity)
         logger.info("Starting ssh service on " f"{provider_desc}, {ip=}, {context.activity=}")
-        await context.run("service ssh start")
+        await self._run_command(context, "service ssh start")
 
     async def _restart_ssh_server(self, context: WorkContext, ip: str):
         provider_desc = await self.get_provider_desc(context.activity)
         logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}")
         try:
-            await context.run("service ssh restart", timeout=120)
+            await self._run_command(context, "service ssh restart", timeout=120)
         except Exception:
             msg = f"Failed to restart the SSH server {provider_desc}, {ip=}, {context.activity=}"
             logger.warning(msg)
