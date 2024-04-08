@@ -21,9 +21,9 @@ RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
 	echo "StrictModes no" >> /etc/ssh/sshd_config
 
 RUN wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-py310_23.11.0-2-Linux-x86_64.sh
-RUN bash miniconda.sh -b -u
-ENV PATH="/root/miniconda3/bin:${PATH}"
-RUN bash -c "echo 'PATH=/root/miniconda3/bin:${PATH}' >> /root/.bashrc"
+RUN bash miniconda.sh -b -u -p /opt/miniconda3
+ENV PATH="/opt/miniconda3/bin:${PATH}"
+RUN bash -c "echo 'PATH=/opt/miniconda3/bin:${PATH}' >> /root/.bashrc"
 RUN conda install -y cudatoolkit
 
 RUN pip install wheel setuptools typing-extensions
