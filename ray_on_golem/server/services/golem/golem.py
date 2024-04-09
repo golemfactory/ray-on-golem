@@ -100,8 +100,9 @@ class GolemService:
     ):
         self._websocat_path = websocat_path
 
+        self.golem: Optional[GolemNode] = None
+
         self._demand_config_helper: DemandConfigHelper = DemandConfigHelper(registry_stats)
-        self._golem: Optional[GolemNode] = None
         self._network: Optional[Network] = None
         self._yagna_appkey: Optional[str] = None
         self._stacks: Dict[(str, bool), ManagerStack] = {}
@@ -114,14 +115,14 @@ class GolemService:
     async def init(self, yagna_appkey: str) -> None:
         logger.info("Starting GolemService...")
 
-        self._golem = GolemNode(app_key=yagna_appkey)
+        self.golem = GolemNode(app_key=yagna_appkey)
         self._yagna_appkey = yagna_appkey
-        await self._golem.start()
+        await self.golem.start()
 
-        self._network = await self._golem.create_network(
+        self._network = await self.golem.create_network(
             "192.168.0.1/16"
-        )  # will be retrieved from provider_config
-        await self._golem.add_to_network(self._network)
+        )  # will be retrieved from provider_parameters
+        await self.golem.add_to_network(self._network)
 
         logger.info("Starting GolemService done")
 
@@ -130,8 +131,8 @@ class GolemService:
 
         await self.clear()
 
-        await self._golem.aclose()
-        self._golem = None
+        await self.golem.aclose()
+        self.golem = None
 
         logger.info("Stopping GolemService done")
 
@@ -203,7 +204,7 @@ class GolemService:
     ) -> ManagerStack:
         if not self._payment_manager:
             self._payment_manager = DeviceListAllocationPaymentManager(
-                self._golem, budget=total_budget, network=payment_network, driver=payment_driver
+                self.golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()
 
@@ -266,13 +267,13 @@ class GolemService:
             demand_lifetime,
             node_config,
             is_head_node,
-            self._golem,
+            self.golem,
             self._payment_manager,
         )
 
         proposal_manager = stack.add_manager(
             DefaultProposalManager(
-                self._golem,
+                self.golem,
                 demand_manager.get_initial_proposal,
                 plugins=(
                     ProviderBlacklistPlugin(payment_network),
@@ -302,7 +303,7 @@ class GolemService:
                 ),
             )
         )
-        stack.add_manager(DefaultAgreementManager(self._golem, proposal_manager.get_draft_proposal))
+        stack.add_manager(DefaultAgreementManager(self.golem, proposal_manager.get_draft_proposal))
 
         return stack
 

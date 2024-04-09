@@ -20,7 +20,7 @@ from ray_on_golem.server.models import (
     NodeData,
     NodeId,
     NodeState,
-    ProviderConfigData,
+    ProviderParametersData,
     Tags,
 )
 from ray_on_golem.server.services.golem import GolemService
@@ -58,7 +58,7 @@ class RayService(WarningMessagesMixin):
         self._yagna_service = yagna_service
         self._datadir = datadir
 
-        self._provider_config: Optional[ProviderConfigData] = None
+        self._provider_parameters: Optional[ProviderParametersData] = None
         self._cluster_name: Optional[str] = None
         self._wallet_address: Optional[str] = None
         self._cluster_running: bool = True
@@ -90,32 +90,32 @@ class RayService(WarningMessagesMixin):
         logger.info("Stopping RayService done")
 
     async def create_cluster(
-        self, provider_config: ProviderConfigData, cluster_name: str
+        self, provider_parameters: ProviderParametersData, cluster_name: str
     ) -> Tuple[bool, str, str, Dict]:
-        is_cluster_just_created = self._provider_config is None
+        is_cluster_just_created = self._provider_parameters is None
 
         if not is_cluster_just_created and self._cluster_name != cluster_name:
             raise RayServiceError(
                 f"Webserver is running only for `{self._cluster_name}` cluster, not for `{cluster_name}`!"
             )
 
-        self._provider_config = provider_config
+        self._provider_parameters = provider_parameters
         self._cluster_name = cluster_name
 
-        self._ssh_private_key_path = Path(provider_config.ssh_private_key)
+        self._ssh_private_key_path = Path(provider_parameters.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
-        self._ssh_user = provider_config.ssh_user
+        self._ssh_user = provider_parameters.ssh_user
 
         with self._ssh_public_key_path.open() as f:
             self._ssh_public_key = f.readline().strip()
 
         payment_status = await self._yagna_service.prepare_funds(
-            self._provider_config.payment_network,
-            self._provider_config.payment_driver,
+            self._provider_parameters.payment_network,
+            self._provider_parameters.payment_driver,
         )
         yagna_output = await self._yagna_service.fetch_payment_status(
-            self._provider_config.payment_network,
-            self._provider_config.payment_driver,
+            self._provider_parameters.payment_network,
+            self._provider_parameters.payment_driver,
         )
         self._wallet_address = await self._yagna_service.fetch_wallet_address()
 
@@ -146,7 +146,7 @@ class RayService(WarningMessagesMixin):
     ) -> List[NodeId]:
         # TODO: Use node_config from yaml.available_node_types not, from yaml.provider
 
-        if not self._provider_config:
+        if not self._provider_parameters:
             raise RayServiceError("Node requesting is available only after cluster bootstrap!")
 
         if not self._cluster_running:
@@ -174,7 +174,7 @@ class RayService(WarningMessagesMixin):
                 )
 
         logger.info(f"Requested {count} nodes")
-        logger.debug(f"{self._provider_config=}")
+        logger.debug(f"{self._provider_parameters=}")
 
         return created_node_ids
 
@@ -189,9 +189,9 @@ class RayService(WarningMessagesMixin):
                 public_ssh_key=self._ssh_public_key,
                 ssh_user=self._ssh_user,
                 ssh_private_key_path=self._ssh_private_key_path,
-                total_budget=self._provider_config.total_budget,
-                payment_network=self._provider_config.payment_network,
-                payment_driver=self._provider_config.payment_driver,
+                total_budget=self._provider_parameters.total_budget,
+                payment_network=self._provider_parameters.payment_network,
+                payment_driver=self._provider_parameters.payment_driver,
                 add_state_log=partial(self._add_node_state_log, node_id),
                 node_type=node_type,
                 is_head_node=is_head_node,

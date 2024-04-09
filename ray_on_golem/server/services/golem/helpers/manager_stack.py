@@ -1,7 +1,7 @@
 import logging
 from datetime import timedelta
 from functools import partial
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from golem.managers import (
     AggregatingDemandManager,
@@ -20,7 +20,9 @@ from golem.payload import Payload
 from golem.resources import ProposalData
 
 from ray_on_golem.server.models import NodeConfigData
-from ray_on_golem.server.services.golem.manager_stack import ManagerStack
+
+if TYPE_CHECKING:
+    from ray_on_golem.server.services.golem.manager_stack import ManagerStack
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +126,7 @@ class ManagerStackNodeConfigHelper:
 
     @staticmethod
     def prepare_demand_manager_for_node_type(
-        stack: ManagerStack,
+        stack: "ManagerStack",
         payloads: List[Payload],
         demand_lifetime: timedelta,
         node_config: NodeConfigData,

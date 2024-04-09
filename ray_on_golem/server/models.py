@@ -1,11 +1,11 @@
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from pydantic import AnyUrl, BaseModel, Field, validator
 
 if TYPE_CHECKING:
     from golem.resources import Activity
-
 
 NodeId = str
 Tags = Dict[str, str]
@@ -25,50 +25,13 @@ class ShutdownState(Enum):
     WILL_SHUTDOWN = "will_shutdown"
 
 
-class NodeData(BaseModel):
-    node_id: NodeId
-    tags: Tags
-    state: NodeState = NodeState.pending
-    state_log: List[str] = []
-    internal_ip: Optional[str] = None
-    ssh_proxy_command: Optional[str] = None
-
-
-class Node(NodeData):
-    activity: Optional["Activity"] = None
-
-    class Config:
-        arbitrary_types_allowed = True
-
-
-class SingleNodeRequestData(BaseModel):
-    node_id: NodeId
-
-
-class GetClusterDataRequestData(BaseModel):
-    pass
-
-
-class GetClusterDataResponseData(BaseModel):
-    cluster_data: Dict[NodeId, NodeData]
-
-
-class DemandConfigData(BaseModel):
-    image_hash: Optional[str] = None
-    image_tag: Optional[str] = None
-    capabilities: List[str] = ["vpn", "inet"]
-    outbound_urls: List[AnyUrl] = []
-    min_mem_gib: float = 0.0
-    min_cpu_threads: int = 0
-    min_storage_gib: float = 0.0
-    max_cpu_threads: Optional[int] = None
-    runtime: str = "vm"
-
-
 class PerCpuExpectedUsageData(BaseModel):
     cpu_load: float
     duration_hours: float
     max_cost: Optional[float] = None
+
+    class Config:
+        extra = "forbid"
 
 
 class PaymentIntervalHours(BaseModel):
@@ -82,6 +45,9 @@ class PaymentIntervalHours(BaseModel):
         else:
             return values["minimal"]
 
+    class Config:
+        extra = "forbid"
+
 
 class BudgetControlData(BaseModel):
     per_cpu_expected_usage: Optional[PerCpuExpectedUsageData] = None
@@ -91,6 +57,24 @@ class BudgetControlData(BaseModel):
     max_env_per_hour_price: Optional[float] = None
 
     payment_interval_hours: Optional[PaymentIntervalHours] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class DemandConfigData(BaseModel):
+    image_hash: Optional[str] = None
+    image_tag: Optional[str] = None
+    capabilities: List[str] = ["vpn", "inet"]
+    outbound_urls: List[AnyUrl] = []
+    min_mem_gib: float = 0.0
+    min_cpu_threads: int = 0
+    min_storage_gib: float = 0.0
+    max_cpu_threads: Optional[int] = None
+    runtime: str = "vm"
+
+    class Config:
+        extra = "forbid"
 
 
 class NodeConfigData(BaseModel):
@@ -103,28 +87,68 @@ class NodeConfigData(BaseModel):
         extra = "forbid"
 
 
-class ProviderConfigData(BaseModel):
+class ProviderParametersData(BaseModel):
+    webserver_port: int
+    enable_registry_stats: bool
     payment_network: str
     payment_driver: str
     total_budget: float
     node_config: NodeConfigData
-    ssh_private_key: str
+    ssh_private_key: Path
     ssh_user: str
+    webserver_datadir: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
 
 
-class BootstrapClusterRequestData(BaseModel):
-    provider_config: ProviderConfigData
+class NodeData(BaseModel):
+    node_id: NodeId
+    tags: Tags
+    state: NodeState = NodeState.pending
+    state_log: List[str] = []
+    internal_ip: Optional[str] = None
+    ssh_proxy_command: Optional[str] = None
+
+    class Config:
+        extra = "ignore"
+
+
+class Node(NodeData):
+    activity: Optional["Activity"] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class ClusterContext(BaseModel):
     cluster_name: str
 
 
-class BootstrapClusterResponseData(BaseModel):
-    is_cluster_just_created: bool
+class SingleNodeRequestData(ClusterContext):
+    node_id: NodeId
+
+
+class GetClusterDataRequestData(ClusterContext):
+    pass
+
+
+class GetClusterDataResponseData(BaseModel):
+    cluster_data: Dict[NodeId, NodeData]
+
+
+class GetWalletStatusRequestData(BaseModel):
+    payment_network: str
+    payment_driver: str
+
+
+class GetWalletStatusResponseData(BaseModel):
     wallet_address: str
     yagna_payment_status_output: str
     yagna_payment_status: Dict
 
 
-class NonTerminatedNodesRequestData(BaseModel):
+class NonTerminatedNodesRequestData(ClusterContext):
     tags: Tags
 
 
@@ -132,8 +156,9 @@ class NonTerminatedNodesResponseData(BaseModel):
     nodes_ids: List[NodeId]
 
 
-class RequestNodesRequestData(BaseModel):
-    node_config: Dict[str, Any]
+class RequestNodesRequestData(ClusterContext):
+    provider_parameters: ProviderParametersData
+    node_config: NodeConfigData
     count: int
     tags: Tags
 
@@ -142,7 +167,7 @@ class RequestNodesResponseData(BaseModel):
     requested_nodes: List[NodeId]
 
 
-class SetNodeTagsRequestData(BaseModel):
+class SetNodeTagsRequestData(ClusterContext):
     node_id: NodeId
     tags: Tags
 
@@ -175,8 +200,8 @@ class GetSshProxyCommandResponseData(BaseModel):
     ssh_proxy_command: Optional[str]
 
 
-class GetOrCreateDefaultSshKeyRequestData(BaseModel):
-    cluster_name: str
+class GetOrCreateDefaultSshKeyRequestData(ClusterContext):
+    pass
 
 
 class GetOrCreateDefaultSshKeyResponseData(BaseModel):

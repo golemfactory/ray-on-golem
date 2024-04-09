@@ -11,28 +11,12 @@ class RayOnGolemServerError(RayOnGolemError):
         super().__init__(self.message)
 
 
+class ClusterNotFound(RayOnGolemServerError):
+    message = "Cluster with given name not found"
+
+
 class NodeNotFound(RayOnGolemServerError):
     message = "Node with given id not found"
-
-
-class NodesNotFound(RayOnGolemServerError):
-    message = "Nodes with given ids not found"
-
-
-class CreateActivitiesTimeout(RayOnGolemServerError):
-    message = "Creating activities timeout reached"
-
-
-class DestroyActivityError(RayOnGolemServerError):
-    message = "Can't destroy activity"
-
-
-class CheckYagnaStatusError(RayOnGolemServerError):
-    message = "Can't check Yagna status"
-
-
-class ManifestNotFound(RayOnGolemServerError):
-    message = "Manifest file not found"
 
 
 class RegistryRequestError(RayOnGolemServerError):

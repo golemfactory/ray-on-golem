@@ -14,7 +14,9 @@ from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
 from ray_on_golem.cli import with_datadir
 from ray_on_golem.reputation.updater import ReputationUpdater
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
-from ray_on_golem.server.services import GolemService, RayService, YagnaService
+from ray_on_golem.server.services import YagnaService
+from ray_on_golem.server.services.new_golem import GolemService
+from ray_on_golem.server.services.new_ray import RayService
 from ray_on_golem.server.settings import (
     RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT,
     WEBSOCAT_PATH,
@@ -104,9 +106,8 @@ def create_application(
     )
 
     app["ray_service"] = RayService(
-        ray_on_golem_port=port,
+        webserver_port=port,
         golem_service=app["golem_service"],
-        yagna_service=app["yagna_service"],
         datadir=datadir,
     )
 
@@ -161,7 +162,7 @@ async def ray_service_ctx(app: web.Application) -> None:
 
     yield
 
-    await ray_service.shutdown()
+    await ray_service.stop()
 
 
 async def reputation_service_ctx(app: web.Application) -> None:

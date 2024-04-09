@@ -37,7 +37,7 @@ SSH_SERVER_ALIVE_INTERVAL = 300
 SSH_SERVER_ALIVE_COUNT_MAX = 3
 
 URL_STATUS = "/"
-URL_BOOTSTRAP_CLUSTER = "/bootstrap_cluster"
+URL_GET_WALLET_STATUS = "/get_wallet_status"
 URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
 URL_IS_RUNNING = "/is_running"
 URL_IS_TERMINATED = "/is_terminated"
