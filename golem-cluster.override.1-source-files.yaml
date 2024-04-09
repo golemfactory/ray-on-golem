@@ -12,5 +12,6 @@ rsync_exclude: [
 
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
 initialization_commands: [
+  "mkdir -p $(python -c 'import site; print(site.getsitepackages()[0])')/golem",
   "cp -fR /app/golem/* $(python -c 'import site; print(site.getsitepackages()[0])')/golem"
 ]

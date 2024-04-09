@@ -38,6 +38,7 @@ ray = {version="==2.9.3", extras=["default"]}
 requests = "^2"
 click = "^8"
 pydantic = "<2"
+toml = "^0.10.2"
 dpath = "^2.1.6"
 appdirs = "^1.4.4"
 

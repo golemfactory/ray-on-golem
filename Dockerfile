@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
 RUN echo "UseDNS no" >> /etc/ssh/sshd_config && \
 	echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && \
 	echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
+	echo "StrictModes no" >> /etc/ssh/sshd_config && \
 	echo "ClientAliveInterval 60" >> /etc/ssh/sshd_config && \
 	echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
 
@@ -36,3 +37,8 @@ RUN pip config set global.index-url https://pypi.dev.golem.network/simple
 RUN pip install pillow
 
 COPY ray_on_golem /app/ray_on_golem/
+
+RUN rm -r /root/.cache
+RUN mv /root /root_copy
+
+VOLUME /root
