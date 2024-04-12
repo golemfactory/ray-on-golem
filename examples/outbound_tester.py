@@ -33,6 +33,12 @@ import ray
 ray.init()
 
 
+def get_own_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("192.168.0.1", 1))
+    return s.getsockname()[0]
+
+
 @dataclass
 class UrlResult:
     node_ip: str
@@ -54,7 +60,7 @@ def exc_causes(e: BaseException):
 
 @ray.remote
 def get_url_len(url: str, num_attempts: int, timeout: int, keep_alive: bool) -> UrlResult:
-    node_ip = socket.gethostbyname(socket.gethostname())
+    node_ip = get_own_ip()
     start = datetime.now()
 
     def seconds():
