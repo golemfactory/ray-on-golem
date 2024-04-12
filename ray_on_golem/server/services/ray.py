@@ -24,7 +24,7 @@ from ray_on_golem.server.models import (
     Tags,
 )
 from ray_on_golem.server.services.golem import GolemService
-from ray_on_golem.server.services.utils import WarningMessagesMixin
+from ray_on_golem.server.services.mixins import WarningMessagesMixin
 from ray_on_golem.server.services.yagna import YagnaService
 from ray_on_golem.utils import (
     are_dicts_equal,
