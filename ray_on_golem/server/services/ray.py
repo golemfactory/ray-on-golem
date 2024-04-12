@@ -86,7 +86,6 @@ class RayService(WarningMessagesMixin):
         await self._stop_head_node_to_webserver_tunnel()
         await self._stop_create_node_tasks()
         await self._destroy_nodes()
-        self.clear_warning_messages()
 
         logger.info("Stopping RayService done")
 

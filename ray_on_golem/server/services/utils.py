@@ -13,6 +13,3 @@ class WarningMessagesMixin:
         if add_timestamp:
             warning = f"{datetime.now(timezone.utc).isoformat()} {warning}"
         self._service_warnings.append(warning)
-
-    def clear_warning_messages(self):
-        self._service_warnings.clear()
