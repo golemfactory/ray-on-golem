@@ -40,6 +40,7 @@ async def status(request: web.Request) -> web.Response:
             datadir=str(ray_service.get_datadir()),
             shutting_down=request.app.get("shutting_down", False),
             self_shutdown=request.app.get("self_shutdown"),
+            server_warnings=ray_service.get_warning_messages(),
         )
     )
 

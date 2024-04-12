@@ -24,6 +24,7 @@ from ray_on_golem.server.models import (
     Tags,
 )
 from ray_on_golem.server.services.golem import GolemService
+from ray_on_golem.server.services.mixins import WarningMessagesMixin
 from ray_on_golem.server.services.yagna import YagnaService
 from ray_on_golem.utils import (
     are_dicts_equal,
@@ -43,7 +44,7 @@ class RayServiceError(RayOnGolemError):
     pass
 
 
-class RayService:
+class RayService(WarningMessagesMixin):
     def __init__(
         self,
         ray_on_golem_port: int,
@@ -77,6 +78,7 @@ class RayService:
         self._ssh_public_key_path: Optional[Path] = None
         self._ssh_public_key: Optional[str] = None
         self._ssh_user: Optional[str] = None
+        super().__init__()
 
     async def shutdown(self) -> None:
         logger.info("Stopping RayService...")
@@ -248,16 +250,24 @@ class RayService:
                         f"Something is wrong with node {node_id} activity. {activity_state=}"
                     )
             except Exception:
+                provider_desc = await self._golem_service.get_provider_desc(activity)
                 msg = (
-                    f"Activity on {await self._golem_service.get_provider_desc(activity)} "
+                    f"Activity on {provider_desc} "
                     f"is no longer accessible. Terminating {node_id} {is_head_node=}"
                 )
                 logger.warning(msg)
                 logger.debug(msg, exc_info=True)
                 if is_head_node:
+                    self.add_warning_message(
+                        f"Terminating cluster as Head({node_id}) {provider_desc} "
+                        "is no longer accessible"
+                    )
                     self._cluster_running = False
                     create_task_with_logging(self.shutdown())
                 else:
+                    self.add_warning_message(
+                        f"Terminating Worker({node_id}) as {provider_desc} is no longer accessible"
+                    )
                     create_task_with_logging(self.terminate_node(node_id))
                 break
             await asyncio.sleep(self._node_monitoring_timeout.total_seconds())

@@ -203,3 +203,4 @@ class WebserverStatus(BaseModel):
     datadir: str
     shutting_down: bool
     self_shutdown: bool
+    server_warnings: List[str]
