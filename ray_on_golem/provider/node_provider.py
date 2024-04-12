@@ -8,7 +8,7 @@ from types import ModuleType
 from typing import Any, Dict, Iterable, List, Optional
 
 import dpath
-from ray.autoscaler._private.cli_logger import cli_logger
+from ray.autoscaler._private.cli_logger import cf, cli_logger
 from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
 from ray.autoscaler.command_runner import CommandRunnerInterface
 from ray.autoscaler.node_provider import NodeProvider
@@ -82,6 +82,8 @@ class GolemNodeProvider(NodeProvider):
         )
         if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
+
+        self._print_server_warning()
 
     @staticmethod
     def fillout_available_node_types_resources(cluster_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -326,8 +328,17 @@ class GolemNodeProvider(NodeProvider):
             cli_logger.newline()
             cli_logger.print(
                 "You can use the Golem Onboarding portal to top up: https://glm.golem.network/"
-                f"#/onboarding/budget?yagnaAddress={self._wallet_address}&network=polygon"
-                "\n\n",
+                f"#/onboarding/budget?yagnaAddress={self._wallet_address}&network=polygon",
                 no_format=True,
             )
+            cli_logger.newline()
+
+    def _print_server_warning(self):
+        webserver_status = self._ray_on_golem_client.get_webserver_status()
+        if webserver_status.server_warnings:
+            cli_logger.newline()
+            with cli_logger.indented():
+                with cli_logger.group("Server warnings:"):
+                    for warning in webserver_status.server_warnings:
+                        cli_logger.print(cf.orange(warning))
             cli_logger.newline()

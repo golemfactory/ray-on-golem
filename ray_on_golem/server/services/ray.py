@@ -2,7 +2,7 @@ import asyncio
 import logging
 from asyncio.subprocess import Process
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
@@ -70,6 +70,8 @@ class RayService:
         self._node_monitoring_tasks: Dict[NodeId, asyncio.Task] = {}
         self._node_monitoring_timeout: timedelta = node_monitoring_timeout
 
+        self._service_warnings: List[str] = []
+
         self._head_node_to_webserver_tunnel_process: Optional[Process] = None
         self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
 
@@ -84,6 +86,7 @@ class RayService:
         await self._stop_head_node_to_webserver_tunnel()
         await self._stop_create_node_tasks()
         await self._destroy_nodes()
+        self._service_warnings.clear()
 
         logger.info("Stopping RayService done")
 
@@ -248,16 +251,25 @@ class RayService:
                         f"Something is wrong with node {node_id} activity. {activity_state=}"
                     )
             except Exception:
+                provider_desc = await self._golem_service.get_provider_desc(activity)
                 msg = (
-                    f"Activity on {await self._golem_service.get_provider_desc(activity)} "
+                    f"Activity on {provider_desc} "
                     f"is no longer accessible. Terminating {node_id} {is_head_node=}"
                 )
                 logger.warning(msg)
                 logger.debug(msg, exc_info=True)
                 if is_head_node:
+                    self.add_service_warning(
+                        f"{datetime.now(timezone.utc).isoformat()} Terminating cluster as "
+                        f"Head({node_id}) {provider_desc} is no longer accessible"
+                    )
                     self._cluster_running = False
                     create_task_with_logging(self.shutdown())
                 else:
+                    self.add_service_warning(
+                        f"{datetime.now(timezone.utc).isoformat()} Terminating Worker({node_id}) "
+                        f"as {provider_desc} is no longer accessible"
+                    )
                     create_task_with_logging(self.terminate_node(node_id))
                 break
             await asyncio.sleep(self._node_monitoring_timeout.total_seconds())
@@ -365,6 +377,12 @@ class RayService:
 
     def get_datadir(self) -> Path:
         return self._datadir
+
+    def get_warnings(self, *args, **kwargs) -> List[str]:
+        return self._service_warnings
+
+    def add_service_warning(self, warning: str) -> None:
+        self._service_warnings.append(warning)
 
     @asynccontextmanager
     async def _get_node_context(self, node_id: NodeId) -> Iterator[Node]:
