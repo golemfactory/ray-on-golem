@@ -8,6 +8,12 @@ import ray
 ray.init()
 
 
+def get_own_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("192.168.0.1", 1))
+    return s.getsockname()[0]
+
+
 def output_cluster_info():
     print(
         """This cluster consists of
@@ -28,7 +34,7 @@ output_cluster_info()
 def f():
     time.sleep(0.5)
 
-    return socket.gethostname()
+    return get_own_ip()
 
 
 # get the number of remote calls from the command line

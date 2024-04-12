@@ -7,6 +7,12 @@ import ray
 ray.init()
 
 
+def get_own_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("192.168.0.1", 1))
+    return s.getsockname()[0]
+
+
 @ray.remote
 class CounterActor:
     def __init__(self):
@@ -17,7 +23,7 @@ class CounterActor:
         time.sleep(0.5)
         self.value += 1
 
-        node_ip = socket.gethostname()
+        node_ip = get_own_ip()
         self.node_ips.append(node_ip)
 
         return node_ip
