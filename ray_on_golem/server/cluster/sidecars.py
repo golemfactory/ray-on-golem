@@ -9,6 +9,7 @@ from golem.utils.asyncio import create_task_with_logging, ensure_cancelled
 from golem.utils.logging import get_trace_id_name
 
 from ray_on_golem.exceptions import RayOnGolemError
+from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.utils import run_subprocess
 
 if TYPE_CHECKING:
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ClusterNodeSidecar(ABC):
+class ClusterNodeSidecar(WarningMessagesMixin, ABC):
     @abstractmethod
     async def start(self) -> None:
         ...
@@ -35,8 +36,11 @@ class ClusterNodeSidecar(ABC):
 class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
     name = "monitor"
 
-    def __init__(self, node: "ClusterNode"):
+    def __init__(self, node: "ClusterNode", cluster: "Cluster"):
+        super().__init__()
+
         self._node = node
+        self._cluster = cluster
 
         self._monitor_task: Optional[asyncio.Task] = None
 
@@ -69,7 +73,7 @@ class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
         return self._monitor_task and not self._monitor_task.done()
 
     def _get_monitor_task_name(self) -> str:
-        return self.name.replace(" ", "-")
+        return "{}-{}".format(self._node, self.name.replace(" ", "-"))
 
     @abstractmethod
     async def _monitor(self) -> None:
@@ -80,9 +84,8 @@ class ActivityStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
     name = "activity monitor"
 
     def __init__(self, node: "ClusterNode", cluster: "Cluster", check_interval: timedelta) -> None:
-        super().__init__(node)
+        super().__init__(node, cluster)
 
-        self._cluster = cluster
         self._check_interval = check_interval
 
     async def _monitor(self) -> None:
@@ -98,11 +101,22 @@ class ActivityStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
                     "`%s` node activity is no longer accessible, terminating", self._node
                 )
 
+                provider_desc = await self._node.get_provider_desc(self._node.activity)
+
                 if isinstance(self._node, HeadClusterNode):
+                    self.add_warning_message(
+                        f"Terminating whole cluster as Head({self._node.node_id}) {provider_desc}"
+                        " activity is no longer accessible"
+                    )
                     create_task_with_logging(self._cluster.stop())
                 else:
+                    self.add_warning_message(
+                        f"Terminating node as Worker({self._node.node_id}) as {provider_desc}"
+                        " activity is no longer accessible"
+                    )
                     create_task_with_logging(self._node.stop())
-                break
+
+                return
 
             await asyncio.sleep(self._check_interval.total_seconds())
 
@@ -110,10 +124,18 @@ class ActivityStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
 class SshStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
     name = "ssh monitor"
 
-    def __init__(self, node: "ClusterNode", check_interval: timedelta, max_fail_count: int) -> None:
-        super().__init__(node)
+    def __init__(
+        self,
+        node: "ClusterNode",
+        cluster: "Cluster",
+        check_interval: timedelta,
+        retry_interval: timedelta,
+        max_fail_count: int,
+    ) -> None:
+        super().__init__(node, cluster)
 
         self._check_interval = check_interval
+        self._retry_interval = retry_interval
         self._max_fail_count = max_fail_count
 
     async def _monitor(self) -> None:
@@ -124,10 +146,23 @@ class SshStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
             except RayOnGolemError:
                 fails_count += 1
                 if self._max_fail_count <= fails_count:
-                    msg = "`%s` node ssh server restart failed too many times, destroying node"
-                    logger.warning(msg, self._node)
-                    logger.debug(msg, self._node, exc_info=True)
-                    create_task_with_logging(self._node.stop())
+                    logger.warning("`%s` node ssh is no longer accessible, terminating", self._node)
+
+                    provider_desc = await self._node.get_provider_desc(self._node.activity)
+
+                    if isinstance(self._node, HeadClusterNode):
+                        self.add_warning_message(
+                            f"Terminating whole cluster as Head({self._node.node_id}) {provider_desc}"
+                            " ssh is no longer accessible"
+                        )
+                        create_task_with_logging(self._cluster.stop())
+                    else:
+                        self.add_warning_message(
+                            f"Terminating node as Worker({self._node.node_id}) as {provider_desc}"
+                            " ssh is no longer accessible"
+                        )
+                        create_task_with_logging(self._node.stop())
+
                     return
 
                 logger.debug(
@@ -136,12 +171,16 @@ class SshStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
                     exc_info=True,
                 )
                 await self._node.restart_ssh_server()
+                await asyncio.sleep(self._retry_interval.total_seconds())
+                continue
 
             await asyncio.sleep(self._check_interval.total_seconds())
 
 
 class HeadNodeToWebserverTunnelClusterNodeSidecar(ClusterNodeSidecar):
     def __init__(self, head_node: "HeadClusterNode") -> None:
+        super().__init__()
+
         self._head_node = head_node
 
         self._tunnel_process: Optional[Process] = None

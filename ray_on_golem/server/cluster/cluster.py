@@ -2,12 +2,13 @@ import asyncio
 import logging
 from collections import defaultdict
 from functools import partial
-from typing import DefaultDict, Dict, Iterable, Mapping, Tuple, Type, Union
+from typing import DefaultDict, Dict, Iterable, List, Mapping, Tuple, Type, Union
 
 from golem.managers import PaymentManager
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
 from ray_on_golem.server.cluster.nodes import ClusterNode, HeadClusterNode, WorkerClusterNode
+from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.server.models import (
     NodeConfigData,
     NodeId,
@@ -27,7 +28,7 @@ StackKey = Tuple[NodeType, IsHeadNode]
 logger = logging.getLogger(__name__)
 
 
-class Cluster:
+class Cluster(WarningMessagesMixin):
     def __init__(
         self,
         golem_service: GolemService,
@@ -36,6 +37,8 @@ class Cluster:
         webserver_port: int,
         demand_config_helper: DemandConfigHelper,
     ) -> None:
+        super().__init__()
+
         self._golem_service = golem_service
         self._name = name
         self._provider_parameters = provider_parameters
@@ -60,6 +63,14 @@ class Cluster:
     @property
     def nodes(self) -> Mapping[str, ClusterNode]:
         return self._nodes
+
+    def get_warning_messages(self) -> List[str]:
+        warnings = super().get_warning_messages()
+
+        for node in self._nodes.values():
+            warnings.extend(node.get_warning_messages())
+
+        return warnings
 
     async def start(self) -> None:
         if self._state in (NodeState.pending, NodeState.running):

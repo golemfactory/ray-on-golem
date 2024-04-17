@@ -1,9 +1,8 @@
 import asyncio
 import logging
 from datetime import timedelta
-from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Collection, List, Optional, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
@@ -18,9 +17,15 @@ from ray_on_golem.server.cluster.sidecars import (
     HeadNodeToWebserverTunnelClusterNodeSidecar,
     SshStateMonitorClusterNodeSidecar,
 )
+from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.server.models import NodeConfigData, NodeData, NodeState
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
 from ray_on_golem.server.services.new_golem import GolemService
+from ray_on_golem.server.settings import (
+    CLUSTER_MONITOR_CHECK_INTERVAL,
+    CLUSTER_MONITOR_RETRY_COUNT,
+    CLUSTER_MONITOR_RETRY_INTERVAL,
+)
 from ray_on_golem.utils import get_ssh_command, get_ssh_command_args, run_subprocess_output
 
 if TYPE_CHECKING:
@@ -29,7 +34,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ClusterNode(NodeData):
+class ClusterNode(WarningMessagesMixin, NodeData):
     node_config: NodeConfigData
     ssh_private_key_path: Path
     ssh_public_key_path: Path
@@ -38,14 +43,12 @@ class ClusterNode(NodeData):
     _cluster: "Cluster"
     _golem_service: GolemService
     _manager_stack: ManagerStack
-    _sidecars: Iterable[ClusterNodeSidecar]
+    _sidecars: Collection[ClusterNodeSidecar]
     _ssh_public_key_data: str
 
     _activity: Optional[Activity] = None
     _start_task: Optional[asyncio.Task] = None
-
-    class Config:
-        underscore_attrs_are_private = True
+    _warning_messages: List[str] = None
 
     def __init__(
         self, cluster: "Cluster", golem_service: GolemService, manager_stack: ManagerStack, **kwargs
@@ -70,6 +73,14 @@ class ClusterNode(NodeData):
     @property
     def activity(self) -> Optional[Activity]:
         return self._activity
+
+    def get_warning_messages(self) -> List[str]:
+        warnings = super().get_warning_messages()
+
+        for sidecar in self._sidecars:
+            warnings.extend(sidecar.get_warning_messages())
+
+        return warnings
 
     def start(self) -> None:
         if self.state in (NodeState.running, NodeState.terminating):
@@ -121,7 +132,7 @@ class ClusterNode(NodeData):
 
         await self._start_sidecars()
 
-        logger.info("Starting `%s` done", self)
+        logger.info("Starting `%s` node done", self)
 
     async def stop(self) -> None:
         if self.state in (NodeState.terminating, NodeState.terminated):
@@ -152,7 +163,7 @@ class ClusterNode(NodeData):
         self.state_log.append(log_entry)
 
     @staticmethod
-    async def _get_provider_desc(activity: Activity) -> str:
+    async def get_provider_desc(activity: Activity) -> str:
         proposal = activity.agreement.proposal
         return f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
 
@@ -249,7 +260,7 @@ class ClusterNode(NodeData):
         context = WorkContext(self._activity) if context is None else context
         ip = self.internal_ip if ip is None else ip
 
-        provider_desc = await self._get_provider_desc(context.activity)
+        provider_desc = await self.get_provider_desc(context.activity)
         logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}")
         try:
             await context.run("service ssh restart", timeout=120)
@@ -267,16 +278,13 @@ class ClusterNode(NodeData):
         activity: Optional[Activity] = None,
         ip: Optional[str] = None,
         ssh_proxy_command: Optional[str] = None,
-        num_retries=3,
-        retry_interval=1,
     ) -> None:
         activity = self._activity if activity is None else activity
         ip = self.internal_ip if ip is None else ip
         ssh_proxy_command = (
             self.ssh_proxy_command if ssh_proxy_command is None else ssh_proxy_command
         )
-
-        provider_desc = await self._get_provider_desc(activity)
+        provider_desc = await self.get_provider_desc(activity)
 
         logger.info(f"SSH connection check on {provider_desc}, {ip=}, {activity=}...")
 
@@ -285,7 +293,7 @@ class ClusterNode(NodeData):
             "uptime",
         ]
 
-        retry = num_retries
+        retry = CLUSTER_MONITOR_RETRY_COUNT
         while True:
             try:
                 await run_subprocess_output(*ssh_command_parts)
@@ -295,7 +303,7 @@ class ClusterNode(NodeData):
                     logger.info(
                         f"SSH connection check on {provider_desc}, {ip=}, {activity=} failed, retrying {retry}..."
                     )
-                    await asyncio.sleep(retry_interval)
+                    await asyncio.sleep(CLUSTER_MONITOR_RETRY_INTERVAL.total_seconds())
                 else:
                     logger.info(
                         f"SSH connection check on {provider_desc}, {ip=}, {activity=} failed after {num_retries} tries!"
@@ -309,7 +317,7 @@ class ClusterNode(NodeData):
         logger.info(f"SSH connection check on {provider_desc}, {ip=}, {activity=} done")
 
     async def _stop_activity(self, activity: Activity) -> None:
-        provider_desc = await self._get_provider_desc(activity)
+        provider_desc = await self.get_provider_desc(activity)
         try:
             await activity.destroy()
         except Exception:
@@ -322,7 +330,7 @@ class ClusterNode(NodeData):
 
         logger.debug("Connect to `%s` with:\n%s", ip, ssh_command)
 
-    def _prepare_sidecars(self) -> Iterable[ClusterNodeSidecar]:
+    def _prepare_sidecars(self) -> Collection[ClusterNodeSidecar]:
         return []
 
     async def _start_sidecars(self) -> None:
@@ -341,25 +349,28 @@ class ClusterNode(NodeData):
 
 
 class WorkerClusterNode(ClusterNode):
-    def _prepare_sidecars(self) -> Iterable[ClusterNodeSidecar]:
+    def _prepare_sidecars(self) -> Collection[ClusterNodeSidecar]:
         return (
             ActivityStateMonitorClusterNodeSidecar(
                 self,
                 cluster=self._cluster,
-                check_interval=timedelta(minutes=1, seconds=30),
+                check_interval=CLUSTER_MONITOR_CHECK_INTERVAL,
             ),
             SshStateMonitorClusterNodeSidecar(
                 self,
-                check_interval=timedelta(minutes=2),
-                max_fail_count=3,
+                cluster=self._cluster,
+                check_interval=CLUSTER_MONITOR_CHECK_INTERVAL,
+                retry_interval=CLUSTER_MONITOR_RETRY_INTERVAL,
+                max_fail_count=CLUSTER_MONITOR_RETRY_COUNT,
             ),
         )
 
 
-class HeadClusterNode(ClusterNode):
+class HeadClusterNode(WorkerClusterNode):
     webserver_port: int
 
-    def _prepare_sidecars(self) -> Iterable[ClusterNodeSidecar]:
-        return chain(
-            super()._prepare_sidecars(), (HeadNodeToWebserverTunnelClusterNodeSidecar(self),)
+    def _prepare_sidecars(self) -> Collection[ClusterNodeSidecar]:
+        return (
+            *super()._prepare_sidecars(),
+            HeadNodeToWebserverTunnelClusterNodeSidecar(self),
         )

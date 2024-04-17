@@ -154,7 +154,7 @@ async def golem_service_ctx(app: web.Application) -> None:
 
     yield
 
-    await golem_service.shutdown()
+    await golem_service.stop()
 
 
 async def ray_service_ctx(app: web.Application) -> None:

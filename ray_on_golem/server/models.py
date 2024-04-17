@@ -112,6 +112,7 @@ class NodeData(BaseModel):
 
     class Config:
         extra = "ignore"
+        underscore_attrs_are_private = True
 
 
 class Node(NodeData):

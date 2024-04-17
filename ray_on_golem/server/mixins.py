@@ -3,7 +3,9 @@ from typing import List
 
 
 class WarningMessagesMixin:
-    def __init__(self) -> None:
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
         self._warning_messages = []
 
     def get_warning_messages(self) -> List[str]:

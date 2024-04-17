@@ -91,7 +91,7 @@ class GolemService:
 
         logger.info("Starting GolemService done")
 
-    async def shutdown(self) -> None:
+    async def stop(self) -> None:
         logger.info("Stopping GolemService...")
 
         await self.golem.aclose()

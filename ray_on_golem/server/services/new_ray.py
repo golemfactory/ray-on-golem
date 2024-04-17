@@ -8,6 +8,7 @@ from typing import DefaultDict, Dict, Iterable, Iterator, List, Optional, Tuple
 from ray_on_golem.server.cluster import Cluster
 from ray_on_golem.server.cluster.nodes import ClusterNode
 from ray_on_golem.server.exceptions import ClusterNotFound, NodeNotFound
+from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.server.models import (
     NodeConfigData,
     NodeData,
@@ -22,8 +23,10 @@ from ray_on_golem.utils import are_dicts_equal, get_default_ssh_key_name, run_su
 logger = logging.getLogger(__name__)
 
 
-class RayService:
+class RayService(WarningMessagesMixin):
     def __init__(self, golem_service: GolemService, datadir: Path, webserver_port: int) -> None:
+        super().__init__()
+
         self._golem_service = golem_service
         self._datadir = datadir
         self._webserver_port = webserver_port
@@ -34,6 +37,16 @@ class RayService:
     @property
     def datadir(self) -> Path:
         return self._datadir
+
+    def get_warning_messages(self) -> List[str]:
+        warnings = super().get_warning_messages()
+
+        for cluster_name, cluster in self._clusters.items():
+            warnings.extend(
+                [f"[{cluster_name}] {warning}" for warning in cluster.get_warning_messages()]
+            )
+
+        return warnings
 
     async def stop(self):
         logger.info("Stopping RayService...")
