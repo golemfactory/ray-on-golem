@@ -352,7 +352,13 @@ class GolemService:
         await self._run_command(context, f"echo '{hostname}' > /etc/hostname")
         await self._run_command(context, f"echo '{ip} {hostname}' >> /etc/hosts")
         await self._run_command(
-            context, "mv /root_copy/.bashrc /root_copy/.profile /root 2> /dev/null"
+            context,
+            "mv "
+            "/root_copy/.bashrc "
+            "/root_copy/.profile "
+            "/root_copy/.config "
+            "/root_copy/.local "
+            "/root 2> /dev/null",
         )
 
         await self._run_command(context, "mkdir -p /root/.ssh")
