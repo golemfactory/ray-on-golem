@@ -7,7 +7,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterable, List, Optional
 
-import dpath.util
+import dpath
 from ray.autoscaler._private.cli_logger import cli_logger
 from ray.autoscaler._private.event_system import CreateClusterEvent, global_event_system
 from ray.autoscaler.command_runner import CommandRunnerInterface
@@ -66,16 +66,20 @@ class GolemNodeProvider(NodeProvider):
         provider_parameters = self._map_ssh_config(provider_parameters)
         self._payment_network = provider_parameters["payment_network"].lower().strip()
 
-        cluster_creation_response = self._ray_on_golem_client.create_cluster(provider_parameters)
-
-        self._wallet_address = cluster_creation_response.wallet_address
-        self._is_cluster_just_created = cluster_creation_response.is_cluster_just_created
-
-        self._print_mainnet_onboarding_message(
-            cluster_creation_response.yagna_payment_status_output
+        cluster_bootstrap_response = self._ray_on_golem_client.bootstrap_cluster(
+            provider_parameters, cluster_name
         )
 
-        wallet_glm_amount = float(cluster_creation_response.yagna_payment_status.get("amount", "0"))
+        self._wallet_address = cluster_bootstrap_response.wallet_address
+        self._is_cluster_just_created = cluster_bootstrap_response.is_cluster_just_created
+
+        self._print_mainnet_onboarding_message(
+            cluster_bootstrap_response.yagna_payment_status_output
+        )
+
+        wallet_glm_amount = float(
+            cluster_bootstrap_response.yagna_payment_status.get("amount", "0")
+        )
         if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
@@ -277,7 +281,7 @@ class GolemNodeProvider(NodeProvider):
     def _apply_config_defaults(config: Dict[str, Any]) -> None:
         provider_parameters: Dict = deepcopy(PROVIDER_DEFAULTS)
 
-        dpath.util.merge(
+        dpath.merge(
             provider_parameters,
             config["provider"]["parameters"],
         )
@@ -286,7 +290,7 @@ class GolemNodeProvider(NodeProvider):
 
         for node_type in config.get("available_node_types", {}).values():
             node_config = deepcopy(config["provider"]["parameters"]["node_config"])
-            dpath.util.merge(
+            dpath.merge(
                 node_config,
                 node_type["node_config"],
             )
@@ -321,14 +325,9 @@ class GolemNodeProvider(NodeProvider):
 
             cli_logger.newline()
             cli_logger.print(
-                "You can use the Golem Onboarding portal to top up: https://golemfactory.github.io"
-                f"/onboarding_production/?yagnaAddress={self._wallet_address}"
-                "\n\n"
-                "DISCLAIMER: Please keep in mind that in its current stage, the Onboarding Portal "
-                "is an EXPERIMENTAL product. Even though it is functional, "
-                "we do not recommend using it unless you wish to help us beta-test this feature. "
-                "You'll find more information on `#Payment UX` discord channel "
-                "https://discord.com/channels/684703559954333727/1136984764197380096",
+                "You can use the Golem Onboarding portal to top up: https://glm.golem.network/"
+                f"#/onboarding/budget?yagnaAddress={self._wallet_address}&network=polygon"
+                "\n\n",
                 no_format=True,
             )
             cli_logger.newline()

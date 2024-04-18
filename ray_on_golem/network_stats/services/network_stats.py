@@ -6,8 +6,6 @@ from datetime import timedelta
 from typing import Dict, Optional, Sequence
 
 from golem.managers import (
-    BlacklistProviderIdPlugin,
-    DefaultPaymentManager,
     DefaultProposalManager,
     NegotiatingPlugin,
     PaymentPlatformNegotiator,
@@ -26,12 +24,15 @@ from golem.resources import DemandData, Proposal
 from golem.resources.proposal.exceptions import ProposalRejected
 from ya_market import ApiException
 
+from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin
 from ray_on_golem.server.models import NodeConfigData
-from ray_on_golem.server.services.golem.golem import DEFAULT_DEMAND_LIFETIME
+from ray_on_golem.server.services.golem.golem import (
+    DEFAULT_DEMAND_LIFETIME,
+    DeviceListAllocationPaymentManager,
+)
 from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
 from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
 from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.golem.provider_data import PROVIDERS_BLACKLIST
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ class NetworkStatsService:
 
         self._payment_manager: Optional[PaymentManager] = None
 
-    async def init(self, yagna_appkey: str) -> None:
+    async def start(self, yagna_appkey: str) -> None:
         logger.info("Starting NetworkStatsService...")
 
         self._golem = GolemNode(app_key=yagna_appkey)
@@ -139,7 +140,7 @@ class NetworkStatsService:
 
         logger.info("Starting NetworkStatsService done")
 
-    async def shutdown(self) -> None:
+    async def stop(self) -> None:
         logger.info("Stopping NetworkStatsService...")
 
         await self._golem.aclose()
@@ -171,16 +172,15 @@ class NetworkStatsService:
                 duration_minutes, node_type, " (head node)" if is_head_node else ""
             )
         )
-        consume_proposals_task = asyncio.create_task(self._consume_draft_proposals(stack))
+
         try:
-            await asyncio.wait(
-                [consume_proposals_task],
+            await asyncio.wait_for(
+                self._consume_draft_proposals(stack),
                 timeout=timedelta(minutes=duration_minutes).total_seconds(),
             )
+        except asyncio.TimeoutError:
+            pass
         finally:
-            consume_proposals_task.cancel()
-            await consume_proposals_task
-
             await stack.stop()
             await self._payment_manager.stop()
             self._payment_manager = None
@@ -193,8 +193,6 @@ class NetworkStatsService:
             while True:
                 draft = await stack._managers[-1].get_draft_proposal()
                 drafts.append(draft)
-        except asyncio.CancelledError:
-            return
         finally:
             await asyncio.gather(
                 # FIXME better reason message
@@ -211,7 +209,7 @@ class NetworkStatsService:
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            self._payment_manager = DefaultPaymentManager(
+            self._payment_manager = DeviceListAllocationPaymentManager(
                 self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()
@@ -230,6 +228,9 @@ class NetworkStatsService:
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
             extra_proposal_plugins, node_config
         )
+        ManagerStackNodeConfigHelper.apply_priority_head_node_scoring(
+            extra_proposal_scorers, node_config
+        )
 
         demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
             stack,
@@ -243,7 +244,7 @@ class NetworkStatsService:
 
         plugins = [
             self._stats_plugin_factory.create_counter_plugin("Initial"),
-            BlacklistProviderIdPlugin(PROVIDERS_BLACKLIST.get(payment_network, set())),
+            ProviderBlacklistPlugin(payment_network),
             self._stats_plugin_factory.create_counter_plugin("Not blacklisted"),
         ]
 

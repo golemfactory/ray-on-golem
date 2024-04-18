@@ -1,0 +1,17 @@
+name: On schedule
+
+on:
+  schedule:
+    # run this workflow every day at 2:00 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  nightly_tests:
+    name: Nightly tests
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: [main, develop]
+    uses: ./.github/workflows/integration_tests.yml
+    with:
+        BRANCH: ${{ matrix.branch }}

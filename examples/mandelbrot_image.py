@@ -38,6 +38,7 @@ def calculate_mandel(
     src_range_x: Tuple[float, float],
     src_range_y: Tuple[float, float],
     max_iter: int,
+    verbose: bool = True,
 ):
     tgt_size_x = tgt_range_x[1] - tgt_range_x[0]
     tgt_size_y = tgt_range_y[1] - tgt_range_y[0]
@@ -45,7 +46,8 @@ def calculate_mandel(
     y_step = (src_range_y[1] - src_range_y[0]) / tgt_size_y
     buffer = bytearray(b"\xff" * (tgt_size_x * tgt_size_y))
 
-    print(f"{datetime.now()}: starting chunk: {tgt_range_x}, {tgt_range_y}")
+    if verbose:
+        print(f"{datetime.now()}: starting chunk: {tgt_range_x}, {tgt_range_y}")
 
     for ys in range(tgt_range_y[0], tgt_range_y[1]):
         y = src_range_y[0] + y_step * (ys - tgt_range_y[0])
@@ -54,7 +56,8 @@ def calculate_mandel(
             r = mandel(x, y, max_iter)
             buffer[tgt_size_x * (ys - tgt_range_y[0]) + xs - tgt_range_x[0]] = r
 
-    print(f"{datetime.now()}: finalized chunk: {tgt_range_x}, {tgt_range_y}")
+    if verbose:
+        print(f"{datetime.now()}: finalized chunk: {tgt_range_x}, {tgt_range_y}")
 
     return buffer
 
@@ -67,6 +70,7 @@ def draw_mandelbrot(
     num_chunks: int = 1,
     output_file: Optional[str] = None,
     use_ray: bool = True,
+    verbose: bool = True,
 ):
     chunks = list()
 
@@ -86,10 +90,13 @@ def draw_mandelbrot(
             x_range,
             (start_y * y_step + y_range[0], end_y * y_step + y_range[0]),
             max_iter,
+            verbose,
         )
         f = ray.remote(calculate_mandel).remote if use_ray else calculate_mandel
 
-        print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args})")
+        if verbose:
+            print(f"{datetime.now()}: scheduling: {c}: {f}({calc_args})")
+
         chunks.append(f(*calc_args))
 
     print(f"{datetime.now()}: finished scheduling")
@@ -111,12 +118,14 @@ def draw_mandelbrot(
         chunk_img_size = (size.x, end_y - start_y)
         box = (0, start_y)
 
-        print(f"{datetime.now()}: got chunk {c}, size: {chunk_img_size}, box: {box}")
+        if verbose:
+            print(f"{datetime.now()}: got chunk {c}, size: {chunk_img_size}, box: {box}")
 
         chunk_img = Image.frombytes("L", size=chunk_img_size, data=chunk)
         img.paste(chunk_img, box=box)
 
-        print(f"{datetime.now()}: processed chunk {c}")
+        if verbose:
+            print(f"{datetime.now()}: processed chunk {c}")
 
     img.show()
 
@@ -184,6 +193,7 @@ def argument_parser():
     parser.add_argument(
         "-R", "--no-use-ray", dest="use_ray", action="store_false", help="don't use ray"
     )
+    parser.add_argument("-q", "--quiet", help="Decrease verbosity", action="store_true")
     parser.set_defaults(use_ray=True)
 
     return parser
@@ -215,6 +225,7 @@ draw_mandelbrot(
     num_chunks=args.num_chunks,
     output_file=args.output_file,
     use_ray=args.use_ray,
+    verbose=(not args.quiet),
 )
 
 print(f"{datetime.now()}: finished. elapsed time: {datetime.now() - start}")

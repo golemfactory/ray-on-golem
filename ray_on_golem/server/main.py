@@ -3,24 +3,30 @@ import logging.config
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import click
 import colorful
 import psutil
 from aiohttp import web
+from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
 
+from ray_on_golem.cli import with_datadir
+from ray_on_golem.reputation.updater import ReputationUpdater
 from ray_on_golem.server.middlewares import error_middleware, trace_id_middleware
 from ray_on_golem.server.services import GolemService, RayService, YagnaService
 from ray_on_golem.server.settings import (
-    DEFAULT_DATADIR,
-    RAY_ON_GOLEM_SHUTDOWN_TIMEOUT,
+    RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT,
     WEBSOCAT_PATH,
     YAGNA_PATH,
     get_datadir,
     get_logging_config,
 )
 from ray_on_golem.server.views import routes
+
+if TYPE_CHECKING:
+    from ray_on_golem.reputation.service import ReputationService
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,25 +53,20 @@ logger = logging.getLogger(__name__)
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    default=DEFAULT_DATADIR,
-    help="Ray on Golem's data directory.",
-)
+@with_datadir
 def main(port: int, self_shutdown: bool, registry_stats: bool, datadir: Path):
     logging.config.dictConfig(get_logging_config(datadir))
 
     app = create_application(port, self_shutdown, registry_stats, get_datadir(datadir))
 
-    logger.info(f"Starting server... {port=}, {self_shutdown=}, {registry_stats=}")
+    logger.info(f"Starting server... {port=}, {self_shutdown=}, {registry_stats=}, {datadir=}")
 
     try:
         web.run_app(
             app,
             port=app["port"],
             print=None,
-            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_TIMEOUT.total_seconds(),
+            shutdown_timeout=RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT.total_seconds(),
         )
     except Exception:
         logger.info("Server unexpectedly died, bye!")
@@ -79,6 +80,8 @@ def create_application(
     registry_stats: bool,
     datadir: Path,
 ) -> web.Application:
+    from ray_on_golem.reputation.service import ReputationService
+
     app = web.Application(
         middlewares=[
             trace_id_middleware,
@@ -107,7 +110,10 @@ def create_application(
         datadir=datadir,
     )
 
+    app["reputation_service"] = ReputationService(datadir=datadir)
+
     app.add_routes(routes)
+    app.cleanup_ctx.append(reputation_service_ctx)
     app.cleanup_ctx.append(yagna_service_ctx)
     app.cleanup_ctx.append(golem_service_ctx)
     app.cleanup_ctx.append(ray_service_ctx)
@@ -124,18 +130,19 @@ async def startup_print(app: web.Application) -> None:
 async def shutdown_print(app: web.Application) -> None:
     print("")  # explicit new line to console to visually better handle ^C
     logger.info(
-        "Waiting up to `%s` for current connections to close...", RAY_ON_GOLEM_SHUTDOWN_TIMEOUT
+        "Waiting up to `%s` for current connections to close...",
+        RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT,
     )
 
 
 async def yagna_service_ctx(app: web.Application) -> None:
     yagna_service: YagnaService = app["yagna_service"]
 
-    await yagna_service.init()
+    await yagna_service.start()
 
     yield
 
-    await yagna_service.shutdown()
+    await yagna_service.stop()
 
 
 async def golem_service_ctx(app: web.Application) -> None:
@@ -157,6 +164,25 @@ async def ray_service_ctx(app: web.Application) -> None:
     await ray_service.shutdown()
 
 
+async def reputation_service_ctx(app: web.Application) -> None:
+    reputation_service: ReputationService = app["reputation_service"]
+
+    await reputation_service.start()
+
+    update_tasks = [
+        create_task_with_logging(
+            ReputationUpdater(network).update(),
+            trace_id=f"reputation_service_ctx-{network}",
+        )
+        for network in ["polygon", "mumbai", "goerli", "holesky"]
+    ]
+
+    yield
+
+    await ensure_cancelled_many(update_tasks)
+    await reputation_service.stop()
+
+
 @click.command(
     help="Start Ray on Golem's webserver and the yagna daemon.",
     context_settings={"show_default": True},
@@ -173,11 +199,7 @@ async def ray_service_ctx(app: web.Application) -> None:
     default=True,
     help="Enable collection of Golem Registry stats about resolved images.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
-)
+@with_datadir
 def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl
@@ -217,11 +239,7 @@ def start(port: int, registry_stats: bool, datadir: Optional[Path] = None):
     is_flag=True,
     help="Kill the process if it fails to exit after shutdown.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
-)
+@with_datadir
 def stop(port, force, kill, datadir):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl
@@ -278,11 +296,7 @@ def stop(port, force, kill, datadir):
     default=4578,
     help="Port on which Ray on Golem's webserver is listening.",
 )
-@click.option(
-    "--datadir",
-    type=Path,
-    help=f"Ray on Golem's data directory. By default, uses a system data directory: {DEFAULT_DATADIR}",
-)
+@with_datadir
 def status(port, datadir):
     from ray_on_golem.client import RayOnGolemClient
     from ray_on_golem.ctl import RayOnGolemCtl

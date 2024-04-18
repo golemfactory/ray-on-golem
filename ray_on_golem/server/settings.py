@@ -10,7 +10,7 @@ YAGNA_APPKEY = os.getenv("YAGNA_APPKEY")
 YAGNA_APPNAME = os.getenv("YAGNA_APPNAME", "ray-on-golem")
 YAGNA_API_URL = URL(os.getenv("YAGNA_API_URL", "http://127.0.0.1:7465"))
 YAGNA_START_TIMEOUT = timedelta(minutes=2)
-YAGNA_FUND_TIMEOUT = timedelta(minutes=2)
+YAGNA_FUND_TIMEOUT = timedelta(minutes=5)
 YAGNA_CHECK_INTERVAL = timedelta(seconds=2)
 
 # how long will we wait until we raise an error on webserver startup
@@ -22,6 +22,9 @@ RAY_ON_GOLEM_CHECK_INTERVAL = timedelta(seconds=2)
 # how long a shutdown request will wait until the webserver shutdown is initiated
 RAY_ON_GOLEM_SHUTDOWN_DELAY = timedelta(seconds=60)
 
+# how long we wait for the webserver shutdown pending connection to complete
+RAY_ON_GOLEM_SHUTDOWN_CONNECTIONS_TIMEOUT = timedelta(seconds=5)
+
 # how long we wait for the webserver shutdown to complete
 RAY_ON_GOLEM_SHUTDOWN_TIMEOUT = timedelta(seconds=60)
 
@@ -30,8 +33,11 @@ RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
 
 RAY_ON_GOLEM_PID_FILENAME = "ray_on_golem.pid"
 
+SSH_SERVER_ALIVE_INTERVAL = 300
+SSH_SERVER_ALIVE_COUNT_MAX = 3
+
 URL_STATUS = "/"
-URL_CREATE_CLUSTER = "/create_cluster"
+URL_BOOTSTRAP_CLUSTER = "/bootstrap_cluster"
 URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
 URL_IS_RUNNING = "/is_running"
 URL_IS_TERMINATED = "/is_terminated"
@@ -158,3 +164,31 @@ def get_logging_config(datadir: Optional[Path] = None):
             },
         },
     }
+
+
+def get_reputation_db_config(datadir: Optional[Path] = None):
+    db_dir = get_datadir(datadir) / "db"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    migrations_dir = Path(__file__).parent.parent / "reputation" / "migrations"
+
+    db_file = db_dir / "reputation.sqlite3"
+
+    models_path = "ray_on_golem.reputation.models"
+
+    tortoise_config = {
+        "connections": {
+            "default": f"sqlite://{db_file.resolve()}",
+        },
+        "apps": {
+            "models": {
+                "models": [models_path, "aerich.models"],
+                "default_connection": "default",
+            }
+        },
+    }
+    aerich_config = {
+        "tortoise_config": tortoise_config,
+        "location": str(migrations_dir.resolve()),
+        "app": "models",
+    }
+    return {"db": tortoise_config, "migrations": aerich_config}

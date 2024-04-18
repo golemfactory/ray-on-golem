@@ -1,8 +1,11 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from golem.resources import Activity
 from pydantic import AnyUrl, BaseModel, Field, validator
+
+if TYPE_CHECKING:
+    from golem.resources import Activity
+
 
 NodeId = str
 Tags = Dict[str, str]
@@ -32,7 +35,7 @@ class NodeData(BaseModel):
 
 
 class Node(NodeData):
-    activity: Optional[Activity] = None
+    activity: Optional["Activity"] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -96,6 +99,9 @@ class NodeConfigData(BaseModel):
     demand: DemandConfigData = Field(default_factory=DemandConfigData)
     budget_control: Optional[BudgetControlData] = Field(default_factory=BudgetControlData)
 
+    class Config:
+        extra = "forbid"
+
 
 class ProviderConfigData(BaseModel):
     payment_network: str
@@ -106,11 +112,12 @@ class ProviderConfigData(BaseModel):
     ssh_user: str
 
 
-class CreateClusterRequestData(ProviderConfigData):
-    pass
+class BootstrapClusterRequestData(BaseModel):
+    provider_config: ProviderConfigData
+    cluster_name: str
 
 
-class CreateClusterResponseData(BaseModel):
+class BootstrapClusterResponseData(BaseModel):
     is_cluster_just_created: bool
     wallet_address: str
     yagna_payment_status_output: str

@@ -2,11 +2,13 @@ import asyncio
 import logging
 from asyncio.subprocess import Process
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from golem.utils.asyncio import create_task_with_logging, ensure_cancelled_many
+from golem.resources import Activity
+from golem.utils.asyncio import create_task_with_logging, ensure_cancelled, ensure_cancelled_many
 from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
@@ -22,16 +24,19 @@ from ray_on_golem.server.models import (
     Tags,
 )
 from ray_on_golem.server.services.golem import GolemService
-from ray_on_golem.server.services.utils import get_ssh_command
 from ray_on_golem.server.services.yagna import YagnaService
 from ray_on_golem.utils import (
     are_dicts_equal,
     get_default_ssh_key_name,
+    get_ssh_command,
     run_subprocess,
     run_subprocess_output,
 )
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_NODE_MONITORING_TIMEOUT = timedelta(minutes=1, seconds=30)
 
 
 class RayServiceError(RayOnGolemError):
@@ -45,6 +50,7 @@ class RayService:
         golem_service: GolemService,
         yagna_service: YagnaService,
         datadir: Path,
+        node_monitoring_timeout: timedelta = DEFAULT_NODE_MONITORING_TIMEOUT,
     ):
         self._ray_on_golem_port = ray_on_golem_port
         self._golem_service = golem_service
@@ -52,13 +58,17 @@ class RayService:
         self._datadir = datadir
 
         self._provider_config: Optional[ProviderConfigData] = None
+        self._cluster_name: Optional[str] = None
         self._wallet_address: Optional[str] = None
+        self._cluster_running: bool = True
 
         self._nodes: Dict[NodeId, Node] = {}
         self._nodes_lock = asyncio.Lock()
         self._nodes_id_counter = 0
 
-        self._create_node_tasks: List[asyncio.Task] = []
+        self._create_node_tasks: Dict[NodeId, asyncio.Task] = {}
+        self._node_monitoring_tasks: Dict[NodeId, asyncio.Task] = {}
+        self._node_monitoring_timeout: timedelta = node_monitoring_timeout
 
         self._head_node_to_webserver_tunnel_process: Optional[Process] = None
         self._head_node_to_webserver_tunnel_early_exit_task: Optional[asyncio.Task] = None
@@ -70,7 +80,7 @@ class RayService:
 
     async def shutdown(self) -> None:
         logger.info("Stopping RayService...")
-
+        await self._stop_node_monitoring_tasks()
         await self._stop_head_node_to_webserver_tunnel()
         await self._stop_create_node_tasks()
         await self._destroy_nodes()
@@ -78,11 +88,17 @@ class RayService:
         logger.info("Stopping RayService done")
 
     async def create_cluster(
-        self, provider_config: ProviderConfigData
+        self, provider_config: ProviderConfigData, cluster_name: str
     ) -> Tuple[bool, str, str, Dict]:
         is_cluster_just_created = self._provider_config is None
 
+        if not is_cluster_just_created and self._cluster_name != cluster_name:
+            raise RayServiceError(
+                f"Webserver is running only for `{self._cluster_name}` cluster, not for `{cluster_name}`!"
+            )
+
         self._provider_config = provider_config
+        self._cluster_name = cluster_name
 
         self._ssh_private_key_path = Path(provider_config.ssh_private_key)
         self._ssh_public_key_path = self._ssh_private_key_path.with_suffix(".pub")
@@ -91,7 +107,7 @@ class RayService:
         with self._ssh_public_key_path.open() as f:
             self._ssh_public_key = f.readline().strip()
 
-        payment_status = await self._yagna_service.run_payment_fund(
+        payment_status = await self._yagna_service.prepare_funds(
             self._provider_config.payment_network,
             self._provider_config.payment_driver,
         )
@@ -113,7 +129,7 @@ class RayService:
 
             await asyncio.gather(
                 *[
-                    node.activity.destroy()
+                    self._golem_service.stop_activity(node.activity)
                     for node in self._nodes.values()
                     if node.activity is not None
                 ]
@@ -131,6 +147,9 @@ class RayService:
         if not self._provider_config:
             raise RayServiceError("Node requesting is available only after cluster bootstrap!")
 
+        if not self._cluster_running:
+            raise RayServiceError("Node requesting is not available after downing cluster!")
+
         created_node_ids = []
         async with self._nodes_lock:
             for _ in range(count):
@@ -142,16 +161,14 @@ class RayService:
                     tags=tags,
                 )
 
-                self._create_node_tasks.append(
-                    create_task_with_logging(
-                        self._create_node(
-                            node_id,
-                            NodeConfigData(**node_config),
-                            node_type=self._get_node_type(tags),
-                            is_head_node=self._is_head_node(tags),
-                        ),
-                        trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
-                    )
+                self._create_node_tasks[node_id] = create_task_with_logging(
+                    self._create_node(
+                        node_id,
+                        NodeConfigData(**node_config),
+                        node_type=self._get_node_type(tags),
+                        is_head_node=self._is_head_node(tags),
+                    ),
+                    trace_id=get_trace_id_name(self, f"create-node-{node_id}"),
                 )
 
         logger.info(f"Requested {count} nodes")
@@ -191,6 +208,11 @@ class RayService:
             # TODO: check if node is a head node
             if not self._is_head_node_to_webserver_tunnel_running():
                 await self._start_head_node_to_webserver_tunnel()
+
+            # monitor activity state
+            self._node_monitoring_tasks[node_id] = create_task_with_logging(
+                self._monitor_node(node_id, activity)
+            )
         except Exception as e:
             async with self._get_node_context(node_id) as node:  # type: Node
                 node.state = NodeState.terminated
@@ -198,7 +220,7 @@ class RayService:
                     f"Failed to create activity: {type(e).__module__}.{type(e).__name__}: {e}"
                 )
         finally:
-            self._create_node_tasks.remove(asyncio.current_task())
+            del self._create_node_tasks[node_id]
 
         logger.info("Creating node `%s` done", node_id)
 
@@ -211,14 +233,53 @@ class RayService:
         self._nodes_id_counter += 1
         return node_id
 
+    async def _monitor_node(self, node_id: NodeId, activity: Activity) -> None:
+        async with self._get_node_context(node_id) as node:  # type: Node
+            is_head_node = self._is_head_node(node.tags)
+        while self._cluster_running:
+            try:
+                activity_state = await activity.get_state()
+                if (
+                    "Terminated" in activity_state.state
+                    or "Unresponsive" in activity_state.state
+                    or activity_state.error_message is not None
+                ):
+                    raise RayServiceError(
+                        f"Something is wrong with node {node_id} activity. {activity_state=}"
+                    )
+            except Exception:
+                msg = (
+                    f"Activity on {await self._golem_service.get_provider_desc(activity)} "
+                    f"is no longer accessible. Terminating {node_id} {is_head_node=}"
+                )
+                logger.warning(msg)
+                logger.debug(msg, exc_info=True)
+                if is_head_node:
+                    self._cluster_running = False
+                    create_task_with_logging(self.shutdown())
+                else:
+                    create_task_with_logging(self.terminate_node(node_id))
+                break
+            await asyncio.sleep(self._node_monitoring_timeout.total_seconds())
+
     async def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
         logger.info("Terminating node `%s`...", node_id)
+
+        if node_id in self._node_monitoring_tasks:
+            logger.debug("Cancelling node `%s` monitoring task...")
+            await ensure_cancelled(self._node_monitoring_tasks[node_id])
+            logger.debug("Cancelling node `%s` monitoring task done")
+
+        if node_id in self._create_node_tasks:
+            logger.debug("Cancelling node `%s` creation request...")
+            await ensure_cancelled(self._create_node_tasks[node_id])
+            logger.debug("Cancelling node `%s` creation request done")
 
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminating
 
         if node.activity:
-            await node.activity.destroy()
+            await self._golem_service.stop_activity(node.activity)
 
         async with self._get_node_context(node_id) as node:  # type: Node
             node.state = NodeState.terminated
@@ -231,6 +292,7 @@ class RayService:
         async with self._nodes_lock:
             if all(node.state == NodeState.terminated for node in self._nodes.values()):
                 logger.info("All nodes are terminated, terminating whole cluster.")
+                self._cluster_running = False
                 await self._stop_head_node_to_webserver_tunnel()
                 await self._golem_service.clear()
 
@@ -362,7 +424,7 @@ class RayService:
             str(self._ssh_private_key_path),
             f"{self._ssh_user}@{str(head_node.internal_ip)}",
         )
-        self._head_node_to_webserver_tunnel_early_exit_task = asyncio.create_task(
+        self._head_node_to_webserver_tunnel_early_exit_task = create_task_with_logging(
             self._on_head_node_to_webserver_tunnel_early_exit()
         )
 
@@ -403,7 +465,20 @@ class RayService:
 
         logger.info("Canceling %d pending node creation tasks...", task_count)
 
-        await ensure_cancelled_many(self._create_node_tasks)
+        await ensure_cancelled_many(self._create_node_tasks.values())
         self._create_node_tasks.clear()
 
         logger.info("Canceling %d pending node creation tasks done", task_count)
+
+    async def _stop_node_monitoring_tasks(self) -> None:
+        task_count = len(self._node_monitoring_tasks)
+        if not task_count:
+            logger.info("Not canceling pending node monitoring tasks, as there are no tasks")
+            return
+
+        logger.info("Canceling %d node monitoring tasks...", task_count)
+
+        await ensure_cancelled_many(self._node_monitoring_tasks.values())
+        self._node_monitoring_tasks.clear()
+
+        logger.info("Canceling %d node monitoring tasks done", task_count)

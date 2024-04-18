@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict
 
-import dpath.util
+import dpath
 import yaml
 
 
@@ -21,9 +21,10 @@ def load_yamls(*yaml_paths: Path) -> Dict[str, Any]:
     base_dict = _load_yaml(yaml_paths[0])
     for path in yaml_paths[1:]:
         data = _load_yaml(path)
-        dpath.util.merge(
+        dpath.merge(
             base_dict,
             data,
+            flags=dpath.MergeType.REPLACE,
         )
 
     return base_dict

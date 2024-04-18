@@ -5,28 +5,28 @@ on:
 
 jobs:
   build:
-    name: Smoke tests
+    name: Example calculate_pi
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       - name: Install poetry
-        uses: Gr1N/setup-poetry@v8
+        uses: Gr1N/setup-poetry@v9
 
       - name: Install dependencies
         run: poetry install --no-ansi
 
       - name: Prepare `golem-cluster.tests.yaml`
 
-        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml
+        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override.4-subnet.yaml
       - name: Call `ray up`
         env:
           PYTHONUNBUFFERED: 1
@@ -39,7 +39,7 @@ jobs:
       - name: Call `ray down`
         run: poetry run ray down golem-cluster.tests.yaml -y
 
-      - name: Call `ray-on-golem down`
+      - name: Call `ray-on-golem stop`
         run: poetry run ray-on-golem stop
 
       - name: Check node creation in logs
@@ -48,9 +48,9 @@ jobs:
 
       - name: Collects logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: logs
+          name: logs-smoke-calculate_pi
           path: |
             /home/runner/.local/share/ray_on_golem/webserver_debug.log
             /home/runner/.local/share/ray_on_golem/yagna.log
