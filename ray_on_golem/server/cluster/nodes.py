@@ -43,9 +43,9 @@ class ClusterNode(WarningMessagesMixin, NodeData):
     _cluster: "Cluster"
     _golem_service: GolemService
     _manager_stack: ManagerStack
+
     _sidecars: Collection[ClusterNodeSidecar]
     _ssh_public_key_data: str
-
     _activity: Optional[Activity] = None
     _start_task: Optional[asyncio.Task] = None
     _warning_messages: List[str] = None
@@ -293,7 +293,8 @@ class ClusterNode(WarningMessagesMixin, NodeData):
             "uptime",
         ]
 
-        retry = CLUSTER_MONITOR_RETRY_COUNT
+        num_retries = CLUSTER_MONITOR_RETRY_COUNT
+        retry = num_retries
         while True:
             try:
                 await run_subprocess_output(*ssh_command_parts)

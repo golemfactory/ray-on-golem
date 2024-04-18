@@ -1,6 +1,6 @@
 # This is Ray on Golem Full yaml 
 # - the example config for testnet cluster, 
-# - with all the properties potentially changable by the user
+# - with all the properties potentially changeable by the user
 
 # Ray on Golem cluster name
 cluster_name: golem-cluster
@@ -74,7 +74,7 @@ provider:
         max_env_per_hour_price: 0.5
 
         # If not provided payment will be sent only after cluster is stopped. 
-        # Required for long running clusters
+        # Required for long-running clusters
         payment_interval_hours:
           minimal: 12
 
@@ -87,7 +87,7 @@ available_node_types:
     # The maximum number of worker nodes of this type to launch
     max_workers: 0
 
-    # The node type's CPU and GPU resources - leave it empty for autodetection
+    # The node type's CPU and GPU resources - leave it empty for auto-detection
     resources: {}
 
     # Additional parameters specific for this node type added on top of node_config from provider.parameters.node_config
@@ -146,4 +146,3 @@ worker_start_ray_commands: [
 # This will be removed by ray-on-golem on the fly.
 head_node: True
 worker_nodes: True
-

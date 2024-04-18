@@ -94,6 +94,7 @@ jobs:
         run: ./.github/workflows/stop-goth.sh
 
       - name: Prepare artifact name
+        if: always()
         run: |
           echo ARTIFACT_NAME=logs-example-${{ inputs.BRANCH }}-${{ matrix.example_name }} | sed "s|/|_|g" >> $GITHUB_ENV
 

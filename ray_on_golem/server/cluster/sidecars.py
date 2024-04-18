@@ -89,6 +89,8 @@ class ActivityStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
         self._check_interval = check_interval
 
     async def _monitor(self) -> None:
+        from ray_on_golem.server.cluster.nodes import HeadClusterNode
+
         while True:
             activity_state = await self._node.activity.get_state()
 
@@ -139,6 +141,8 @@ class SshStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
         self._max_fail_count = max_fail_count
 
     async def _monitor(self) -> None:
+        from ray_on_golem.server.cluster.nodes import HeadClusterNode
+
         fails_count = 0
         while True:
             try:
