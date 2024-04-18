@@ -13,6 +13,7 @@ __all__ = (
     "DriverListAllocationPaymentManager",
     "GolemService",
     "ManagerStack",
+    "ManagerStackNodeConfigHelper",
     "get_manifest",
     "DemandConfigHelper",
     "RayService",

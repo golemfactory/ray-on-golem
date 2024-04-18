@@ -89,6 +89,8 @@ class NodeConfigData(BaseModel):
 
 class ProviderParametersData(BaseModel):
     webserver_port: int
+    ray_gcs_expose_port: Optional[int]
+    ray_dashboard_expose_port: Optional[int]
     enable_registry_stats: bool
     payment_network: str
     payment_driver: str
