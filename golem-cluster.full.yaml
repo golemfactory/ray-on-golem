@@ -22,6 +22,12 @@ provider:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
 
+    # Ports under which Ray's GCS and dashboard will be exposed on the local machine
+    # Needs to be changed while running multiple clusters on a single machine
+    # Can be null to disable exposure
+    ray_gcs_expose_port: 6379
+    ray_dashboard_expose_port: 8265
+
     # Blockchain used for payments.
     # `holesky` means running free nodes on testnet,
     # `polygon` is for mainnet operations.

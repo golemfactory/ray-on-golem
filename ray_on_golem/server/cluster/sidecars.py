@@ -15,13 +15,18 @@ from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.utils import run_subprocess
 
 if TYPE_CHECKING:
-    from ray_on_golem.server.cluster.nodes import ClusterNode, HeadClusterNode
+    from ray_on_golem.server.cluster.nodes import ClusterNode
 
 logger = logging.getLogger(__name__)
 
 
 class ClusterNodeSidecar(WarningMessagesMixin, ABC):
     """Base class for companion business logic that runs in relation to the node."""
+
+    def __init__(self, *, node: "ClusterNode", **kwargs) -> None:
+        super().__init__(**kwargs)
+
+        self._node = node
 
     @abstractmethod
     async def start(self) -> None:
@@ -47,7 +52,6 @@ class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
     def __init__(
         self,
         *,
-        node: "ClusterNode",
         on_monitor_failed_func: Callable[
             ["MonitorClusterNodeSidecar", "ClusterNode"], MaybeAwaitable[None]
         ],
@@ -55,7 +59,6 @@ class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
     ):
         super().__init__(**kwargs)
 
-        self._node = node
         self._on_monitor_check_failed_func = on_monitor_failed_func
 
         self._monitor_task: Optional[asyncio.Task] = None
@@ -182,16 +185,25 @@ class SshStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
             await asyncio.sleep(self._check_interval.total_seconds())
 
 
-class HeadNodeToWebserverTunnelClusterNodeSidecar(ClusterNodeSidecar):
-    """Sidecar that runs reverse ssh tunnel from the related head node to local machine.
+class PortTunnelClusterNodeSidecar(ClusterNodeSidecar):
+    """Sidecar that runs ssh tunnel from the related node to local machine.
 
     Warning will be generated if tunnel exists prematurely.
     """
 
-    def __init__(self, head_node: "HeadClusterNode") -> None:
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        local_port: int,
+        remote_port: Optional[int] = None,
+        reverse: bool = False,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
 
-        self._head_node = head_node
+        self._local_port = local_port
+        self._remote_port = local_port if remote_port is None else remote_port
+        self._reverse = reverse
 
         self._tunnel_process: Optional[Process] = None
         self._early_exit_task: Optional[asyncio.Task] = None
@@ -201,44 +213,48 @@ class HeadNodeToWebserverTunnelClusterNodeSidecar(ClusterNodeSidecar):
 
         if self.is_running():
             logger.info(
-                "Not starting `%s` node to webserver tunnel, as it's already running",
-                self._head_node,
+                "Not starting `%s` node `%s` tunnel, as it's already running",
+                self._node,
+                self._get_tunel_type(),
             )
             return
 
-        logger.info("Starting `%s` node to webserver tunnel...", self._head_node)
+        logger.info("Starting `%s` node `%s` tunnel...", self._node, self._get_tunel_type())
 
         self._tunnel_process = await run_subprocess(
             "ssh",
             "-N",
-            "-R",
-            f"*:{self._head_node.webserver_port}:127.0.0.1:{self._head_node.webserver_port}",
+            "-R" if self._reverse else "-L",
+            f"*:{self._remote_port}:127.0.0.1:{self._local_port}",
             "-o",
             "StrictHostKeyChecking=no",
             "-o",
             "UserKnownHostsFile=/dev/null",
             "-o",
-            f"ProxyCommand={self._head_node.ssh_proxy_command}",
+            f"ProxyCommand={self._node.ssh_proxy_command}",
             "-i",
-            str(self._head_node.ssh_private_key_path),
-            f"{self._head_node.ssh_user}@{str(self._head_node.internal_ip)}",
+            str(self._node.ssh_private_key_path),
+            f"{self._node.ssh_user}@{str(self._node.internal_ip)}",
         )
         self._early_exit_task = create_task_with_logging(
-            self._on_tunnel_early_exit(), trace_id=get_trace_id_name(self, "early-exit")
+            self._on_tunnel_early_exit(),
+            trace_id=get_trace_id_name(self, f"{self._get_tunel_type()}-early-exit"),
         )
 
-        logger.info("Starting `%s` node to webserver tunnel done", self._head_node)
+        logger.info("Starting `%s` node `%s` tunnel done", self._node, self._get_tunel_type())
 
     async def stop(self) -> None:
         """Stop the sidecar and cleanup its internal state."""
 
         if not self.is_running():
             logger.info(
-                "Not stopping `%s` node to webserver tunnel, as it's not running", self._head_node
+                "Not stopping `%s` node `%s`, as it's not running",
+                self._node,
+                self._get_tunel_type(),
             )
             return
 
-        logger.info("Stopping `%s` node to webserver tunnel...", self._head_node)
+        logger.info("Stopping `%s` node `%s` tunnel...", self._node, self._get_tunel_type())
 
         await ensure_cancelled(self._early_exit_task)
         self._early_exit_task = None
@@ -248,7 +264,7 @@ class HeadNodeToWebserverTunnelClusterNodeSidecar(ClusterNodeSidecar):
 
         self._tunnel_process = None
 
-        logger.info("Stopping `%s` node to webserver tunnel done", self._head_node)
+        logger.info("Stopping `%s` node `%s` tunnel done", self._node, self._get_tunel_type())
 
     def is_running(self) -> bool:
         """Check if the sidecar is running."""
@@ -258,4 +274,13 @@ class HeadNodeToWebserverTunnelClusterNodeSidecar(ClusterNodeSidecar):
     async def _on_tunnel_early_exit(self) -> None:
         await self._tunnel_process.communicate()
 
-        logger.warning(f"`%s` node to webserver tunnel exited prematurely!", self._head_node)
+        logger.warning(
+            f"`%s` node %s exited prematurely!",
+            self._node,
+            self._get_tunel_type(),
+        )
+
+    def _get_tunel_type(self) -> str:
+        return ":{}{}:{}".format(
+            self._local_port, "<-" if self._reverse else "->", self._remote_port
+        )

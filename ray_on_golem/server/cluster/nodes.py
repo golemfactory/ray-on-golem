@@ -14,8 +14,8 @@ from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.cluster.sidecars import (
     ActivityStateMonitorClusterNodeSidecar,
     ClusterNodeSidecar,
-    HeadNodeToWebserverTunnelClusterNodeSidecar,
     MonitorClusterNodeSidecar,
+    PortTunnelClusterNodeSidecar,
     SshStateMonitorClusterNodeSidecar,
 )
 from ray_on_golem.server.mixins import WarningMessagesMixin
@@ -31,6 +31,9 @@ from ray_on_golem.utils import get_ssh_command, get_ssh_command_args, run_subpro
 
 if TYPE_CHECKING:
     from ray_on_golem.server.cluster import Cluster
+
+RAY_GCS_PORT = 6379
+RAY_DASHBOARD_PORT = 8265
 
 logger = logging.getLogger(__name__)
 
@@ -435,13 +438,47 @@ class WorkerClusterNode(ClusterNode):
 class HeadClusterNode(WorkerClusterNode):
     """Self-contained element that represents explicitly a Ray head node."""
 
-    webserver_port: int
+    _webserver_port: int
+    _ray_gcs_expose_port: Optional[int]
+    _ray_dashboard_expose_port: Optional[int]
+
+    def __init__(
+        self,
+        webserver_port: int,
+        ray_gcs_expose_port: Optional[int],
+        ray_dashboard_expose_port: Optional[int],
+        **kwargs,
+    ) -> None:
+        self._webserver_port = webserver_port
+        self._ray_gcs_expose_port = ray_gcs_expose_port
+        self._ray_dashboard_expose_port = ray_dashboard_expose_port
+
+        # Late init as it will trigger `_prepare_sidecars` that requires fields from above
+        super().__init__(**kwargs)
 
     def _prepare_sidecars(self) -> Collection[ClusterNodeSidecar]:
-        return (
+        sidecars = [
             *super()._prepare_sidecars(),
-            HeadNodeToWebserverTunnelClusterNodeSidecar(self),
-        )
+            PortTunnelClusterNodeSidecar(node=self, local_port=self._webserver_port, reverse=True),
+        ]
+
+        if self._ray_gcs_expose_port is not None:
+            sidecars.append(
+                PortTunnelClusterNodeSidecar(
+                    node=self, local_port=self._ray_gcs_expose_port, remote_port=RAY_GCS_PORT
+                ),
+            )
+
+        if self._ray_dashboard_expose_port is not None:
+            sidecars.append(
+                PortTunnelClusterNodeSidecar(
+                    node=self,
+                    local_port=self._ray_dashboard_expose_port,
+                    remote_port=RAY_DASHBOARD_PORT,
+                ),
+            )
+
+        return sidecars
 
     async def _on_monitor_check_failed(
         self, monitor: MonitorClusterNodeSidecar, node: ClusterNode
