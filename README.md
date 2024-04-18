@@ -21,6 +21,10 @@ It can be used to parallelize your Python code to use all cores on your own comp
 
 You can learn about Ray Core mechanisms on [Ray docs website](https://docs.ray.io/en/latest/ray-core/walkthrough.html) or check out [Ray on Golem docs](https://docs.golem.network/docs/creators/ray) to dive right into development.
 
+## Looking for Beta Testers
+
+We are looking for [Beta Testers](https://ray.golem.network) - sign up to create Ray on Golem with us!
+
 ## Quickstart
 
 This [quickstart](https://docs.golem.network/docs/creators/ray/quickstart) shows you how to set Ray and Ray on Golem up, start your cluster, test it, and then stop it.
@@ -47,7 +51,7 @@ It will give you a cluster of one node (which will expand when you feed it with 
 
 ```bash
 # Download the golem-cluster.yaml
-wget https://github.com/golemfactory/ray-on-golem/raw/main/golem-cluster.yaml
+wget https://ray.golem.network/golem-cluster.yaml
 
 # In this command:
 # * yagna starts in the background (if not running)
@@ -104,6 +108,13 @@ Finally, stop your cluster to free the Golem network providers and to avoid spen
 ray down golem-cluster.yaml --yes
 ```
 
+When you no longer plan to start new clusters feel free to stop the background Ray on Golem components.
+
+```bash
+# Terminate background Ray on Golem components
+ray-on-golem stop
+```
+
 ## Summary
 
 By completing the above quickstart you have successfully:
@@ -113,25 +124,38 @@ By completing the above quickstart you have successfully:
 - Started up the Ray on Golem cluster
 - Run the app on your local computer and then on the cluster
 - Stopped the cluster
+- Terminated the background Ray on Golem components
 
 Congratulations!
 
 ## Limitations
 
-Current version is `alpha` which means the happy path is working on **Ubuntu** on the Golem test and main networks.
-We have tested Ray on Golem on Ubuntu and on WSL, but it should work on other Linux distributions. At the moment, we don't support MacOS or bare Windows.
- 
-We use this version to show the direction and get feedback.
+The current version of Ray on Golem is an MVP. We believe it to be sufficiently easy to use and free of errors to allow people interested in running simple Ray applications to be able to use it without too much hassle.
+We are continually working on enhancing it to ultimately support all features of Ray and to enable all of its use cases.
+If you find any bugs or issues or would like to discuss missing features
+that are critical to what you're working on, please let us know
+(on [`#Ray on Golem` discord channel](https://chat.golem.network/)) -
+we will be happy to assist you.
 
-There is one Ray on Golem image. It contains `ray 2.7.1` and `python 3.10.13`.
+Ray on Golem works on both the Golem test network (free but not very powerful)
+and the [mainnet](https://docs.golem.network/docs/creators/ray/mainnet).
+
+We have tested Ray on Golem on **Ubuntu** (22.04+) and WSL, but it should work on other Linux distributions. For now, we don't support MacOS or bare Windows.
+
+The basic Ray on Golem image contains `ray 2.9.3` and `python 3.10.13`.
 It should work with any combination of local ray and python versions. Please let us know if you have any troubles because of that (on [`#Ray on Golem` discord channel](https://chat.golem.network/))
 
 The images include only basic libraries, if you need any dependencies, 
-you can use `pip` via [cluster yaml `initialization_commands`](https://golem-docs-git-mateusz-ray-on-golem-pre-alpha-golem.vercel.app/docs/creators/ray/cluster-yaml-reference#initializationcommands)
+you can use `pip` via [cluster yaml `initialization_commands`](https://docs.golem.network/docs/creators/ray/cluster-yaml-reference#initializationcommands)
+
+There is also an image supporting Golem GPU Providers - learn more about [image configuration](https://docs.golem.network/docs/creators/ray/cluster-yaml#image-tag-and-image-hash).
+
 
 ## Next steps
 
 Explore [Ray on Golem docs](https://docs.golem.network/docs/creators/ray) to learn more about various aspects and usages of our platform.
+
+Sign up for [Beta Tests](https://ray.golem.network) to create Ray on Golem with us!
 
 If you have any questions, comments, insights, praises, or doubts about these docs and Ray on Golem in general please don't hesitate to reach out to us either on
 - [`#Ray on Golem` discord channel](https://chat.golem.network/) 
