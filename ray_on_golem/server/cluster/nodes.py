@@ -292,6 +292,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         await self._run_command(
             context, f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys'
         )
+        await self._run_command(context, "watch 'free -h >> /root/mem_usage.log' &")
 
     async def _start_ssh_server(self, context: WorkContext, ip: str, provider_desc: str):
         logger.info(f"Starting ssh service on {provider_desc}, {ip=}, {context.activity=}")
