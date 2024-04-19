@@ -14,7 +14,7 @@ from ray_on_golem.utils import run_subprocess
 
 if TYPE_CHECKING:
     from ray_on_golem.server.cluster.cluster import Cluster
-    from ray_on_golem.server.cluster.nodes import ClusterNode, HeadClusterNode
+    from ray_on_golem.server.cluster.nodes import ClusterNode, HeadClusterNode  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,10 @@ class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
         self._cluster = cluster
 
         self._monitor_task: Optional[asyncio.Task] = None
+
+    @abstractmethod
+    async def _monitor(self) -> None:
+        ...
 
     async def start(self) -> None:
         if self.is_running():
@@ -74,10 +78,6 @@ class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
 
     def _get_monitor_task_name(self) -> str:
         return "{}-{}".format(self._node, self.name.replace(" ", "-"))
-
-    @abstractmethod
-    async def _monitor(self) -> None:
-        ...
 
 
 class ActivityStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):

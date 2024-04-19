@@ -82,17 +82,21 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
         return warnings
 
-    def start(self) -> None:
+    def schedule_start(self) -> None:
+        if self._start_task and not self._start_task.done():
+            logger.info(f"Not scheduling start `%s` node, as it's already scheduled", self)
+            return
+
+        self._start_task = create_task_with_logging(
+            self.start(),
+            trace_id=get_trace_id_name(self, "scheduled-start"),
+        )
+
+    async def start(self) -> None:
         if self.state in (NodeState.running, NodeState.terminating):
             logger.info(f"Not starting `%s` node, as it's already running or stopping", self)
             return
 
-        self._start_task = create_task_with_logging(
-            self._start(),
-            trace_id=get_trace_id_name(self, "request-node"),
-        )
-
-    async def _start(self) -> None:
         logger.info("Starting `%s` node...", self)
 
         self.state = NodeState.pending

@@ -152,7 +152,7 @@ class Cluster(WarningMessagesMixin):
 
             self._nodes[node_id] = node
 
-            node.start()
+            node.schedule_start()
 
         logger.info(
             "Requesting `%s` nodes of `%s` type as %s node done", count, node_type, worker_type

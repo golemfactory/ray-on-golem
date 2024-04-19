@@ -78,7 +78,10 @@ class GolemNodeProvider(NodeProvider):
                 wallet_status_response.wallet_address,
             )
 
-        if not float(wallet_status_response.yagna_payment_status.get("amount", "0")):
+        wallet_glm_amount = float(
+            float(wallet_status_response.yagna_payment_status.get("amount", "0"))
+        )
+        if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
 
         self._print_server_warning()

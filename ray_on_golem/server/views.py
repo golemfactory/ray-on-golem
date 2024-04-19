@@ -243,7 +243,7 @@ async def shutdown(request):
 
     if not (shutdown_request.ignore_self_shutdown or request.app["self_shutdown"]):
         shutdown_state = ShutdownState.NOT_ENABLED
-    elif await ray_service.get_non_terminated_nodes_ids():
+    elif ray_service.is_any_node_running():
         if shutdown_request.force_shutdown:
             shutdown_state = ShutdownState.FORCED_SHUTDOWN
         else:
