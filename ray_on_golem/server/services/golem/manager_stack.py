@@ -137,16 +137,14 @@ class ManagerStack:
                 )
             )
 
-        demand_manager = stack.add_manager(
-            ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
-                stack,
-                payloads,
-                demand_lifetime,
-                node_config,
-                is_head_node,
-                golem,
-                payment_manager,
-            )
+        demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
+            stack,
+            payloads,
+            demand_lifetime,
+            node_config,
+            is_head_node,
+            golem,
+            payment_manager,
         )
 
         proposal_manager = stack.add_manager(
