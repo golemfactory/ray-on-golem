@@ -38,6 +38,9 @@ jobs:
       - name: Run `examples/calculate.pi`
         run: poetry run ray submit golem-cluster.tests.yaml examples/calculate_pi.py
 
+      - name: Check `pip install and Pillow`
+        run: poetry run ray exec golem-cluster.tests.yaml "pip install endplay"
+
       - name: Call `ray down`
         run: poetry run ray down golem-cluster.tests.yaml -y
 
