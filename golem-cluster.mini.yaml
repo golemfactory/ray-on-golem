@@ -7,6 +7,9 @@ cluster_name: golem-cluster
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10
 
+# The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
+idle_timeout_minutes: 5
+
 # The cloud provider-specific configuration properties.
 provider:
   type: "external"
