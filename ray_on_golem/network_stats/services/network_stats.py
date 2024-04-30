@@ -26,7 +26,12 @@ from ya_market import ApiException
 
 from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin
 from ray_on_golem.server.models import NodeConfigData
-from ray_on_golem.server.services import DriverListAllocationPaymentManager, DemandConfigHelper, ManagerStackNodeConfigHelper, ManagerStack
+from ray_on_golem.server.services import (
+    DemandConfigHelper,
+    DriverListAllocationPaymentManager,
+    ManagerStack,
+    ManagerStackNodeConfigHelper,
+)
 from ray_on_golem.server.services.golem.manager_stack import DEFAULT_DEMAND_LIFETIME
 
 logger = logging.getLogger(__name__)

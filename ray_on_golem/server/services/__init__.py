@@ -1,10 +1,10 @@
 from ray_on_golem.server.services.golem import (
+    DemandConfigHelper,
     DriverListAllocationPaymentManager,
     GolemService,
     ManagerStack,
-    get_manifest,
-    DemandConfigHelper,
     ManagerStackNodeConfigHelper,
+    get_manifest,
 )
 from ray_on_golem.server.services.ray import RayService
 from ray_on_golem.server.services.yagna import YagnaService
