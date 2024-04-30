@@ -26,13 +26,8 @@ from ya_market import ApiException
 
 from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin
 from ray_on_golem.server.models import NodeConfigData
-from ray_on_golem.server.services.golem.golem import (
-    DEFAULT_DEMAND_LIFETIME,
-    DeviceListAllocationPaymentManager,
-)
-from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
-from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
-from ray_on_golem.server.services.golem.manager_stack import ManagerStack
+from ray_on_golem.server.services import DriverListAllocationPaymentManager, DemandConfigHelper, ManagerStackNodeConfigHelper, ManagerStack
+from ray_on_golem.server.services.golem.manager_stack import DEFAULT_DEMAND_LIFETIME
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +204,7 @@ class NetworkStatsService:
         is_head_node: bool,
     ) -> ManagerStack:
         if not self._payment_manager:
-            self._payment_manager = DeviceListAllocationPaymentManager(
+            self._payment_manager = DriverListAllocationPaymentManager(
                 self._golem, budget=total_budget, network=payment_network, driver=payment_driver
             )
             await self._payment_manager.start()

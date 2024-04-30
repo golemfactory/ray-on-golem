@@ -3,17 +3,18 @@ from ray_on_golem.server.services.golem import (
     GolemService,
     ManagerStack,
     get_manifest,
+    DemandConfigHelper,
+    ManagerStackNodeConfigHelper,
 )
 from ray_on_golem.server.services.ray import RayService
 from ray_on_golem.server.services.yagna import YagnaService
 
 __all__ = (
-    "GolemService",
-    "RayService",
-    "YagnaService",
-    "get_manifest",
-    "GolemService",
     "DriverListAllocationPaymentManager",
+    "GolemService",
     "ManagerStack",
     "get_manifest",
+    "DemandConfigHelper",
+    "RayService",
+    "YagnaService",
 )

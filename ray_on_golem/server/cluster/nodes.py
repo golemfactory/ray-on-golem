@@ -20,7 +20,7 @@ from ray_on_golem.server.cluster.sidecars import (
 )
 from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.server.models import NodeConfigData, NodeData, NodeState
-from ray_on_golem.server.services.golem import GolemService, ManagerStack
+from ray_on_golem.server.services import GolemService, ManagerStack
 from ray_on_golem.server.settings import (
     CLUSTER_MONITOR_CHECK_INTERVAL,
     CLUSTER_MONITOR_RETRY_COUNT,

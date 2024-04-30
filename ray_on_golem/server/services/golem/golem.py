@@ -18,16 +18,6 @@ from ray_on_golem.utils import run_subprocess_output
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DEMAND_LIFETIME = timedelta(hours=8)
-DEFAULT_LONG_RUNNING_DEMAND_LIFETIME = timedelta(days=365)
-DEFAULT_DEBIT_NOTE_INTERVAL = timedelta(minutes=3)
-DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT = timedelta(minutes=4)
-DEFAULT_PROPOSAL_RESPONSE_TIMEOUT = timedelta(seconds=30)
-DEFAULT_SSH_SENTRY_TIMEOUT = timedelta(minutes=2)
-DEFAULT_MAX_SENTRY_FAILS_COUNT = 3
-
-EXPIRATION_TIME_FACTOR = 0.8
-
 
 class NoMatchingPlatform(AllocationException):
     ...

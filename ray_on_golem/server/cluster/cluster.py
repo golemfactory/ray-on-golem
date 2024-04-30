@@ -8,7 +8,7 @@ from golem.managers import PaymentManager
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
 from ray_on_golem.server import utils
-from ray_on_golem.server.cluster import ClusterNode, HeadClusterNode, WorkerClusterNode
+from ray_on_golem.server.cluster.nodes import ClusterNode, HeadClusterNode, WorkerClusterNode
 from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.server.models import (
     NodeConfigData,
