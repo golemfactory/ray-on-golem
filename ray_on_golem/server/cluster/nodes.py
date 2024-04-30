@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Collection, List, Optional, Tuple
+from typing import TYPE_CHECKING, Collection, List, Optional, Sequence, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
@@ -15,6 +15,7 @@ from ray_on_golem.server.cluster.sidecars import (
     ActivityStateMonitorClusterNodeSidecar,
     ClusterNodeSidecar,
     HeadNodeToWebserverTunnelClusterNodeSidecar,
+    MonitorClusterNodeSidecar,
     SshStateMonitorClusterNodeSidecar,
 )
 from ray_on_golem.server.mixins import WarningMessagesMixin
@@ -26,6 +27,7 @@ from ray_on_golem.server.settings import (
     CLUSTER_MONITOR_RETRY_COUNT,
     CLUSTER_MONITOR_RETRY_INTERVAL,
 )
+from ray_on_golem.server.utils import get_provider_desc
 from ray_on_golem.utils import get_ssh_command, get_ssh_command_args, run_subprocess_output
 
 if TYPE_CHECKING:
@@ -35,6 +37,8 @@ logger = logging.getLogger(__name__)
 
 
 class ClusterNode(WarningMessagesMixin, NodeData):
+    """Self-contained element that represents Ray node."""
+
     node_config: NodeConfigData
     ssh_private_key_path: Path
     ssh_public_key_path: Path
@@ -68,14 +72,20 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         return self.node_id
 
     def get_data(self) -> NodeData:
+        """Return model-related data from the node."""
+
         return NodeData.parse_obj(self)
 
     @property
     def activity(self) -> Optional[Activity]:
+        """Read-only activity related to the node."""
+
         return self._activity
 
-    def get_warning_messages(self) -> List[str]:
-        warnings = super().get_warning_messages()
+    def get_warning_messages(self) -> Sequence[str]:
+        """Get read-only collection of warnings both from the node and its sidecars."""
+
+        warnings = list(super().get_warning_messages())
 
         for sidecar in self._sidecars:
             warnings.extend(sidecar.get_warning_messages())
@@ -83,8 +93,15 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         return warnings
 
     def schedule_start(self) -> None:
-        if self._start_task and not self._start_task.done():
-            logger.info(f"Not scheduling start `%s` node, as it's already scheduled", self)
+        """Schedule start of the node in another asyncio task."""
+
+        if (self._start_task and not self._start_task.done()) or (
+            self.state in (NodeState.running, NodeState.terminating)
+        ):
+            logger.info(
+                f"Not scheduling start `%s` node, as it's already scheduled, running or stopping",
+                self,
+            )
             return
 
         self._start_task = create_task_with_logging(
@@ -93,6 +110,8 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         )
 
     async def start(self) -> None:
+        """Start the node, its internal state and try to create its activity."""
+
         if self.state in (NodeState.running, NodeState.terminating):
             logger.info(f"Not starting `%s` node, as it's already running or stopping", self)
             return
@@ -139,6 +158,8 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         logger.info("Starting `%s` node done", self)
 
     async def stop(self) -> None:
+        """Stop the node and cleanup its internal state."""
+
         if self.state in (NodeState.terminating, NodeState.terminated):
             logger.info(f"Not stopping `%s` node, as it's already stopped", self)
             return
@@ -165,11 +186,6 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
     def _add_state_log(self, log_entry: str) -> None:
         self.state_log.append(log_entry)
-
-    @staticmethod
-    async def get_provider_desc(activity: Activity) -> str:
-        proposal = activity.agreement.proposal
-        return f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
 
     async def _create_activity(self) -> Tuple[Activity, str, str]:
         logger.info("Creating new activity...")
@@ -234,6 +250,12 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
         await context.start()
 
+    @staticmethod
+    async def _run_command(context: WorkContext, cmd: str, timeout: Optional[float] = None):
+        result = await context.run(cmd, timeout=timeout)
+        await result.wait()
+        logger.debug("Command executed: %s: %s", cmd, [e.to_dict() for e in result.events])
+
     async def _upload_node_configuration(
         self,
         context: WorkContext,
@@ -245,31 +267,44 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
         hostname = ip.replace(".", "-")
 
-        await context.run("echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
-        await context.run(f"echo 'NODE_IP={ip}' >> /etc/environment")
-        await context.run(f"hostname '{hostname}'")
-        await context.run(f"echo '{hostname}' > /etc/hostname")
-        await context.run(f"echo '{ip} {hostname}' >> /etc/hosts")
-        await context.run("mkdir -p /root/.ssh")
-        await context.run(f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys')
+        await self._run_command(context, "echo 'ON_GOLEM_NETWORK=1' >> /etc/environment")
+        await self._run_command(context, f"echo 'NODE_IP={ip}' >> /etc/environment")
+        await self._run_command(context, f"echo '{hostname}' > /etc/hostname")
+        await self._run_command(context, f"echo '{ip} {hostname}' >> /etc/hosts")
+        await self._run_command(
+            context,
+            "mv "
+            "/root_copy/.bashrc "
+            "/root_copy/.profile "
+            "/root_copy/.config "
+            "/root_copy/.local "
+            "/root 2> /dev/null",
+        )
+
+        await self._run_command(context, "mkdir -p /root/.ssh")
+        await self._run_command(
+            context, f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys'
+        )
 
     async def _start_ssh_server(self, context: WorkContext, ip: str, provider_desc: str):
         logger.info(f"Starting ssh service on {provider_desc}, {ip=}, {context.activity=}")
 
-        await context.run("service ssh start")
+        await self._run_command(context, "service ssh start")
 
     async def restart_ssh_server(
         self, context: Optional[WorkContext] = None, ip: Optional[str] = None
     ):
+        """Restart ssh server running on activity related to the node."""
+
         context = WorkContext(self._activity) if context is None else context
         ip = self.internal_ip if ip is None else ip
 
-        provider_desc = await self.get_provider_desc(context.activity)
+        provider_desc = await get_provider_desc(context.activity)
         logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}")
         try:
-            await context.run("service ssh restart", timeout=120)
+            await self._run_command(context, "service ssh restart", timeout=120)
         except Exception:
-            msg = f"Failed to restart SSH server {provider_desc}, {ip=}, {context.activity=}"
+            msg = f"Failed to restart the SSH server {provider_desc}, {ip=}, {context.activity=}"
             logger.warning(msg)
             logger.debug(msg, exc_info=True)
         else:
@@ -283,12 +318,18 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         ip: Optional[str] = None,
         ssh_proxy_command: Optional[str] = None,
     ) -> None:
+        """Verify if ssh connection to activity related to the node is working.
+
+        Multiple attempts will be made. `RayOnGolemError` will be thrown if ssh connection is not
+        working.
+        """
+
         activity = self._activity if activity is None else activity
         ip = self.internal_ip if ip is None else ip
         ssh_proxy_command = (
             self.ssh_proxy_command if ssh_proxy_command is None else ssh_proxy_command
         )
-        provider_desc = await self.get_provider_desc(activity)
+        provider_desc = await get_provider_desc(activity)
 
         logger.info(f"SSH connection check on {provider_desc}, {ip=}, {activity=}...")
 
@@ -322,7 +363,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         logger.info(f"SSH connection check on {provider_desc}, {ip=}, {activity=} done")
 
     async def _stop_activity(self, activity: Activity) -> None:
-        provider_desc = await self.get_provider_desc(activity)
+        provider_desc = await get_provider_desc(activity)
         try:
             await activity.destroy()
         except Exception:
@@ -354,24 +395,42 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
 
 class WorkerClusterNode(ClusterNode):
+    """Self-contained element that represents explicitly a Ray worker node."""
+
     def _prepare_sidecars(self) -> Collection[ClusterNodeSidecar]:
         return (
             ActivityStateMonitorClusterNodeSidecar(
-                self,
-                cluster=self._cluster,
+                node=self,
+                on_monitor_failed_func=self._on_monitor_check_failed,
                 check_interval=CLUSTER_MONITOR_CHECK_INTERVAL,
             ),
             SshStateMonitorClusterNodeSidecar(
-                self,
-                cluster=self._cluster,
+                node=self,
+                on_monitor_failed_func=self._on_monitor_check_failed,
                 check_interval=CLUSTER_MONITOR_CHECK_INTERVAL,
                 retry_interval=CLUSTER_MONITOR_RETRY_INTERVAL,
                 max_fail_count=CLUSTER_MONITOR_RETRY_COUNT,
             ),
         )
 
+    async def _on_monitor_check_failed(
+        self, monitor: MonitorClusterNodeSidecar, node: ClusterNode
+    ) -> bool:
+        provider_desc = await get_provider_desc(self.activity)
+
+        message = f"Terminating node as worker `%s` %s {monitor.name} is no longer accessible"
+
+        logger.warning(message, self.node_id, provider_desc)
+        self.add_warning_message(message, self.node_id, provider_desc)
+
+        create_task_with_logging(self.stop())
+
+        return True
+
 
 class HeadClusterNode(WorkerClusterNode):
+    """Self-contained element that represents explicitly a Ray head node."""
+
     webserver_port: int
 
     def _prepare_sidecars(self) -> Collection[ClusterNodeSidecar]:
@@ -379,3 +438,17 @@ class HeadClusterNode(WorkerClusterNode):
             *super()._prepare_sidecars(),
             HeadNodeToWebserverTunnelClusterNodeSidecar(self),
         )
+
+    async def _on_monitor_check_failed(
+        self, monitor: MonitorClusterNodeSidecar, node: ClusterNode
+    ) -> bool:
+        provider_desc = await get_provider_desc(self.activity)
+
+        message = f"Terminating cluster as head `%s` %s {monitor.name} is no longer accessible"
+
+        logger.warning(message, self.node_id, provider_desc)
+        self.add_warning_message(message, self.node_id, provider_desc)
+
+        create_task_with_logging(self._cluster.stop())
+
+        return True

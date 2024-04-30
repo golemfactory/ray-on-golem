@@ -3,7 +3,7 @@ import logging
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import DefaultDict, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import DefaultDict, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from ray_on_golem.server.cluster import Cluster
 from ray_on_golem.server.cluster.nodes import ClusterNode
@@ -38,8 +38,8 @@ class RayService(WarningMessagesMixin):
     def datadir(self) -> Path:
         return self._datadir
 
-    def get_warning_messages(self) -> List[str]:
-        warnings = super().get_warning_messages()
+    def get_warning_messages(self) -> Sequence[str]:
+        warnings = list(super().get_warning_messages())
 
         for cluster_name, cluster in self._clusters.items():
             warnings.extend(
@@ -182,10 +182,9 @@ class RayService(WarningMessagesMixin):
 
                 self._clusters[cluster_name] = cluster = Cluster(
                     self._golem_service,
+                    self._webserver_port,
                     cluster_name,
                     provider_parameters,
-                    self._webserver_port,
-                    self._golem_service.demand_config_helper,
                 )
 
                 await cluster.start()

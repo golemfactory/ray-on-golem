@@ -3,6 +3,8 @@
 # - with all the properties potentially changeable by the user
 
 # Ray on Golem cluster name
+# This value identifies a given cluster within the ray-on-golem webserver.
+# Therefore, it must be unique if you ever wish to run more than one cluster on the same ray-on-golem instance.
 cluster_name: golem-cluster
 
 # The maximum number of workers the cluster will have at any given time

@@ -101,7 +101,7 @@ class GolemNodeProvider(NodeProvider):
         registry_stats: bool = True,
         datadir: Optional[Path] = None,
     ) -> RayOnGolemClient:
-        if datadir is not None:
+        if datadir:
             datadir = Path(datadir)
 
         client = RayOnGolemClient(port)

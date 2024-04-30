@@ -36,7 +36,7 @@ class RayOnGolemClient:
                 payment_driver=payment_driver,
             ),
             response_model=models.GetWalletStatusResponseData,
-            error_message="Couldn't bootstrap cluster",
+            error_message="Couldn't get wallet status",
         )
 
     def request_nodes(
