@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Collection, List, Optional, Sequence, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
-from golem.resources import Activity
+from golem.resources import Activity, BatchError
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled
 from golem.utils.logging import get_trace_id_name
 
@@ -20,8 +20,7 @@ from ray_on_golem.server.cluster.sidecars import (
 )
 from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.server.models import NodeConfigData, NodeData, NodeState
-from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.new_golem import GolemService
+from ray_on_golem.server.services.golem import GolemService, ManagerStack
 from ray_on_golem.server.settings import (
     CLUSTER_MONITOR_CHECK_INTERVAL,
     CLUSTER_MONITOR_RETRY_COUNT,
@@ -253,7 +252,12 @@ class ClusterNode(WarningMessagesMixin, NodeData):
     @staticmethod
     async def _run_command(context: WorkContext, cmd: str, timeout: Optional[float] = None):
         result = await context.run(cmd, timeout=timeout)
-        await result.wait()
+
+        try:
+            await result.wait()
+        except BatchError as e:
+            raise RayOnGolemError(f"Executing command `{cmd}` failed!") from e
+
         logger.debug("Command executed: %s: %s", cmd, [e.to_dict() for e in result.events])
 
     async def _upload_node_configuration(
@@ -300,11 +304,11 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         ip = self.internal_ip if ip is None else ip
 
         provider_desc = await get_provider_desc(context.activity)
-        logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}")
+        logger.debug(f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=}...")
         try:
             await self._run_command(context, "service ssh restart", timeout=120)
         except Exception:
-            msg = f"Failed to restart the SSH server {provider_desc}, {ip=}, {context.activity=}"
+            msg = f"Restarting ssh service on {provider_desc}, {ip=}, {context.activity=} failed!"
             logger.warning(msg)
             logger.debug(msg, exc_info=True)
         else:
@@ -449,6 +453,6 @@ class HeadClusterNode(WorkerClusterNode):
         logger.warning(message, self.node_id, provider_desc)
         self.add_warning_message(message, self.node_id, provider_desc)
 
-        create_task_with_logging(self._cluster.stop())
+        create_task_with_logging(self._cluster.stop(clear=False))
 
         return True

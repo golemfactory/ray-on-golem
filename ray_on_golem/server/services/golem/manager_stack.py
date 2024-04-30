@@ -23,8 +23,10 @@ from golem.resources import Agreement, Proposal
 
 from ray_on_golem.reputation.plugins import ProviderBlacklistPlugin, ReputationScorer
 from ray_on_golem.server.models import NodeConfigData
-from ray_on_golem.server.services.golem.helpers.demand_config import DemandConfigHelper
-from ray_on_golem.server.services.golem.helpers.manager_stack import ManagerStackNodeConfigHelper
+from ray_on_golem.server.services.golem.helpers import (
+    DemandConfigHelper,
+    ManagerStackNodeConfigHelper,
+)
 
 TManager = TypeVar("TManager", bound=Manager)
 

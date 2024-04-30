@@ -8,7 +8,7 @@ from golem.managers import PaymentManager
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
 from ray_on_golem.server import utils
-from ray_on_golem.server.cluster.nodes import ClusterNode, HeadClusterNode, WorkerClusterNode
+from ray_on_golem.server.cluster import ClusterNode, HeadClusterNode, WorkerClusterNode
 from ray_on_golem.server.mixins import WarningMessagesMixin
 from ray_on_golem.server.models import (
     NodeConfigData,
@@ -17,9 +17,11 @@ from ray_on_golem.server.models import (
     ProviderParametersData,
     Tags,
 )
-from ray_on_golem.server.services.golem.golem import DeviceListAllocationPaymentManager
-from ray_on_golem.server.services.golem.manager_stack import ManagerStack
-from ray_on_golem.server.services.new_golem import GolemService
+from ray_on_golem.server.services.golem import (
+    DriverListAllocationPaymentManager,
+    GolemService,
+    ManagerStack,
+)
 
 IsHeadNode = bool
 NodeType = str
@@ -52,7 +54,7 @@ class Cluster(WarningMessagesMixin):
         )
         self._nodes: Dict[NodeId, ClusterNode] = {}
         self._nodes_id_counter = 0
-        self._payment_manager: PaymentManager = DeviceListAllocationPaymentManager(
+        self._payment_manager: PaymentManager = DriverListAllocationPaymentManager(
             self._golem_service.golem,
             budget=self._provider_parameters.total_budget,
             network=self._provider_parameters.payment_network,
@@ -95,8 +97,8 @@ class Cluster(WarningMessagesMixin):
 
         logger.info("Starting `%s` cluster done", self._name)
 
-    async def stop(self) -> None:
-        """Stop the cluster and cleanup its internal state."""
+    async def stop(self, clear: bool = True) -> None:
+        """Stop the cluster."""
 
         if self._state in (NodeState.terminating, NodeState.terminated):
             logger.info("Not stopping `%s` cluster as it's already stopped or stopping", self._name)
@@ -109,20 +111,29 @@ class Cluster(WarningMessagesMixin):
         for node in self._nodes.values():
             await node.stop()
 
-        self._nodes.clear()
-        self._nodes_id_counter = 0
-
         for stack in self._manager_stacks.values():
             await stack.stop()
-
-        self._manager_stacks.clear()
-        self._manager_stacks_locks.clear()
 
         await self._payment_manager.stop()
 
         self._state = NodeState.terminated
 
+        if clear:
+            self.clear()
+
         logger.info("Stopping `%s` cluster done", self._name)
+
+    def clear(self) -> None:
+        """Clear the internal state of the cluster."""
+
+        if self._state == NodeState.terminated:
+            logger.info("Not clearing `%s` cluster as it's not stopped", self._name)
+            return
+
+        self._nodes.clear()
+        self._nodes_id_counter = 0
+        self._manager_stacks.clear()
+        self._manager_stacks_locks.clear()
 
     async def request_nodes(
         self, node_config: NodeConfigData, count: int, tags: Tags

@@ -6,9 +6,7 @@ from pydantic import BaseModel
 
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server import models, settings
-from ray_on_golem.server.models import ShutdownState
-from ray_on_golem.server.services import YagnaService
-from ray_on_golem.server.services.new_ray import RayService
+from ray_on_golem.server.services import RayService, YagnaService
 from ray_on_golem.utils import raise_graceful_exit
 from ray_on_golem.version import get_version
 
@@ -35,6 +33,7 @@ def json_response(model_obj: BaseModel) -> web.Response:
 @routes.view(settings.URL_STATUS)
 async def status(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
+
     return json_response(
         models.WebserverStatus(
             version=get_version(),
@@ -242,27 +241,27 @@ async def shutdown(request):
     shutdown_request = models.ShutdownRequestData.parse_raw(await request.text())
 
     if not (shutdown_request.ignore_self_shutdown or request.app["self_shutdown"]):
-        shutdown_state = ShutdownState.NOT_ENABLED
+        shutdown_state = models.ShutdownState.NOT_ENABLED
     elif ray_service.is_any_node_running():
         if shutdown_request.force_shutdown:
-            shutdown_state = ShutdownState.FORCED_SHUTDOWN
+            shutdown_state = models.ShutdownState.FORCED_SHUTDOWN
         else:
-            shutdown_state = ShutdownState.CLUSTER_NOT_EMPTY
+            shutdown_state = models.ShutdownState.CLUSTER_NOT_EMPTY
     else:
-        shutdown_state = ShutdownState.WILL_SHUTDOWN
+        shutdown_state = models.ShutdownState.WILL_SHUTDOWN
 
-    if shutdown_state in (ShutdownState.WILL_SHUTDOWN, ShutdownState.FORCED_SHUTDOWN):
+    if shutdown_state in (models.ShutdownState.WILL_SHUTDOWN, models.ShutdownState.FORCED_SHUTDOWN):
         shutdown_seconds = shutdown_request.shutdown_delay
         if shutdown_seconds:
             logger.info(
                 "Received a %sself-shutdown request, exiting in %s seconds...",
-                "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+                "forced " if models.ShutdownState.FORCED_SHUTDOWN else "",
                 shutdown_seconds,
             )
         else:
             logger.info(
                 "Initiating a %sshutdown immediately...",
-                "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+                "forced " if models.ShutdownState.FORCED_SHUTDOWN else "",
             )
         loop = asyncio.get_event_loop()
         loop.call_later(shutdown_seconds, raise_graceful_exit)
