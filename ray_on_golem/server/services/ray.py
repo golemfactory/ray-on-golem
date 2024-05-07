@@ -89,7 +89,7 @@ class RayService(WarningMessagesMixin):
     ) -> List[NodeId]:
         try:
             async with self._with_cluster_context(cluster_name) as cluster:
-                nodes = self._get_non_terminated_nodes_ids(cluster)
+                nodes = cluster.get_non_terminated_nodes()
 
             if tags_to_match is None:
                 return [node.node_id for node in nodes]
@@ -97,13 +97,6 @@ class RayService(WarningMessagesMixin):
             return [node.node_id for node in nodes if are_dicts_equal(node.tags, tags_to_match)]
         except ClusterNotFound:
             return []
-
-    def _get_non_terminated_nodes_ids(self, cluster: Cluster) -> List[ClusterNode]:
-        return [
-            node
-            for node in cluster.nodes.values()
-            if node.state not in [NodeState.terminating, NodeState.terminated]
-        ]
 
     async def is_node_running(self, cluster_name: str, node_id: NodeId) -> bool:
         async with self._with_cluster_node_context(
@@ -164,11 +157,7 @@ class RayService(WarningMessagesMixin):
             return str(priv_f.read()), str(pub_f.read())
 
     def is_any_node_running(self) -> bool:
-        for cluster in self._clusters.values():
-            if self._get_non_terminated_nodes_ids(cluster):
-                return True
-
-        return False
+        return any(cluster.get_non_terminated_nodes() for cluster in self._clusters.values())
 
     async def _get_or_create_cluster(
         self, cluster_name: str, provider_parameters: ProviderParametersData
@@ -186,9 +175,10 @@ class RayService(WarningMessagesMixin):
                     provider_parameters,
                 )
 
-                await cluster.start()
-
                 logger.info("Creating cluster `%s` done", cluster_name)
+
+            # Always try to start the cluster
+            await cluster.start()
 
             return cluster
 

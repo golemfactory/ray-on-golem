@@ -41,7 +41,6 @@ PROVIDER_DEFAULTS = {
     "webserver_port": 4578,
     "webserver_datadir": None,
     "ray_gcs_expose_port": 6379,
-    "ray_dashboard_expose_port": 8265,
     "enable_registry_stats": True,
     "payment_network": PAYMENT_NETWORK_HOLESKY,
     "payment_driver": PAYMENT_DRIVER_ERC20,

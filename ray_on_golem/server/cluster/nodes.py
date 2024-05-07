@@ -2,13 +2,15 @@ import asyncio
 import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Collection, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Callable, Collection, List, Optional, Sequence, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
 from golem.resources import Activity, BatchError
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled
+from golem.utils.asyncio.tasks import resolve_maybe_awaitable
 from golem.utils.logging import get_trace_id_name
+from golem.utils.typing import MaybeAwaitable
 
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.cluster.sidecars import (
@@ -55,15 +57,22 @@ class ClusterNode(WarningMessagesMixin, NodeData):
     _activity: Optional[Activity] = None
     _start_task: Optional[asyncio.Task] = None
     _warning_messages: List[str] = None
+    _on_stop: Optional[Callable[["ClusterNode"], MaybeAwaitable[None]]] = None
 
     def __init__(
-        self, cluster: "Cluster", golem_service: GolemService, manager_stack: ManagerStack, **kwargs
+        self,
+        cluster: "Cluster",
+        golem_service: GolemService,
+        manager_stack: ManagerStack,
+        on_stop: Optional[Callable[["ClusterNode"], MaybeAwaitable[None]]] = None,
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
 
         self._cluster = cluster
         self._golem_service = golem_service
         self._manager_stack = manager_stack
+        self._on_stop = on_stop
 
         self._sidecars = self._prepare_sidecars()
 
@@ -83,6 +92,11 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         """Read-only activity related to the node."""
 
         return self._activity
+
+    @property
+    def manager_stack(self) -> ManagerStack:
+        """Read-only manager stack related to the node."""
+        return self._manager_stack
 
     def get_warning_messages(self) -> Sequence[str]:
         """Get read-only collection of warnings both from the node and its sidecars."""
@@ -183,6 +197,9 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         self.state = NodeState.terminated
         self.internal_ip = None
         self.ssh_proxy_command = None
+
+        if self._on_stop:
+            await resolve_maybe_awaitable(self._on_stop(self))
 
         logger.info("Stopping `%s` node done", self)
 
@@ -441,18 +458,15 @@ class HeadClusterNode(WorkerClusterNode):
 
     _webserver_port: int
     _ray_gcs_expose_port: Optional[int]
-    _ray_dashboard_expose_port: Optional[int]
 
     def __init__(
         self,
         webserver_port: int,
         ray_gcs_expose_port: Optional[int],
-        ray_dashboard_expose_port: Optional[int],
         **kwargs,
     ) -> None:
         self._webserver_port = webserver_port
         self._ray_gcs_expose_port = ray_gcs_expose_port
-        self._ray_dashboard_expose_port = ray_dashboard_expose_port
 
         # Late init as it will trigger `_prepare_sidecars` that requires fields from above
         super().__init__(**kwargs)
@@ -467,15 +481,6 @@ class HeadClusterNode(WorkerClusterNode):
             sidecars.append(
                 PortTunnelClusterNodeSidecar(
                     node=self, local_port=self._ray_gcs_expose_port, remote_port=RAY_GCS_PORT
-                ),
-            )
-
-        if self._ray_dashboard_expose_port:
-            sidecars.append(
-                PortTunnelClusterNodeSidecar(
-                    node=self,
-                    local_port=self._ray_dashboard_expose_port,
-                    remote_port=RAY_DASHBOARD_PORT,
                 ),
             )
 
