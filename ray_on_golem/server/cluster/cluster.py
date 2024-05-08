@@ -274,7 +274,7 @@ class Cluster(WarningMessagesMixin):
     def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
         return hashlib.md5(node_config.json().encode()).hexdigest()
 
-    async def _on_node_stop(self, node: ClusterNode) -> None:
+    def _on_node_stop(self, node: ClusterNode) -> None:
         non_terminated_nodes = self.get_non_terminated_nodes()
         if not non_terminated_nodes:
             logger.debug("No more nodes running on the cluster, scheduling cluster stop")
@@ -283,7 +283,9 @@ class Cluster(WarningMessagesMixin):
                 self.stop(),
                 trace_id=get_trace_id_name(self, "on-node-stop-cluster-stop"),
             )
-        elif not any(node.manager_stack == n.manager_stack for n in self.get_non_terminated_nodes()):
+        elif not any(
+            node.manager_stack == n.manager_stack for n in self.get_non_terminated_nodes()
+        ):
             logger.debug(
                 "No more nodes running on the manager stack, scheduling manager stack stop"
             )
@@ -295,4 +297,6 @@ class Cluster(WarningMessagesMixin):
                 trace_id=get_trace_id_name(self, "on-node-stop-manager-stack-stop"),
             )
         else:
-            logger.debug("Cluster and manager stack have some nodes still running, nothing to stop.")
+            logger.debug(
+                "Cluster and manager stack have some nodes still running, nothing to stop."
+            )
