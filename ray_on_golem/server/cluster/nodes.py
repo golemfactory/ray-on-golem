@@ -436,6 +436,7 @@ class WorkerClusterNode(ClusterNode):
                 retry_interval=CLUSTER_MONITOR_RETRY_INTERVAL,
                 max_fail_count=CLUSTER_MONITOR_RETRY_COUNT,
             ),
+            PortTunnelClusterNodeSidecar(node=self, local_port=9000, reverse=True),
         )
 
     async def _on_monitor_check_failed(
