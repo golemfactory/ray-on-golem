@@ -15,7 +15,7 @@ from golem.managers import (
     ProposalManagerPlugin,
     ProposalScorer,
     ProposalScoringBuffer,
-    RandomScore,
+    RandomScore, RefreshingDemandManager,
 )
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
@@ -82,8 +82,8 @@ class ManagerStack:
     async def create(
         cls,
         node_config: NodeConfigData,
+        subnet_tag: str,
         payment_network: str,
-        is_head_node: bool,
         payment_manager: PaymentManager,
         demand_config_helper: DemandConfigHelper,
         golem: GolemNode,
@@ -100,9 +100,6 @@ class ManagerStack:
         )
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
             extra_proposal_plugins, node_config
-        )
-        ManagerStackNodeConfigHelper.apply_priority_head_node_scoring(
-            extra_proposal_scorers, node_config
         )
 
         proposal_negotiators = [PaymentPlatformNegotiator()]
@@ -139,14 +136,14 @@ class ManagerStack:
                 )
             )
 
-        demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
-            stack,
-            payloads,
-            demand_lifetime,
-            node_config,
-            is_head_node,
-            golem,
-            payment_manager,
+        demand_manager = stack.add_manager(
+            RefreshingDemandManager(
+                golem,
+                payment_manager.get_allocation,
+                payloads,
+                demand_lifetime=demand_lifetime,
+                subnet_tag=subnet_tag,
+            )
         )
 
         proposal_manager = stack.add_manager(

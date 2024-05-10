@@ -46,9 +46,14 @@ PROVIDER_DEFAULTS = {
     "payment_driver": PAYMENT_DRIVER_ERC20,
     "node_config": {
         "subnet_tag": "public",
-        "priority_head_subnet_tag": "ray-on-golem-heads",
     },
     "total_budget": 1.0,
+}
+
+HEAD_NODE_DEFAULTS = {
+    "node_config": {
+        "priority_subnet_tag": "ray-on-golem-heads",
+    }
 }
 
 
@@ -290,6 +295,13 @@ class GolemNodeProvider(NodeProvider):
 
         for node_type in config.get("available_node_types", {}).values():
             node_config = deepcopy(config["provider"]["parameters"]["node_config"])
+
+            if node_type == "ray.head.default":
+                dpath.merge(
+                    node_config,
+                    deepcopy(HEAD_NODE_DEFAULTS)
+                )
+
             dpath.merge(
                 node_config,
                 node_type["node_config"],

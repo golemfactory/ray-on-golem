@@ -31,6 +31,10 @@ RAY_ON_GOLEM_SHUTDOWN_TIMEOUT = timedelta(seconds=60)
 # how long we wait for the webserver process to exit
 RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
 
+# How long ClusterNode should try to get agreement from "priority_subnet_tag"
+# before failing back to "subnet_tag"
+RAY_ON_GOLEM_PRIORITY_AGREEMENT_TIMEOUT = timedelta(seconds=30)
+
 RAY_ON_GOLEM_PID_FILENAME = "ray_on_golem.pid"
 
 SSH_SERVER_ALIVE_INTERVAL = 300
