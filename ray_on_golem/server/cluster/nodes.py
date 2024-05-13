@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING, Callable, Collection, List, Optional, Sequence
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
-from golem.resources import Activity, BatchError, Agreement
+from golem.resources import Activity, Agreement, BatchError
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled
 from golem.utils.asyncio.tasks import resolve_maybe_awaitable
 from golem.utils.logging import get_trace_id_name
 from golem.utils.typing import MaybeAwaitable
+
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server.cluster.sidecars import (
     ActivityStateMonitorClusterNodeSidecar,
@@ -184,7 +185,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
         logger.info("Starting `%s` node done", self)
 
-    async def stop(self) -> None:
+    async def stop(self, call_events: bool = True) -> None:
         """Stop the node and cleanup its internal state."""
 
         if self.state in (NodeState.terminating, NodeState.terminated):
@@ -209,7 +210,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         self.internal_ip = None
         self.ssh_proxy_command = None
 
-        if self._on_stop:
+        if self._on_stop and call_events:
             await resolve_maybe_awaitable(self._on_stop(self))
 
         logger.info("Stopping `%s` node done", self)
@@ -272,7 +273,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
             try:
                 return await asyncio.wait_for(
                     self._priority_manager_stack.get_agreement(),
-                    timeout=self._priority_agreement_timeout.total_seconds()
+                    timeout=self._priority_agreement_timeout.total_seconds(),
                 )
             except asyncio.TimeoutError:
                 self._add_state_log(

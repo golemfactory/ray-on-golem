@@ -2,7 +2,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from functools import partial
-from typing import DefaultDict, Dict, Iterable, List, Mapping, Sequence, Tuple, Type, cast, Optional
+from typing import DefaultDict, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type
 
 from golem.managers import PaymentManager
 from golem.utils.asyncio import create_task_with_logging
@@ -111,7 +111,7 @@ class Cluster(WarningMessagesMixin):
 
         stop_coros = []
         for node in self._nodes.values():
-            stop_coros.append(node.stop())  # TODO: Stop bez triggerowania eventów?
+            stop_coros.append(node.stop(call_events=False))
 
         await asyncio.gather(*stop_coros)
 
@@ -226,8 +226,14 @@ class Cluster(WarningMessagesMixin):
     def _get_node_type(tags: Tags) -> str:
         return tags.get(TAG_RAY_USER_NODE_TYPE)
 
-    async def _prepare_manager_stacks(self, node_config: NodeConfigData) -> Tuple[ManagerStack, Optional[ManagerStack]]:
-        priority_manager_stack = await self._get_or_create_manager_stack(node_config, node_config.priority_subnet_tag) if node_config.priority_subnet_tag else None
+    async def _prepare_manager_stacks(
+        self, node_config: NodeConfigData
+    ) -> Tuple[ManagerStack, Optional[ManagerStack]]:
+        priority_manager_stack = (
+            await self._get_or_create_manager_stack(node_config, node_config.priority_subnet_tag)
+            if node_config.priority_subnet_tag
+            else None
+        )
         manager_stack = await self._get_or_create_manager_stack(node_config, node_config.subnet_tag)
 
         return manager_stack, priority_manager_stack
@@ -291,14 +297,14 @@ class Cluster(WarningMessagesMixin):
 
             logger.debug(
                 "No more nodes running on the `%s` manager stack, scheduling manager stack stop",
-                manager_stack
+                manager_stack,
             )
 
             any_manager_stopped = True
             stack_hash = node.node_config.get_hash()
 
             create_task_with_logging(
-                self._remove_manager_stack(stack_hash),
+                self._manager_stacks[stack_hash].stop(),
                 trace_id=get_trace_id_name(self, "on-node-stop-manager-stack-stop"),
             )
 

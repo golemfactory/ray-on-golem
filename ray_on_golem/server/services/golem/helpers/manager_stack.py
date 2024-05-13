@@ -1,10 +1,8 @@
 import logging
 from datetime import timedelta
-from functools import partial
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List
 
 from golem.managers import (
-    AggregatingDemandManager,
     DemandManager,
     LinearCoeffsCost,
     LinearPerCpuAverageCostPricing,
@@ -17,7 +15,6 @@ from golem.managers import (
 )
 from golem.node import GolemNode
 from golem.payload import Payload
-from golem.resources import ProposalData
 
 from ray_on_golem.server.models import NodeConfigData
 
