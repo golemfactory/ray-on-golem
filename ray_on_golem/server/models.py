@@ -1,3 +1,4 @@
+import hashlib
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
@@ -85,6 +86,9 @@ class NodeConfigData(BaseModel):
 
     class Config:
         extra = "forbid"
+
+    def get_hash(self) -> str:
+        return hashlib.md5(self.json().encode()).hexdigest()
 
 
 class ProviderParametersData(BaseModel):

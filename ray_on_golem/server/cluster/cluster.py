@@ -268,7 +268,7 @@ class Cluster(WarningMessagesMixin):
         logger.info(f"Removing stack `%s` done", stack_key)
 
     def _get_stack_key(self, node_config: NodeConfigData, is_head_node: IsHeadNode) -> StackKey:
-        return (self._get_hash_from_node_config(node_config), is_head_node)
+        return (node_config.get_hash(), is_head_node)
 
     @staticmethod
     def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
