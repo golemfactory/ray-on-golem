@@ -6,8 +6,7 @@ from pydantic import BaseModel
 
 from ray_on_golem.exceptions import RayOnGolemError
 from ray_on_golem.server import models, settings
-from ray_on_golem.server.models import ShutdownState
-from ray_on_golem.server.services import RayService
+from ray_on_golem.server.services import RayService, YagnaService
 from ray_on_golem.utils import raise_graceful_exit
 from ray_on_golem.version import get_version
 
@@ -34,10 +33,11 @@ def json_response(model_obj: BaseModel) -> web.Response:
 @routes.view(settings.URL_STATUS)
 async def status(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
+
     return json_response(
         models.WebserverStatus(
             version=get_version(),
-            datadir=str(ray_service.get_datadir()),
+            datadir=str(ray_service.datadir),
             shutting_down=request.app.get("shutting_down", False),
             self_shutdown=request.app.get("self_shutdown"),
             server_warnings=ray_service.get_warning_messages(),
@@ -45,30 +45,28 @@ async def status(request: web.Request) -> web.Response:
     )
 
 
-@routes.post(settings.URL_BOOTSTRAP_CLUSTER)
-async def bootstrap_cluster(request: web.Request) -> web.Response:
-    ray_service: RayService = request.app["ray_service"]
+@routes.post(settings.URL_GET_WALLET_STATUS)
+async def get_wallet_status(request: web.Request) -> web.Response:
+    yagna_service: YagnaService = request.app["yagna_service"]
 
-    request_data = models.BootstrapClusterRequestData.parse_raw(await request.text())
+    request_data = models.GetWalletStatusRequestData.parse_raw(await request.text())
 
     try:
-        (
-            is_cluster_just_created,
-            wallet_address,
-            yagna_payment_status_output,
-            yagna_payment_status,
-        ) = await ray_service.create_cluster(
-            request_data.provider_config, request_data.cluster_name
+        payment_status = await yagna_service.prepare_funds(
+            request_data.payment_network, request_data.payment_driver
         )
+        yagna_output = await yagna_service.fetch_payment_status(
+            request_data.payment_network, request_data.payment_driver
+        )
+        wallet_address = await yagna_service.fetch_wallet_address()
     except RayOnGolemError as e:
         raise web.HTTPBadRequest(reason=str(e))
 
     return json_response(
-        models.BootstrapClusterResponseData(
-            is_cluster_just_created=is_cluster_just_created,
+        models.GetWalletStatusResponseData(
             wallet_address=wallet_address,
-            yagna_payment_status_output=yagna_payment_status_output,
-            yagna_payment_status=yagna_payment_status,
+            yagna_payment_status_output=yagna_output,
+            yagna_payment_status=payment_status,
         )
     )
 
@@ -79,7 +77,10 @@ async def non_terminated_nodes_ids(request: web.Request) -> web.Response:
 
     request_data = models.NonTerminatedNodesRequestData.parse_raw(await request.text())
 
-    nodes_ids = await ray_service.get_non_terminated_nodes_ids(tags_to_match=request_data.tags)
+    nodes_ids = await ray_service.get_non_terminated_nodes_ids(
+        cluster_name=request_data.cluster_name,
+        tags_to_match=request_data.tags,
+    )
 
     return json_response(models.NonTerminatedNodesResponseData(nodes_ids=nodes_ids))
 
@@ -90,7 +91,10 @@ async def is_node_running(request: web.Request) -> web.Response:
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 
-    is_running = await ray_service.is_node_running(request_data.node_id)
+    is_running = await ray_service.is_node_running(
+        cluster_name=request_data.cluster_name,
+        node_id=request_data.node_id,
+    )
 
     return json_response(models.IsRunningResponseData(is_running=is_running))
 
@@ -99,9 +103,11 @@ async def is_node_running(request: web.Request) -> web.Response:
 async def get_cluster_data(request: web.Request) -> web.Response:
     ray_service: RayService = request.app["ray_service"]
 
-    models.GetClusterDataRequestData.parse_raw(await request.text())
+    request_data = models.GetClusterDataRequestData.parse_raw(await request.text())
 
-    cluster_data = await ray_service.get_cluster_data()
+    cluster_data = await ray_service.get_cluster_data(
+        cluster_name=request_data.cluster_name,
+    )
 
     return json_response(models.GetClusterDataResponseData(cluster_data=cluster_data))
 
@@ -112,7 +118,10 @@ async def is_node_terminated(request: web.Request) -> web.Response:
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 
-    is_terminated = await ray_service.is_node_terminated(request_data.node_id)
+    is_terminated = await ray_service.is_node_terminated(
+        cluster_name=request_data.cluster_name,
+        node_id=request_data.node_id,
+    )
 
     return json_response(models.IsTerminatedResponseData(is_terminated=is_terminated))
 
@@ -123,7 +132,10 @@ async def get_node_tags(request: web.Request) -> web.Response:
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 
-    node_tags = await ray_service.get_node_tags(request_data.node_id)
+    node_tags = await ray_service.get_node_tags(
+        cluster_name=request_data.cluster_name,
+        node_id=request_data.node_id,
+    )
 
     return json_response(models.GetNodeTagsResponseData(tags=node_tags))
 
@@ -134,7 +146,10 @@ async def get_node_internal_ip(request: web.Request) -> web.Response:
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 
-    ip_address = await ray_service.get_node_internal_ip(request_data.node_id)
+    ip_address = await ray_service.get_node_internal_ip(
+        cluster_name=request_data.cluster_name,
+        node_id=request_data.node_id,
+    )
 
     return json_response(models.GetNodeIpAddressResponseData(ip_address=ip_address))
 
@@ -146,6 +161,7 @@ async def set_node_tags(request: web.Request) -> web.Response:
     request_data = models.SetNodeTagsRequestData.parse_raw(await request.text())
 
     await ray_service.set_node_tags(
+        cluster_name=request_data.cluster_name,
         node_id=request_data.node_id,
         tags=request_data.tags,
     )
@@ -161,7 +177,11 @@ async def request_nodes(request: web.Request) -> web.Response:
     request_data = models.RequestNodesRequestData.parse_raw(await request.text())
 
     requested_nodes = await ray_service.request_nodes(
-        request_data.node_config, request_data.count, request_data.tags
+        cluster_name=request_data.cluster_name,
+        provider_config=request_data.provider_parameters,
+        node_config=request_data.node_config,
+        count=request_data.count,
+        tags=request_data.tags,
     )
 
     return json_response(models.RequestNodesResponseData(requested_nodes=requested_nodes))
@@ -174,7 +194,10 @@ async def terminate_node(request: web.Request) -> web.Response:
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 
-    terminated_nodes = await ray_service.terminate_node(request_data.node_id)
+    terminated_nodes = await ray_service.terminate_node(
+        cluster_name=request_data.cluster_name,
+        node_id=request_data.node_id,
+    )
 
     return json_response(models.TerminateNodeResponseData(terminated_nodes=terminated_nodes))
 
@@ -185,7 +208,10 @@ async def get_ssh_proxy_command(request):
 
     request_data = models.SingleNodeRequestData.parse_raw(await request.text())
 
-    ssh_proxy_command = await ray_service.get_ssh_proxy_command(node_id=request_data.node_id)
+    ssh_proxy_command = await ray_service.get_ssh_proxy_command(
+        cluster_name=request_data.cluster_name,
+        node_id=request_data.node_id,
+    )
 
     return json_response(models.GetSshProxyCommandResponseData(ssh_proxy_command=ssh_proxy_command))
 
@@ -215,27 +241,27 @@ async def shutdown(request):
     shutdown_request = models.ShutdownRequestData.parse_raw(await request.text())
 
     if not (shutdown_request.ignore_self_shutdown or request.app["self_shutdown"]):
-        shutdown_state = ShutdownState.NOT_ENABLED
-    elif await ray_service.get_non_terminated_nodes_ids():
+        shutdown_state = models.ShutdownState.NOT_ENABLED
+    elif ray_service.is_any_node_running():
         if shutdown_request.force_shutdown:
-            shutdown_state = ShutdownState.FORCED_SHUTDOWN
+            shutdown_state = models.ShutdownState.FORCED_SHUTDOWN
         else:
-            shutdown_state = ShutdownState.CLUSTER_NOT_EMPTY
+            shutdown_state = models.ShutdownState.CLUSTER_NOT_EMPTY
     else:
-        shutdown_state = ShutdownState.WILL_SHUTDOWN
+        shutdown_state = models.ShutdownState.WILL_SHUTDOWN
 
-    if shutdown_state in (ShutdownState.WILL_SHUTDOWN, ShutdownState.FORCED_SHUTDOWN):
+    if shutdown_state in (models.ShutdownState.WILL_SHUTDOWN, models.ShutdownState.FORCED_SHUTDOWN):
         shutdown_seconds = shutdown_request.shutdown_delay
         if shutdown_seconds:
             logger.info(
                 "Received a %sself-shutdown request, exiting in %s seconds...",
-                "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+                "forced " if models.ShutdownState.FORCED_SHUTDOWN else "",
                 shutdown_seconds,
             )
         else:
             logger.info(
                 "Initiating a %sshutdown immediately...",
-                "forced " if ShutdownState.FORCED_SHUTDOWN else "",
+                "forced " if models.ShutdownState.FORCED_SHUTDOWN else "",
             )
         loop = asyncio.get_event_loop()
         loop.call_later(shutdown_seconds, raise_graceful_exit)

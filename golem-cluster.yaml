@@ -18,7 +18,6 @@ provider:
   use_internal_ips: true
   module: "ray_on_golem.provider.node_provider.GolemNodeProvider"
   parameters:
-    
     # Blockchain used for payments.
     # `holesky` means running free nodes on testnet,
     # `polygon` is for mainnet operations.

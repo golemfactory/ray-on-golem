@@ -63,22 +63,23 @@ class GolemNodeProvider(NodeProvider):
             datadir=provider_parameters["webserver_datadir"],
         )
 
-        provider_parameters = self._map_ssh_config(provider_parameters)
-        self._payment_network = provider_parameters["payment_network"].lower().strip()
+        if is_running_on_golem_network():
+            return
 
-        cluster_bootstrap_response = self._ray_on_golem_client.bootstrap_cluster(
-            provider_parameters, cluster_name
+        wallet_status_response = self._ray_on_golem_client.get_wallet_status(
+            provider_parameters["payment_network"],
+            provider_parameters["payment_driver"],
         )
 
-        self._wallet_address = cluster_bootstrap_response.wallet_address
-        self._is_cluster_just_created = cluster_bootstrap_response.is_cluster_just_created
-
-        self._print_mainnet_onboarding_message(
-            cluster_bootstrap_response.yagna_payment_status_output
-        )
+        if provider_parameters["payment_network"] in ONBOARDING_MESSAGE:
+            self._print_mainnet_onboarding_message(
+                provider_parameters["payment_network"],
+                wallet_status_response.yagna_payment_status_output,
+                wallet_status_response.wallet_address,
+            )
 
         wallet_glm_amount = float(
-            cluster_bootstrap_response.yagna_payment_status.get("amount", "0")
+            float(wallet_status_response.yagna_payment_status.get("amount", "0"))
         )
         if not wallet_glm_amount:
             cli_logger.abort("You don't seem to have any GLM tokens on your Golem wallet.")
@@ -98,7 +99,7 @@ class GolemNodeProvider(NodeProvider):
         cls,
         port: int,
         registry_stats: bool = True,
-        datadir: Optional[str] = None,
+        datadir: Optional[Path] = None,
     ) -> RayOnGolemClient:
         if datadir:
             datadir = Path(datadir)
@@ -126,7 +127,6 @@ class GolemNodeProvider(NodeProvider):
             registry_stats=provider_parameters["enable_registry_stats"],
             datadir=provider_parameters["webserver_datadir"],
         )
-        # TODO: SAVE wallet address
 
         auth = config["auth"]
         default_ssh_private_key = TMP_PATH / get_default_ssh_key_name(config["cluster_name"])
@@ -175,7 +175,7 @@ class GolemNodeProvider(NodeProvider):
 
         if "ssh_proxy_command" not in auth_config and not is_running_on_golem_network():
             auth_config["ssh_proxy_command"] = self._ray_on_golem_client.get_ssh_proxy_command(
-                node_id
+                self.cluster_name, node_id
             )
 
         return SSHCommandRunner(**common_args)
@@ -190,6 +190,8 @@ class GolemNodeProvider(NodeProvider):
             cli_logger.print(f"Requesting {count} nodes...")
 
             requested_node_ids = self._ray_on_golem_client.request_nodes(
+                cluster_name=self.cluster_name,
+                provider_parameters=self.provider_config["parameters"],
                 node_config=node_config,
                 count=count,
                 tags=tags,
@@ -199,7 +201,7 @@ class GolemNodeProvider(NodeProvider):
             nodes_last_log_size = {node_id: 0 for node_id in requested_node_ids}
 
             while True:
-                cluster_state = self._ray_on_golem_client.get_cluster_state()
+                cluster_state = self._ray_on_golem_client.get_cluster_state(self.cluster_name)
                 monitored_nodes = {
                     node.node_id: node
                     for node in cluster_state.values()
@@ -251,33 +253,28 @@ class GolemNodeProvider(NodeProvider):
                 cli_logger.labeled_value(node.node_id, log, no_format=True)
 
     def terminate_node(self, node_id: NodeId) -> Dict[NodeId, Dict]:
-        return self._ray_on_golem_client.terminate_node(node_id)
+        return self._ray_on_golem_client.terminate_node(self.cluster_name, node_id)
 
     def non_terminated_nodes(self, tag_filters) -> List[NodeId]:
-        return self._ray_on_golem_client.non_terminated_nodes(tag_filters)
+        return self._ray_on_golem_client.non_terminated_nodes(self.cluster_name, tag_filters)
 
     def is_running(self, node_id: NodeId) -> bool:
-        return self._ray_on_golem_client.is_running(node_id)
+        return self._ray_on_golem_client.is_running(self.cluster_name, node_id)
 
     def is_terminated(self, node_id: NodeId) -> bool:
-        return self._ray_on_golem_client.is_terminated(node_id)
+        return self._ray_on_golem_client.is_terminated(self.cluster_name, node_id)
 
     def node_tags(self, node_id: NodeId) -> Dict:
-        return self._ray_on_golem_client.get_node_tags(node_id)
+        return self._ray_on_golem_client.get_node_tags(self.cluster_name, node_id)
 
     def internal_ip(self, node_id: NodeId) -> Optional[str]:
-        return self._ray_on_golem_client.get_node_internal_ip(node_id)
+        return self._ray_on_golem_client.get_node_internal_ip(self.cluster_name, node_id)
 
     def external_ip(self, node_id: NodeId) -> Optional[str]:
-        return self._ray_on_golem_client.get_node_internal_ip(node_id)
+        return self._ray_on_golem_client.get_node_internal_ip(self.cluster_name, node_id)
 
     def set_node_tags(self, node_id: NodeId, tags: Dict) -> None:
-        self._ray_on_golem_client.set_node_tags(node_id, tags)
-
-    @staticmethod
-    def _map_ssh_config(provider_parameters: Dict[str, Any]):
-        ssh_arg_mapping = {"_ssh_private_key": "ssh_private_key", "_ssh_user": "ssh_user"}
-        return {ssh_arg_mapping.get(k) or k: v for k, v in provider_parameters.items()}
+        self._ray_on_golem_client.set_node_tags(self.cluster_name, node_id, tags)
 
     @staticmethod
     def _apply_config_defaults(config: Dict[str, Any]) -> None:
@@ -308,13 +305,12 @@ class GolemNodeProvider(NodeProvider):
             )
 
         # copy ssh details to provider namespace for cluster creation in __init__
-        provider_parameters["_ssh_private_key"] = auth["ssh_private_key"]
-        provider_parameters["_ssh_user"] = auth["ssh_user"]
+        provider_parameters["ssh_private_key"] = auth["ssh_private_key"]
+        provider_parameters["ssh_user"] = auth["ssh_user"]
 
-    def _print_mainnet_onboarding_message(self, yagna_payment_status_output: str) -> None:
-        if self._payment_network not in ONBOARDING_MESSAGE:
-            return
-
+    def _print_mainnet_onboarding_message(
+        self, payment_network: str, yagna_payment_status_output: str, wallet_address: str
+    ) -> None:
         cli_logger.newline()
 
         with cli_logger.indented():
@@ -328,7 +324,7 @@ class GolemNodeProvider(NodeProvider):
             cli_logger.newline()
             cli_logger.print(
                 "You can use the Golem Onboarding portal to top up: https://glm.golem.network/"
-                f"#/onboarding/budget?yagnaAddress={self._wallet_address}&network=polygon",
+                f"#/onboarding/budget?yagnaAddress={wallet_address}&network={payment_network}",
                 no_format=True,
             )
             cli_logger.newline()
