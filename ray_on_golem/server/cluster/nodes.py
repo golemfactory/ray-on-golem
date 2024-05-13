@@ -463,14 +463,14 @@ class HeadClusterNode(WorkerClusterNode):
             PortTunnelClusterNodeSidecar(node=self, local_port=self._webserver_port, reverse=True),
         ]
 
-        if self._ray_gcs_expose_port is not None:
+        if self._ray_gcs_expose_port:
             sidecars.append(
                 PortTunnelClusterNodeSidecar(
                     node=self, local_port=self._ray_gcs_expose_port, remote_port=RAY_GCS_PORT
                 ),
             )
 
-        if self._ray_dashboard_expose_port is not None:
+        if self._ray_dashboard_expose_port:
             sidecars.append(
                 PortTunnelClusterNodeSidecar(
                     node=self,

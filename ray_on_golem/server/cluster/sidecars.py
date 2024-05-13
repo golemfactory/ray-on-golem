@@ -202,7 +202,7 @@ class PortTunnelClusterNodeSidecar(ClusterNodeSidecar):
         super().__init__(**kwargs)
 
         self._local_port = local_port
-        self._remote_port = local_port if remote_port is None else remote_port
+        self._remote_port = remote_port or local_port
         self._reverse = reverse
 
         self._tunnel_process: Optional[Process] = None
