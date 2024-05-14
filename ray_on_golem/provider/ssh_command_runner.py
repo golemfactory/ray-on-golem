@@ -40,6 +40,7 @@ class SSHCommandRunner(BaseSshCommandRunner):
         command += ["-avz"]
         command += ["--no-o"]
         command += ["--no-g"]
+        command += ["-v", "--stats", "--progress"]
         command += self._create_rsync_filter_args(options=options)
         command += [source, "{}@{}:{}".format(self.ssh_user, self.ssh_ip, target)]
         cli_logger.verbose("Running `{}`", cf.bold(" ".join(command)))
@@ -56,6 +57,7 @@ class SSHCommandRunner(BaseSshCommandRunner):
         command += ["-avz"]
         command += ["--no-o"]
         command += ["--no-g"]
+        command += ["-v", "--stats", "--progress"]
         command += self._create_rsync_filter_args(options=options)
         command += ["{}@{}:{}".format(self.ssh_user, self.ssh_ip, source), target]
         cli_logger.verbose("Running `{}`", cf.bold(" ".join(command)))

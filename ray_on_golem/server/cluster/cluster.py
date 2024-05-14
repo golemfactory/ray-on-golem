@@ -188,6 +188,8 @@ class Cluster(WarningMessagesMixin):
             partial(
                 HeadClusterNode,
                 webserver_port=self._webserver_port,
+                ray_gcs_expose_port=self._provider_parameters.ray_gcs_expose_port,
+                ray_dashboard_expose_port=self._provider_parameters.ray_dashboard_expose_port,
             )
             if is_head_node
             else WorkerClusterNode

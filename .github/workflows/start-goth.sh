@@ -29,9 +29,11 @@ echo CREATING ASSETS
 python -m goth create-assets .envs/goth/assets
 # disable use-proxy
 sed -Ezi 's/("\n.*use\-proxy:\s)(True)/\1False/mg' .envs/goth/assets/goth-config-testing.yml
+sed -Ezi 's/("mem_gib":\s+)(1.0)/\11.5/mg' .envs/goth/assets/provider/hardware.json
 
 echo STARTING NETWORK
 cat .envs/goth/assets/goth-config-testing.yml
+cat .envs/goth/assets/provider/hardware.json
 python -m goth start .envs/goth/assets/goth-config-testing.yml &
 GOTH_PID=$!
 echo "GOTH_PID=$GOTH_PID" | tee -a "$GITHUB_ENV"
