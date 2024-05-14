@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import logging
 from collections import defaultdict
 from functools import partial
@@ -269,10 +268,6 @@ class Cluster(WarningMessagesMixin):
 
     def _get_stack_key(self, node_config: NodeConfigData, is_head_node: IsHeadNode) -> StackKey:
         return (node_config.get_hash(), is_head_node)
-
-    @staticmethod
-    def _get_hash_from_node_config(node_config: NodeConfigData) -> str:
-        return hashlib.md5(node_config.json().encode()).hexdigest()
 
     def _on_node_stop(self, node: ClusterNode) -> None:
         non_terminated_nodes = self.get_non_terminated_nodes()
