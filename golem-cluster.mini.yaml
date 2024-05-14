@@ -2,7 +2,7 @@
 
 
 # Ray on Golem cluster name
-cluster_name: golem-cluster
+cluster_name: "golem-cluster"
 
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10

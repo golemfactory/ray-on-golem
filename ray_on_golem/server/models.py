@@ -1,3 +1,4 @@
+import hashlib
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
@@ -86,11 +87,13 @@ class NodeConfigData(BaseModel):
     class Config:
         extra = "forbid"
 
+    def get_hash(self) -> str:
+        return hashlib.md5(self.json().encode()).hexdigest()
+
 
 class ProviderParametersData(BaseModel):
     webserver_port: int
     ray_gcs_expose_port: Optional[int]
-    ray_dashboard_expose_port: Optional[int]
     enable_registry_stats: bool
     payment_network: str
     payment_driver: str

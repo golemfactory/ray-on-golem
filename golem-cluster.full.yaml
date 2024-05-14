@@ -5,7 +5,7 @@
 # Ray on Golem cluster name
 # This value identifies a given cluster within the ray-on-golem webserver.
 # Therefore, it must be unique if you ever wish to run more than one cluster on the same ray-on-golem instance.
-cluster_name: golem-cluster
+cluster_name: "golem-cluster"
 
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10
@@ -22,11 +22,10 @@ provider:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
 
-    # Ports under which Ray's GCS and dashboard will be exposed on the local machine
+    # Port under which Ray's GCS will be exposed on the local machine
     # Needs to be changed while running multiple clusters on a single machine
     # Can be null to disable exposure
     ray_gcs_expose_port: 6379
-    ray_dashboard_expose_port: 8265
 
     # Blockchain used for payments.
     # `holesky` means running free nodes on testnet,
@@ -111,7 +110,7 @@ available_node_types:
     node_config: {}
 
 # Specify the node type of the head node (as configured above).
-head_node_type: ray.head.default
+head_node_type: "ray.head.default"
 
 # The files or directories to copy to the head and worker nodes
 # Remote workdir is /root/
@@ -152,5 +151,5 @@ worker_start_ray_commands: [
 
 # Satisfy checks to disable warning about legacy fields at `ray up`.
 # This will be removed by ray-on-golem on the fly.
-head_node: True
-worker_nodes: True
+head_node: true
+worker_nodes: true

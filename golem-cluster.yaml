@@ -4,7 +4,7 @@
 # - with properties allowing fine-tuning
 
 # Ray on Golem cluster name
-cluster_name: golem-cluster
+cluster_name: "golem-cluster"
 
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10
@@ -135,6 +135,6 @@ worker_start_ray_commands: [
 
 # Satisfy checks to disable warning about legacy fields at `ray up`.
 # This will be removed by ray-on-golem on the fly.
-head_node: True
-worker_nodes: True
+head_node: true
+worker_nodes: true
 

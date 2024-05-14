@@ -2,9 +2,11 @@ import asyncio
 import logging
 from collections import defaultdict
 from functools import partial
-from typing import DefaultDict, Dict, Iterable, List, Mapping, Tuple, Type
+from typing import DefaultDict, Dict, Iterable, List, Mapping, Sequence, Tuple, Type
 
 from golem.managers import PaymentManager
+from golem.utils.asyncio import create_task_with_logging
+from golem.utils.logging import get_trace_id_name
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
 from ray_on_golem.server import utils
@@ -17,15 +19,15 @@ from ray_on_golem.server.models import (
     ProviderParametersData,
     Tags,
 )
-from ray_on_golem.server.services.golem import (
+from ray_on_golem.server.services import (
     DriverListAllocationPaymentManager,
     GolemService,
     ManagerStack,
 )
 
 IsHeadNode = bool
-NodeType = str
-StackKey = Tuple[NodeType, IsHeadNode]
+NodeHash = str
+StackKey = Tuple[NodeHash, IsHeadNode]
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +128,7 @@ class Cluster(WarningMessagesMixin):
     def clear(self) -> None:
         """Clear the internal state of the cluster."""
 
-        if self._state == NodeState.terminated:
+        if self._state != NodeState.terminated:
             logger.info("Not clearing `%s` cluster as it's not stopped", self._name)
             return
 
@@ -134,6 +136,15 @@ class Cluster(WarningMessagesMixin):
         self._nodes_id_counter = 0
         self._manager_stacks.clear()
         self._manager_stacks_locks.clear()
+
+    def get_non_terminated_nodes(self) -> Sequence["ClusterNode"]:
+        """Return cluster nodes that are running on the cluster."""
+
+        return [
+            node
+            for node in self._nodes.values()
+            if node.state not in [NodeState.terminating, NodeState.terminated]
+        ]
 
     async def request_nodes(
         self, node_config: NodeConfigData, count: int, tags: Tags
@@ -143,12 +154,19 @@ class Cluster(WarningMessagesMixin):
         is_head_node = utils.is_head_node(tags)
         worker_type = "head" if is_head_node else "worker"
         node_type = self._get_node_type(tags)
+        stack_key = self._get_stack_key(node_config, is_head_node)
 
-        logger.info("Requesting `%s` %s node(s) of type `%s`...", count, worker_type, node_type)
+        logger.info(
+            "Requesting `%s` %s node(s) of type `%s` %s...",
+            count,
+            worker_type,
+            node_type,
+            stack_key,
+        )
 
         manager_stack = await self._get_or_create_manager_stack(
+            stack_key,
             node_config,
-            node_type,
             is_head_node,
         )
 
@@ -163,6 +181,7 @@ class Cluster(WarningMessagesMixin):
                 cluster=self,
                 golem_service=self._golem_service,
                 manager_stack=manager_stack,
+                on_stop=self._on_node_stop,
                 node_id=node_id,
                 tags=tags,
                 node_config=node_config,
@@ -173,7 +192,13 @@ class Cluster(WarningMessagesMixin):
 
             node.schedule_start()
 
-        logger.info("Requesting `%s` %s node(s) of type `%s` done", count, worker_type, node_type)
+        logger.info(
+            "Requesting `%s` %s node(s) of type `%s` %s done",
+            count,
+            worker_type,
+            node_type,
+            stack_key,
+        )
         logger.debug(f"{node_config=}")
 
         return created_node_ids
@@ -189,7 +214,6 @@ class Cluster(WarningMessagesMixin):
                 HeadClusterNode,
                 webserver_port=self._webserver_port,
                 ray_gcs_expose_port=self._provider_parameters.ray_gcs_expose_port,
-                ray_dashboard_expose_port=self._provider_parameters.ray_dashboard_expose_port,
             )
             if is_head_node
             else WorkerClusterNode
@@ -204,12 +228,10 @@ class Cluster(WarningMessagesMixin):
 
     async def _get_or_create_manager_stack(
         self,
+        stack_key: StackKey,
         node_config: NodeConfigData,
-        node_type: NodeType,
         is_head_node: IsHeadNode,
     ) -> ManagerStack:
-        stack_key = (node_type, is_head_node)
-
         async with self._manager_stacks_locks[stack_key]:
             stack = self._manager_stacks.get(stack_key)
 
@@ -243,3 +265,33 @@ class Cluster(WarningMessagesMixin):
             del self._manager_stacks_locks[stack_key]
 
         logger.info(f"Removing stack `%s` done", stack_key)
+
+    def _get_stack_key(self, node_config: NodeConfigData, is_head_node: IsHeadNode) -> StackKey:
+        return (node_config.get_hash(), is_head_node)
+
+    def _on_node_stop(self, node: ClusterNode) -> None:
+        non_terminated_nodes = self.get_non_terminated_nodes()
+        if not non_terminated_nodes:
+            logger.debug("No more nodes running on the cluster, scheduling cluster stop")
+
+            create_task_with_logging(
+                self.stop(),
+                trace_id=get_trace_id_name(self, "on-node-stop-cluster-stop"),
+            )
+        elif not any(
+            node.manager_stack == n.manager_stack for n in self.get_non_terminated_nodes()
+        ):
+            logger.debug(
+                "No more nodes running on the manager stack, scheduling manager stack stop"
+            )
+
+            stack_key = self._get_stack_key(node.node_config, isinstance(node, HeadClusterNode))
+
+            create_task_with_logging(
+                self._remove_manager_stack(stack_key),
+                trace_id=get_trace_id_name(self, "on-node-stop-manager-stack-stop"),
+            )
+        else:
+            logger.debug(
+                "Cluster and manager stack have some nodes still running, nothing to stop."
+            )
