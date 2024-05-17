@@ -80,7 +80,6 @@ def get_ssh_command_args(
 ) -> List[str]:
     return [
         "ssh",
-        "-vvv",
         "-o",
         "StrictHostKeyChecking=no",
         "-o",

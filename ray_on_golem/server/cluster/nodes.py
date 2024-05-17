@@ -330,14 +330,16 @@ class ClusterNode(WarningMessagesMixin, NodeData):
             "/root_copy/.profile "
             "/root_copy/.config "
             "/root_copy/.local "
+            "/root_copy/venv "
             "/root 2> /dev/null",
         )
+        await self._run_command(context, f"echo 'export PATH=$PATH:/root/.local/bin' >> /root/.bashrc")
+        await self._run_command(context, f"echo 'source /root/venv/bin/activate' >> /root/.bashrc")
 
         await self._run_command(context, "mkdir -p /root/.ssh")
         await self._run_command(
             context, f'echo "{ssh_public_key_data}" >> /root/.ssh/authorized_keys'
         )
-        await self._run_command(context, "watch 'free -h >> /root/mem_usage.log' &")
 
     async def _start_ssh_server(self, context: WorkContext, ip: str, provider_desc: str):
         logger.info(f"Starting ssh service on {provider_desc}, {ip=}, {context.activity=}")
