@@ -294,17 +294,19 @@ class GolemNodeProvider(NodeProvider):
         config["provider"]["parameters"] = provider_parameters
 
         for node_type in config.get("available_node_types", {}).values():
-            node_config = deepcopy(config["provider"]["parameters"]["node_config"])
+            result = {}
 
             if node_type == "ray.head.default":
-                dpath.merge(node_config, deepcopy(HEAD_NODE_DEFAULTS))
+                result = deepcopy(HEAD_NODE_DEFAULTS)
+
+            dpath.merge(result["node_config"], deepcopy(config["provider"]["parameters"]["node_config"]))
 
             dpath.merge(
-                node_config,
+                result["node_config"],
                 node_type["node_config"],
             )
 
-            node_type["node_config"] = node_config
+            node_type.update(result)
 
         auth: Dict = config.setdefault("auth", {})
         auth.setdefault("ssh_user", "root")

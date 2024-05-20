@@ -268,7 +268,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
     async def _get_agreement(self) -> Agreement:
         if self._priority_manager_stack:
-            self._add_state_log("[1/9] Getting agreement from providers in priority subnet...")
+            self._add_state_log("[1/9] Getting an agreement from the providers in the priority subnet...")
 
             try:
                 return await asyncio.wait_for(
@@ -277,8 +277,8 @@ class ClusterNode(WarningMessagesMixin, NodeData):
                 )
             except asyncio.TimeoutError:
                 self._add_state_log(
-                    "Failed to get agreement from providers in priority subnet,"
-                    " retrying with providers in default subnet..."
+                    "Failed to get an agreement from the providers in the priority subnet,"
+                    " retrying with the providers in the default subnet..."
                 )
 
         self._add_state_log("[1/9] Getting agreement...")

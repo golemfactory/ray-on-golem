@@ -109,17 +109,9 @@ class Cluster(WarningMessagesMixin):
 
         self._state = NodeState.terminating
 
-        stop_coros = []
-        for node in self._nodes.values():
-            stop_coros.append(node.stop(call_events=False))
+        await asyncio.gather(*[node.stop(call_events=False) for node in self._nodes.values()])
 
-        await asyncio.gather(*stop_coros)
-
-        stop_coros = []
-        for stack in self._manager_stacks.values():
-            stop_coros.append(stack.stop())
-
-        await asyncio.gather(*stop_coros)
+        await asyncio.gather(*[stack.stop() for stack in self._manager_stacks.values()])
 
         await self._payment_manager.stop()
 
