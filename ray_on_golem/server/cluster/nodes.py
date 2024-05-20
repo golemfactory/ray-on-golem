@@ -333,7 +333,9 @@ class ClusterNode(WarningMessagesMixin, NodeData):
             "/root_copy/venv "
             "/root 2> /dev/null",
         )
-        await self._run_command(context, f"echo 'export PATH=$PATH:/root/.local/bin' >> /root/.bashrc")
+        await self._run_command(
+            context, f"echo 'export PATH=$PATH:/root/.local/bin' >> /root/.bashrc"
+        )
         await self._run_command(context, f"echo 'source /root/venv/bin/activate' >> /root/.bashrc")
 
         await self._run_command(context, "mkdir -p /root/.ssh")
