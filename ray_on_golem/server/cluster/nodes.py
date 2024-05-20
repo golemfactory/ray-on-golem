@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable, Collection, List, Optional, Sequence
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
-from golem.resources import Activity, BatchError
+from golem.resources import Activity, Agreement, BatchError
 from golem.utils.asyncio import create_task_with_logging, ensure_cancelled
 from golem.utils.asyncio.tasks import resolve_maybe_awaitable
 from golem.utils.logging import get_trace_id_name
@@ -54,6 +54,9 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
     _sidecars: Collection[ClusterNodeSidecar]
     _ssh_public_key_data: str
+
+    _priority_agreement_timeout: timedelta
+    _priority_manager_stack: Optional[ManagerStack] = None
     _activity: Optional[Activity] = None
     _start_task: Optional[asyncio.Task] = None
     _warning_messages: List[str] = None
@@ -64,6 +67,8 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         cluster: "Cluster",
         golem_service: GolemService,
         manager_stack: ManagerStack,
+        priority_agreement_timeout: timedelta,
+        priority_manager_stack: Optional[ManagerStack] = None,
         on_stop: Optional[Callable[["ClusterNode"], MaybeAwaitable[None]]] = None,
         **kwargs,
     ) -> None:
@@ -72,6 +77,8 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         self._cluster = cluster
         self._golem_service = golem_service
         self._manager_stack = manager_stack
+        self._priority_manager_stack = priority_manager_stack
+        self._priority_agreement_timeout = priority_agreement_timeout
         self._on_stop = on_stop
 
         self._sidecars = self._prepare_sidecars()
@@ -94,9 +101,14 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         return self._activity
 
     @property
-    def manager_stack(self) -> ManagerStack:
+    def manager_stacks(self) -> Sequence[ManagerStack]:
         """Read-only manager stack related to the node."""
-        return self._manager_stack
+        manager_stacks = [self._manager_stack]
+
+        if self._priority_manager_stack:
+            manager_stacks.append(self._priority_manager_stack)
+
+        return manager_stacks
 
     def get_warning_messages(self) -> Sequence[str]:
         """Get read-only collection of warnings both from the node and its sidecars."""
@@ -173,7 +185,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
         logger.info("Starting `%s` node done", self)
 
-    async def stop(self) -> None:
+    async def stop(self, call_events: bool = True) -> None:
         """Stop the node and cleanup its internal state."""
 
         if self.state in (NodeState.terminating, NodeState.terminated):
@@ -198,7 +210,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         self.internal_ip = None
         self.ssh_proxy_command = None
 
-        if self._on_stop:
+        if self._on_stop and call_events:
             await resolve_maybe_awaitable(self._on_stop(self))
 
         logger.info("Stopping `%s` node done", self)
@@ -209,9 +221,8 @@ class ClusterNode(WarningMessagesMixin, NodeData):
     async def _create_activity(self) -> Tuple[Activity, str, str]:
         logger.info("Creating new activity...")
 
-        self._add_state_log("[1/9] Getting agreement...")
-
-        agreement = await self._manager_stack.get_agreement()
+        self._add_state_log("[1/9] Getting an agreement...")
+        agreement = await self._get_agreement()
 
         proposal = agreement.proposal
         provider_desc = f"{await proposal.get_provider_name()} ({await proposal.get_provider_id()})"
@@ -255,6 +266,23 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         logger.info(f"Creating new activity done on {provider_desc}, {ip=}, {activity=}")
 
         return activity, ip, ssh_proxy_command
+
+    async def _get_agreement(self) -> Agreement:
+        if self._priority_manager_stack:
+            try:
+                return await asyncio.wait_for(
+                    self._priority_manager_stack.get_agreement(),
+                    timeout=self._priority_agreement_timeout.total_seconds(),
+                )
+            except asyncio.TimeoutError:
+                self._add_state_log(
+                    "No recommended providers were found. We are extending the search to all "
+                    "public providers, which might be less stable. Restart the cluster to try "
+                    "finding recommended providers again. If the problem persists please let us "
+                    "know at `#Ray on Golem` discord channel (https://chat.golem.network/)"
+                )
+
+        return await self._manager_stack.get_agreement()
 
     async def _deploy_activity(self, context: WorkContext, ip: str, provider_desc: str) -> None:
         activity = context.activity

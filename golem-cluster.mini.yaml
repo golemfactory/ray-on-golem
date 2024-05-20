@@ -1,6 +1,5 @@
 # This is Ray on Golem Mini yaml - the smallest config for testnet cluster of up to 10 nodes
 
-
 # Ray on Golem cluster name
 cluster_name: "golem-cluster"
 
@@ -67,6 +66,6 @@ worker_start_ray_commands: [
 
 # Satisfy checks to disable warning about legacy fields at `ray up`.
 # This will be removed by ray-on-golem on the fly.
-head_node: True
-worker_nodes: True
+head_node: true
+worker_nodes: true
 

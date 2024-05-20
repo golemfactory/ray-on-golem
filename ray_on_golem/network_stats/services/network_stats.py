@@ -228,9 +228,6 @@ class NetworkStatsService:
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
             extra_proposal_plugins, node_config
         )
-        ManagerStackNodeConfigHelper.apply_priority_head_node_scoring(
-            extra_proposal_scorers, node_config
-        )
 
         demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
             stack,

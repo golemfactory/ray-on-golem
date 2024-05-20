@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, TypeVar
+from typing import Dict, List, Optional, TypeVar
 
 from golem.managers import (
     AgreementManager,
@@ -16,6 +16,7 @@ from golem.managers import (
     ProposalScorer,
     ProposalScoringBuffer,
     RandomScore,
+    RefreshingDemandManager,
 )
 from golem.node import GolemNode
 from golem.payload import PaymentInfo
@@ -43,8 +44,10 @@ logger = logging.getLogger(__name__)
 
 class ManagerStack:
     def __init__(self) -> None:
-        self._managers = []
+        self._managers: List[Manager] = []
         self._agreement_manager: Optional[AgreementManager] = None
+
+        self._is_running = False
 
     def add_manager(self, manager: TManager) -> TManager:
         self._managers.append(manager)
@@ -55,25 +58,32 @@ class ManagerStack:
         return manager
 
     async def start(self) -> None:
-        logger.info("Starting stack managers...")
+        if self._is_running:
+            logger.info(f"Not starting `%s` manager stack, as it's already started", self)
+            return
+
+        logger.info("Starting `%s` manager stack...", self)
+
+        self._is_running = True
 
         for manager in self._managers:
-            if manager is not None:
-                await manager.start()
+            await manager.start()
 
-        logger.info("Starting stack managers done")
+        logger.info("Starting `%s` manager stack done", self)
 
     async def stop(self) -> None:
-        logger.info("Stopping stack managers...")
+        if not self._is_running:
+            logger.info(f"Not stopping `%s` manager stack, as it's already stopped", self)
+            return
+
+        logger.info("Stopping `%s` manager stack...", self)
+
+        self._is_running = False
 
         for manager in reversed(self._managers):
-            if manager is not None:
-                try:
-                    await manager.stop()
-                except Exception:
-                    logger.exception(f"{manager} stop failed!")
+            await manager.stop()
 
-        logger.info("Stopping stack managers done")
+        logger.info("Stopping `%s` manager stack done", self)
 
     async def get_agreement(self) -> Agreement:
         return await self._agreement_manager.get_agreement()
@@ -82,8 +92,8 @@ class ManagerStack:
     async def create(
         cls,
         node_config: NodeConfigData,
+        subnet_tag: str,
         payment_network: str,
-        is_head_node: bool,
         payment_manager: PaymentManager,
         demand_config_helper: DemandConfigHelper,
         golem: GolemNode,
@@ -100,9 +110,6 @@ class ManagerStack:
         )
         ManagerStackNodeConfigHelper.apply_budget_control_hard_limits(
             extra_proposal_plugins, node_config
-        )
-        ManagerStackNodeConfigHelper.apply_priority_head_node_scoring(
-            extra_proposal_scorers, node_config
         )
 
         proposal_negotiators = [PaymentPlatformNegotiator()]
@@ -139,14 +146,14 @@ class ManagerStack:
                 )
             )
 
-        demand_manager = ManagerStackNodeConfigHelper.prepare_demand_manager_for_node_type(
-            stack,
-            payloads,
-            demand_lifetime,
-            node_config,
-            is_head_node,
-            golem,
-            payment_manager,
+        demand_manager = stack.add_manager(
+            RefreshingDemandManager(
+                golem,
+                payment_manager.get_allocation,
+                payloads,
+                demand_lifetime=demand_lifetime,
+                subnet_tag=subnet_tag,
+            )
         )
 
         proposal_manager = stack.add_manager(

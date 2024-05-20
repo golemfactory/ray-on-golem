@@ -1,10 +1,8 @@
 import logging
 from datetime import timedelta
-from functools import partial
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List
 
 from golem.managers import (
-    AggregatingDemandManager,
     DemandManager,
     LinearCoeffsCost,
     LinearPerCpuAverageCostPricing,
@@ -17,7 +15,6 @@ from golem.managers import (
 )
 from golem.node import GolemNode
 from golem.payload import Payload
-from golem.resources import ProposalData
 
 from ray_on_golem.server.models import NodeConfigData
 
@@ -98,32 +95,6 @@ class ManagerStackNodeConfigHelper:
         else:
             logger.debug("Budget control based on max limits is not enabled")
 
-    @classmethod
-    def apply_priority_head_node_scoring(
-        cls,
-        extra_proposal_scorers: Dict[str, ProposalScorer],
-        node_config: NodeConfigData,
-    ):
-        if not node_config.priority_head_subnet_tag:
-            return
-
-        extra_proposal_scorers["Extra score for priority head node"] = MapScore(
-            partial(
-                cls._score_suggested_heads,
-                priority_head_subnet_tag=node_config.priority_head_subnet_tag,
-            )
-        )
-
-    @staticmethod
-    def _score_suggested_heads(
-        proposal_data: ProposalData, priority_head_subnet_tag: Optional[str]
-    ) -> Optional[float]:
-        add_scoring = priority_head_subnet_tag and (
-            proposal_data.properties.get("golem.node.debug.subnet") == priority_head_subnet_tag
-        )
-
-        return HEAD_NODE_EXTRA_SCORE if add_scoring else 0
-
     @staticmethod
     def prepare_demand_manager_for_node_type(
         stack: "ManagerStack",
@@ -143,26 +114,4 @@ class ManagerStackNodeConfigHelper:
                 subnet_tag=node_config.subnet_tag,
             )
         )
-
-        if is_head_node and node_config.priority_head_subnet_tag:
-            suggested_heads_demand_manager = stack.add_manager(
-                RefreshingDemandManager(
-                    golem_node,
-                    payment_manager.get_allocation,
-                    payloads,
-                    demand_lifetime=demand_lifetime,
-                    subnet_tag=node_config.priority_head_subnet_tag,
-                )
-            )
-
-            demand_manager = stack.add_manager(
-                AggregatingDemandManager(
-                    golem_node,
-                    [
-                        suggested_heads_demand_manager.get_initial_proposal,
-                        demand_manager.get_initial_proposal,
-                    ],
-                )
-            )
-
         return demand_manager
