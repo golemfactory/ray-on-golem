@@ -276,10 +276,10 @@ class ClusterNode(WarningMessagesMixin, NodeData):
                 )
             except asyncio.TimeoutError:
                 self._add_state_log(
-                    'No recommended providers were found. We are extending the search to all '
-                    'public providers, which might be less stable. Restart the cluster to try '
-                    'finding recommended providers again. If the problem persists please let us '
-                    'know at `#Ray on Golem` discord channel (https://chat.golem.network/)'
+                    "No recommended providers were found. We are extending the search to all "
+                    "public providers, which might be less stable. Restart the cluster to try "
+                    "finding recommended providers again. If the problem persists please let us "
+                    "know at `#Ray on Golem` discord channel (https://chat.golem.network/)"
                 )
 
         return await self._manager_stack.get_agreement()

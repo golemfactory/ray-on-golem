@@ -299,7 +299,10 @@ class GolemNodeProvider(NodeProvider):
             if node_type == "ray.head.default":
                 result = deepcopy(HEAD_NODE_DEFAULTS)
 
-            dpath.merge(result["node_config"], deepcopy(config["provider"]["parameters"]["node_config"]))
+            dpath.merge(
+                result.setdefault("node_config"),
+                deepcopy(config["provider"]["parameters"]["node_config"]),
+            )
 
             dpath.merge(
                 result["node_config"],
