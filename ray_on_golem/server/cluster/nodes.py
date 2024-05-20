@@ -221,6 +221,7 @@ class ClusterNode(WarningMessagesMixin, NodeData):
     async def _create_activity(self) -> Tuple[Activity, str, str]:
         logger.info("Creating new activity...")
 
+        self._add_state_log("[1/9] Getting an agreement...")
         agreement = await self._get_agreement()
 
         proposal = agreement.proposal
@@ -268,8 +269,6 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
     async def _get_agreement(self) -> Agreement:
         if self._priority_manager_stack:
-            self._add_state_log("[1/9] Getting an agreement from the providers in the priority subnet...")
-
             try:
                 return await asyncio.wait_for(
                     self._priority_manager_stack.get_agreement(),
@@ -277,11 +276,11 @@ class ClusterNode(WarningMessagesMixin, NodeData):
                 )
             except asyncio.TimeoutError:
                 self._add_state_log(
-                    "Failed to get an agreement from the providers in the priority subnet,"
-                    " retrying with the providers in the default subnet..."
+                    'No recommended providers were found. We are extending the search to all '
+                    'public providers, which might be less stable. Restart the cluster to try '
+                    'finding recommended providers again. If the problem persists please let us '
+                    'know at `#Ray on Golem` discord channel (https://chat.golem.network/)'
                 )
-
-        self._add_state_log("[1/9] Getting agreement...")
 
         return await self._manager_stack.get_agreement()
 
