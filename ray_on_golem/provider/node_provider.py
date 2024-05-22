@@ -329,7 +329,7 @@ class GolemNodeProvider(NodeProvider):
         cli_logger.newline()
 
         with cli_logger.indented():
-            cli_logger.print(ONBOARDING_MESSAGE.get(self._payment_network), no_format=True)
+            cli_logger.print(ONBOARDING_MESSAGE.get(payment_network), no_format=True)
             cli_logger.print("Your wallet:")
 
             with cli_logger.indented():
