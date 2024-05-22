@@ -113,38 +113,35 @@ class ManagerStack:
         )
 
         proposal_negotiators = [PaymentPlatformNegotiator()]
-        if node_config.budget_control.payment_interval_hours is not None:
-            logger.debug(
-                "Adding mid agreement payments based on given payment_interval: %s",
-                node_config.budget_control.payment_interval_hours,
-            )
 
-            minimal_payment_timeout = timedelta(
-                hours=node_config.budget_control.payment_interval_hours.minimal
-            )
-            optimal_payment_timeout = timedelta(
-                hours=node_config.budget_control.payment_interval_hours.optimal
-            )
+        logger.debug(
+            "Adding mid agreement payments based on given payment_interval: %s",
+            node_config.budget_control.payment_interval_hours,
+        )
+        minimal_payment_timeout = timedelta(
+            hours=node_config.budget_control.payment_interval_hours.minimal
+        )
+        optimal_payment_timeout = timedelta(
+            hours=node_config.budget_control.payment_interval_hours.optimal
+        )
 
-            payloads.append(
-                PaymentInfo(
-                    debit_notes_accept_timeout=int(
-                        DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT.total_seconds()
-                    ),
-                    debit_notes_interval=int(DEFAULT_DEBIT_NOTE_INTERVAL.total_seconds()),
-                    payment_timeout=int(minimal_payment_timeout.total_seconds()),
-                )
+        payloads.append(
+            PaymentInfo(
+                debit_notes_accept_timeout=int(DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT.total_seconds()),
+                debit_notes_interval=int(DEFAULT_DEBIT_NOTE_INTERVAL.total_seconds()),
+                payment_timeout=int(minimal_payment_timeout.total_seconds()),
             )
-            demand_lifetime = DEFAULT_LONG_RUNNING_DEMAND_LIFETIME
+        )
+        demand_lifetime = DEFAULT_LONG_RUNNING_DEMAND_LIFETIME
 
-            proposal_negotiators.append(
-                MidAgreementPaymentsNegotiator(
-                    min_debit_note_interval=DEFAULT_DEBIT_NOTE_INTERVAL,
-                    optimal_debit_note_interval=DEFAULT_DEBIT_NOTE_INTERVAL,
-                    min_payment_timeout=minimal_payment_timeout,
-                    optimal_payment_timeout=optimal_payment_timeout,
-                )
+        proposal_negotiators.append(
+            MidAgreementPaymentsNegotiator(
+                min_debit_note_interval=DEFAULT_DEBIT_NOTE_INTERVAL,
+                optimal_debit_note_interval=DEFAULT_DEBIT_NOTE_INTERVAL,
+                min_payment_timeout=minimal_payment_timeout,
+                optimal_payment_timeout=optimal_payment_timeout,
             )
+        )
 
         demand_manager = stack.add_manager(
             RefreshingDemandManager(

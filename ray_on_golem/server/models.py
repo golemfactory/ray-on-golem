@@ -36,7 +36,7 @@ class PerCpuExpectedUsageData(BaseModel):
 
 
 class PaymentIntervalHours(BaseModel):
-    minimal: float
+    minimal: float = 12
     optimal: float = None
 
     @validator("optimal", always=True, pre=True)
@@ -57,7 +57,7 @@ class BudgetControlData(BaseModel):
     max_cpu_per_hour_price: Optional[float] = None
     max_env_per_hour_price: Optional[float] = None
 
-    payment_interval_hours: Optional[PaymentIntervalHours] = None
+    payment_interval_hours: PaymentIntervalHours = Field(default_factory=PaymentIntervalHours)
 
     class Config:
         extra = "forbid"
