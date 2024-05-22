@@ -127,9 +127,7 @@ class ManagerStack:
 
         payloads.append(
             PaymentInfo(
-                debit_notes_accept_timeout=int(
-                    DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT.total_seconds()
-                ),
+                debit_notes_accept_timeout=int(DEFAULT_DEBIT_NOTES_ACCEPT_TIMEOUT.total_seconds()),
                 debit_notes_interval=int(DEFAULT_DEBIT_NOTE_INTERVAL.total_seconds()),
                 payment_timeout=int(minimal_payment_timeout.total_seconds()),
             )
