@@ -25,7 +25,7 @@ provider:
     #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
-    total_budget: 1
+    total_budget: 5
 
     # Common parameters for all node types. Can be overridden in available_node_types
     node_config:
