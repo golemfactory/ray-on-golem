@@ -13,7 +13,7 @@ ray = {version = "~2.9.3", extras = ["default"]}
 #golem-core = {path = "../golem-core-python", develop = true}
 # golem-core = {git = "https://github.com/golemfactory/golem-core-python.git", branch = "main"}
 # golem-core = {version = "^0.7.0", source = "test-pypi"}
-golem-core = "^0.7.1"
+golem-core = "^0.7.3"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"
