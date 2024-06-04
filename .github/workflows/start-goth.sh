@@ -23,7 +23,7 @@ python -m pip install --upgrade setuptools wheel
 
 echo INSTALLING DEPENDENCIES
 python -m pip install --extra-index-url https://test.pypi.org/simple/ goth==$GOTH_VERSION
-python -m pip install pytest pytest-asyncio pexpect
+python -m pip install pytest pytest-asyncio pexpect "requests<2.32.0" # Remove requests after fixed https://github.com/docker/docker-py/issues/3256
 
 echo CREATING ASSETS
 python -m goth create-assets .envs/goth/assets
