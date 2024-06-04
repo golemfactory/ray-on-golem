@@ -5,6 +5,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import DefaultDict, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
+from golem.utils.asyncio import create_task_with_logging, ensure_cancelled
+from golem.utils.logging import get_trace_id_name
+
 from ray_on_golem.server.cluster import Cluster, ClusterNode
 from ray_on_golem.server.exceptions import ClusterNotFound, NodeNotFound
 from ray_on_golem.server.mixins import WarningMessagesMixin
@@ -17,6 +20,7 @@ from ray_on_golem.server.models import (
     Tags,
 )
 from ray_on_golem.server.services.golem import GolemService
+from ray_on_golem.server.settings import RAY_ON_GOLEM_EMPTY_CLUSTER_REMOVE_TIMEOUT
 from ray_on_golem.utils import are_dicts_equal, get_default_ssh_key_name, run_subprocess_output
 
 logger = logging.getLogger(__name__)
@@ -32,6 +36,7 @@ class RayService(WarningMessagesMixin):
 
         self._clusters: Dict[str, Cluster] = {}
         self._clusters_locks: DefaultDict[str, asyncio.Semaphore] = defaultdict(asyncio.Semaphore)
+        self._clusters_remove_tasks: Dict[str, asyncio.Task] = {}
 
     @property
     def datadir(self) -> Path:
@@ -55,6 +60,7 @@ class RayService(WarningMessagesMixin):
 
         self._clusters.clear()
         self._clusters_locks.clear()
+        self._clusters_remove_tasks.clear()
 
         logger.info("Stopping RayService...")
 
@@ -163,7 +169,15 @@ class RayService(WarningMessagesMixin):
         self, cluster_name: str, provider_parameters: ProviderParametersData
     ) -> Cluster:
         async with self._clusters_locks[cluster_name]:
-            cluster = self._clusters.get(cluster_name)
+            cluster_remove_task = self._clusters_remove_tasks.pop(cluster_name, None)
+            if cluster_remove_task and not cluster_remove_task.done():
+                await ensure_cancelled(cluster_remove_task)
+
+                logger.debug("Cluster `%s` was about to be removed, but will be recreated for new nodes", cluster_name)
+
+                cluster = None
+            else:
+                cluster = self._clusters.get(cluster_name)
 
             if not cluster:
                 logger.info("Creating cluster `%s`...", cluster_name)
@@ -173,6 +187,7 @@ class RayService(WarningMessagesMixin):
                     self._webserver_port,
                     cluster_name,
                     provider_parameters,
+                    on_stop=self._on_cluster_stop,
                 )
 
                 logger.info("Creating cluster `%s` done", cluster_name)
@@ -209,3 +224,27 @@ class RayService(WarningMessagesMixin):
                 yield cluster.nodes[node_id]
             except KeyError:
                 raise NodeNotFound
+
+    async def _remove_cluster(self, cluster: Cluster) -> None:
+        await asyncio.sleep(RAY_ON_GOLEM_EMPTY_CLUSTER_REMOVE_TIMEOUT.total_seconds())
+
+        cluster_name = str(cluster)
+        async with self._clusters_locks[cluster_name]:
+            assert not cluster.is_running()
+
+            del self._clusters[cluster_name]
+
+        # cleanup the lock after removing the cluster
+        if not self._clusters_locks[cluster_name].locked():
+            del self._clusters_locks[cluster_name]
+
+    async def _on_cluster_stop(self, cluster: Cluster) -> None:
+        cluster_name = str(cluster)
+
+        logger.info(f"Cluster `%s` stopped, it will be removed after 30 seconds", cluster_name)
+
+        async with self._clusters_locks[cluster_name]:
+            self._clusters_remove_tasks[cluster_name] = create_task_with_logging(
+                self._remove_cluster(cluster),
+                trace_id=get_trace_id_name(self, f"cluster-{cluster}-delayed-remove"),
+            )
