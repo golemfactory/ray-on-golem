@@ -173,7 +173,10 @@ class RayService(WarningMessagesMixin):
             if cluster_remove_task and not cluster_remove_task.done():
                 await ensure_cancelled(cluster_remove_task)
 
-                logger.debug("Cluster `%s` was about to be removed, but will be recreated for new nodes", cluster_name)
+                logger.debug(
+                    "Cluster `%s` was about to be removed, but will be recreated for new nodes",
+                    cluster_name,
+                )
 
                 cluster = None
             else:

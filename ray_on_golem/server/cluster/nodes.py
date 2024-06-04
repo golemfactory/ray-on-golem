@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Collection, List, Optional, Sequence, Tuple
+from typing import Callable, Collection, List, Optional, Sequence, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
