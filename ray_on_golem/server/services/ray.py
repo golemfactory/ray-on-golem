@@ -229,9 +229,13 @@ class RayService(WarningMessagesMixin):
                 raise NodeNotFound
 
     async def _remove_cluster(self, cluster: Cluster) -> None:
-        await asyncio.sleep(RAY_ON_GOLEM_EMPTY_CLUSTER_REMOVE_TIMEOUT.total_seconds())
-
+        timeout = RAY_ON_GOLEM_EMPTY_CLUSTER_REMOVE_TIMEOUT.total_seconds()
         cluster_name = str(cluster)
+
+        logger.info(f"Cluster `%s` stopped, it will be removed after %s", cluster_name, timeout)
+
+        await asyncio.sleep(timeout)
+
         async with self._clusters_locks[cluster_name]:
             assert not cluster.is_running()
 
@@ -243,8 +247,6 @@ class RayService(WarningMessagesMixin):
 
     async def _on_cluster_stop(self, cluster: Cluster) -> None:
         cluster_name = str(cluster)
-
-        logger.info(f"Cluster `%s` stopped, it will be removed after 30 seconds", cluster_name)
 
         async with self._clusters_locks[cluster_name]:
             self._clusters_remove_tasks[cluster_name] = create_task_with_logging(

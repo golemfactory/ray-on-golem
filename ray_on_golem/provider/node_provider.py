@@ -47,7 +47,7 @@ PROVIDER_DEFAULTS = {
     "node_config": {
         "subnet_tag": "public",
     },
-    "total_budget": 1.0,
+    "total_budget": 5.0,
 }
 
 HEAD_NODE_DEFAULTS = {

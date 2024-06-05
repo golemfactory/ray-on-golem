@@ -103,7 +103,6 @@ class ManagerStack:
         extra_proposal_scorers: Dict[str, ProposalScorer] = {}
 
         payloads = await demand_config_helper.get_payloads_from_demand_config(node_config.demand)
-        demand_lifetime = DEFAULT_DEMAND_LIFETIME
 
         ManagerStackNodeConfigHelper.apply_budget_control_expected_usage(
             extra_proposal_plugins, extra_proposal_scorers, node_config
