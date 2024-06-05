@@ -31,6 +31,9 @@ RAY_ON_GOLEM_SHUTDOWN_TIMEOUT = timedelta(seconds=60)
 # how long we wait for the webserver process to exit
 RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
 
+# how long we wait to remove the cluster from memory after its became empty
+RAY_ON_GOLEM_EMPTY_CLUSTER_REMOVE_TIMEOUT = timedelta(seconds=30)
+
 # How long ClusterNode should try to get agreement from "priority_subnet_tag"
 # before failing back to "subnet_tag"
 RAY_ON_GOLEM_PRIORITY_AGREEMENT_TIMEOUT = timedelta(seconds=30)

@@ -68,4 +68,3 @@ worker_start_ray_commands: [
 # This will be removed by ray-on-golem on the fly.
 head_node: true
 worker_nodes: true
-

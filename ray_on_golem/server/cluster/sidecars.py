@@ -52,9 +52,7 @@ class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
     def __init__(
         self,
         *,
-        on_monitor_failed_func: Callable[
-            ["MonitorClusterNodeSidecar", "ClusterNode"], MaybeAwaitable[None]
-        ],
+        on_monitor_failed_func: Callable[["MonitorClusterNodeSidecar"], MaybeAwaitable[None]],
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -104,6 +102,14 @@ class MonitorClusterNodeSidecar(ClusterNodeSidecar, ABC):
 
         return self._monitor_task and not self._monitor_task.done()
 
+    def _handle_monitor_check_failure(self) -> None:
+        logger.debug(f"`%s` node {self} check failed, monitor will stop", self._node)
+
+        create_task_with_logging(
+            resolve_maybe_awaitable(self._on_monitor_check_failed_func(self)),
+            trace_id=get_trace_id_name(self, "on-monitor-check-failed"),
+        )
+
     def _get_monitor_task_name(self) -> str:
         return "{}-{}".format(self._node, str(self).replace(" ", "-"))
 
@@ -130,7 +136,7 @@ class ActivityStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
                 or "Unresponsive" in activity_state.state
                 or activity_state.error_message is not None
             ):
-                await resolve_maybe_awaitable(self._on_monitor_check_failed_func(self, self._node))
+                self._handle_monitor_check_failure()
 
                 return
 
@@ -167,9 +173,7 @@ class SshStateMonitorClusterNodeSidecar(MonitorClusterNodeSidecar):
             except RayOnGolemError:
                 fails_count += 1
                 if self._max_fail_count <= fails_count:
-                    await resolve_maybe_awaitable(
-                        self._on_monitor_check_failed_func(self, self._node)
-                    )
+                    self._handle_monitor_check_failure()
 
                     return
 

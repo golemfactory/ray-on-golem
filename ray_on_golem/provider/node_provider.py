@@ -47,7 +47,7 @@ PROVIDER_DEFAULTS = {
     "node_config": {
         "subnet_tag": "public",
     },
-    "total_budget": 1.0,
+    "total_budget": 5.0,
 }
 
 HEAD_NODE_DEFAULTS = {
@@ -293,10 +293,10 @@ class GolemNodeProvider(NodeProvider):
 
         config["provider"]["parameters"] = provider_parameters
 
-        for node_type in config.get("available_node_types", {}).values():
+        for node_type_name, node_type in config.get("available_node_types", {}).items():
             result: Dict = {}
 
-            if node_type == "ray.head.default":
+            if node_type_name == config.get("head_node_type", "ray.head.default"):
                 result = deepcopy(HEAD_NODE_DEFAULTS)
 
             dpath.merge(
