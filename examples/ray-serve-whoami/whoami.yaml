@@ -5,7 +5,7 @@ cluster_name: ray-serve-whoami
 max_workers: 10
 
 # The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
-idle_timeout_minutes: 2
+idle_timeout_minutes: 5
 
 # The cloud provider-specific configuration properties.
 provider:
@@ -13,26 +13,24 @@ provider:
   use_internal_ips: true
   module: "ray_on_golem.provider.node_provider.GolemNodeProvider"
   parameters:
-    # Port of golem webserver that has connection with golem network
-    webserver_port: 4578
-
+    
     # Blockchain used for payments.
-    # Goerli means running free nodes on testnet,
-    # Polygon is for mainnet operations.
-    #payment_network: "goerli"
-    payment_network: "holesky"
-    #payment_network: "polygon"
+    # `holesky` means running free nodes on testnet,
+    # `polygon` is for mainnet operations.
+    #payment_network: "holesky"
+    payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
     total_budget: 5
 
-    # Common parameters for all node types. Can be overriden in available_node_types
+    # Common parameters for all node types. Can be overridden in available_node_types
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        #image_tag: "blueshade/ray-on-golem:0.9.0a0-py3.10.13-ray2.9.2"
-        image_tag: "blueshade/ray-on-golem:0.9.0a3-py3.10.13-ray2.9.2"
+        #image_tag: "approxit/ray-on-golem:0.10.0-py3.10.13-ray2.9.3"
+        #image_tag: "golem/ray-on-golem:0.10.0-py3.10.13-ray2.9.3"
+        image_tag: "blueshade/ray-on-golem:0.11.0a2-py3.10.13-ray2.9.3"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
@@ -40,12 +38,12 @@ provider:
         outbound_urls: ["https://pypi.dev.golem.network"]
 
         # Minimal values of parameters offered by Golem provider 
-        min_mem_gib: 1
-        min_cpu_threads: 1
-        min_storage_gib: 1
+        #min_mem_gib: 1
+        #min_cpu_threads: 1
+        #min_storage_gib: 1
 
         # Maximal values of parameters offered by Golem provider
-        max_cpu_threads: null
+        #max_cpu_threads: null
 
       budget_control:
         per_cpu_expected_usage:
@@ -71,22 +69,17 @@ provider:
         # Amount of GLMs for each hour that worker runs which Golem provider offer will be rejected if exceeded.
         max_env_per_hour_price: 0.5
 
-        # If not provided payment will be sent only after cluster is stopped. Note: cluster will then run for maximum of 8 hours
-        # Required for long running clusters
-        payment_interval_hours:
-          minimal: 1
-          optimal: 12 # optional defaults to `minimal`
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
   ray.head.default:
     # The minimum number of worker nodes of this type to launch
-    min_workers: 0
+    #min_workers: 0
 
     # The maximum number of worker nodes of this type to launch
-    max_workers: 0
+    #max_workers: 0
 
-    # The node type's CPU and GPU resources
+    # The node type's CPU and GPU resources - leave it empty for autodetection
     resources: {}
 
     # Additional parameters specific for this node type added on top of node_config from provider.parameters.node_config
@@ -96,18 +89,10 @@ available_node_types:
     #    min_mem_gib: 10
 
   ray.worker.default:
-    min_workers: 1
+    min_workers: 2
     max_workers: 10
     resources: {}
     node_config: {}
-
-# Specify the node type of the head node (as configured above).
-head_node_type: ray.head.default
-
-# Satisfy checks to disable warning about legacy fields at `ray up`.
-# This will be removed by ray-on-golem on the fly.
-head_node: True
-worker_nodes: True
 
 # The files or directories to copy to the head and worker nodes
 # Remote workdir is /root/
@@ -116,23 +101,23 @@ file_mounts: {
   # "/absolute/path/dir/": ".",
   # "./relative/path/dir/": ".",
   # "./relative/path/file.txt": "./file.txt"
-  "/root/": "./ray-serve-whoami.py",
+  "/root/ray-serve-whoami.py": "./ray-serve-whoami.py",
+  "/root/ray-serve-whoami-client.py": "./ray-serve-whoami-client.py",
 }
 
+# A list of paths to the files or directories to copy from the head node to the worker nodes
+cluster_synced_files: []
+
 # List of commands that will be run to initialize the nodes (before `setup_commands`)
-initialization_commands: []
-#initialization_commands: [
-#   "pip install ray[serve]",
-#]
+initialization_commands: [
+  "pip install ray[serve]==2.9.3",
+]
 
 # List of shell commands to run to set up nodes
 setup_commands: []
 
 # Custom commands that will be run on the head node after common setup.
-#head_setup_commands: []
-head_setup_commands: [
-#   "pip install ray[serve]",
-]
+head_setup_commands: []
 
 # Custom commands that will be run on worker nodes after common setup.
 worker_setup_commands: []
@@ -147,13 +132,8 @@ worker_start_ray_commands: [
   "ray start --address $RAY_HEAD_IP:6379",
 ]
 
-# Authentication credentials that Ray will use to launch nodes
-# auth:
-  # Custom username for ssh
-  # ssh_user: "root"
+# Satisfy checks to disable warning about legacy fields at `ray up`.
+# This will be removed by ray-on-golem on the fly.
+head_node: True
+worker_nodes: True
 
-  # If ssh_private_key will be not provided, temporary key will be created and used
-  # ssh_private_key: "~/.ssh/id_rsa"
-
-# A list of paths to the files or directories to copy from the head node to the worker nodes
-cluster_synced_files: []
