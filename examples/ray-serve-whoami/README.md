@@ -17,3 +17,8 @@
 - Now the requestor should have an endpoint on `127.0.0.1:8000`
 - `python3 ray-serve-whoami-client.py`
 - `seq 100 | xargs -n1 -P20 python3 ray-serve-whoami-client.py`
+- Add sort & uniq to see count of tasks done on each actor:
+- `seq 100 | xargs -n1 -P50 python3 ray-serve-whoami-client.py | sort -n | uniq -c`
+
+- Check out actors with:
+- `ray exec whoami.yaml 'ray list actors --filter "state=ALIVE"'`
