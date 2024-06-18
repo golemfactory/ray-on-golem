@@ -22,3 +22,7 @@
 
 - Check out actors with:
 - `ray exec whoami.yaml 'ray list actors --filter "state=ALIVE"'`
+
+## Screen casts
+- Play the screencasts with (`-i1` compresses all pauses to 1 sec)
+  - `asciinema play -i1 ray-serve-20240617-1.cast`
