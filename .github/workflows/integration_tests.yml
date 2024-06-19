@@ -64,25 +64,38 @@ jobs:
 
       - name: Prepare `golem-cluster.tests.yaml`
         run: |
-          poetry run python -m utils.apply_overrides -b ${{ matrix.base_yaml_path || './golem-cluster.yaml' }} golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override-goth.yaml -o golem-cluster.tests.yaml
-          cat golem-cluster.tests.yaml 
+          poetry run python -m utils.apply_overrides -b ${{ matrix.base_yaml_path || './golem-cluster.yaml' }} golem-cluster.override.1-source-files.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override-goth.yaml -o golem-cluster.tests.yaml
+          cat golem-cluster.tests.yaml
+          free -h
+          ps -Heo size,command --sort -size
 
       - name: Call `ray up`
         env:
           PYTHONUNBUFFERED: 1
           RUST_LOG: "INFO,ya_erc20_driver::erc20::wallet=debug"
+        timeout-minutes: 5
         run: poetry run ray up golem-cluster.tests.yaml -y --no-config-cache
 
       - name: Run `examples/${{ matrix.example_name }}.py`
-        run: poetry run ray submit golem-cluster.tests.yaml examples/${{ matrix.example_name }}.py -- ${{ matrix.args }}
+        timeout-minutes: 5
+        run: |
+          poetry run ray exec golem-cluster.tests.yaml 'free -h'
+          poetry run ray exec golem-cluster.tests.yaml 'ps -Heo size,command --sort -size'
+          echo "= = = = BEFORE = = = ="
+          poetry run ray submit golem-cluster.tests.yaml examples/${{ matrix.example_name }}.py -- ${{ matrix.args }}
+          echo "= = = = AFTER = = = ="
+          poetry run ray exec golem-cluster.tests.yaml 'free -h'
+          poetry run ray exec golem-cluster.tests.yaml 'ps -Heo size,command --sort -size'
 
-      - name: Print last cluster logs
+      - name: Collect cluster logs
         if: always()
         continue-on-error: true
-        timeout-minutes: 1
+        timeout-minutes: 2
         run: |
-          poetry run ray exec golem-cluster.tests.yaml 'ls /tmp/ray/session_latest/logs/'
-          poetry run ray exec golem-cluster.tests.yaml 'tail -n 100 /tmp/ray/session_latest/logs/*'
+          poetry run ray exec golem-cluster.tests.yaml 'free -h'
+          poetry run ray exec golem-cluster.tests.yaml 'ps -Heo size,command --sort -size'
+          poetry run ray exec golem-cluster.tests.yaml 'ray cluster-dump --local --debug-state --processes-verbose -o ray_cluster_dump.tar.gz'
+          poetry run ray rsync-down golem-cluster.tests.yaml ray_cluster_dump.tar.gz ray_cluster_dump.tar.gz
 
       - name: Call `ray down`
         run: poetry run ray down golem-cluster.tests.yaml -y
@@ -90,10 +103,15 @@ jobs:
       - name: Call `ray-on-golem stop`
         run: poetry run ray-on-golem stop
 
+      - name: Check node creation in logs
+        run: poetry run python tests/webserver_logs_test.py ~/.local/share/ray_on_golem/webserver.log 2
+
       - name: Stop Goth
+        if: always()
         run: ./.github/workflows/stop-goth.sh
 
       - name: Prepare artifact name
+        if: always()
         run: |
           echo ARTIFACT_NAME=logs-example-${{ inputs.BRANCH }}-${{ matrix.example_name }} | sed "s|/|_|g" >> $GITHUB_ENV
 
@@ -106,3 +124,4 @@ jobs:
             /root/.local/share/ray_on_golem/webserver_debug.log
             /root/.local/share/ray_on_golem/yagna.log
             /tmp/goth-tests
+            ray_cluster_dump.tar.gz

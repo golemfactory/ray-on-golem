@@ -6,7 +6,7 @@ import yaml
 
 from ray_on_golem.ctl.ctl import RayOnGolemCtl
 from ray_on_golem.provider.node_provider import GolemNodeProvider
-from ray_on_golem.server.models import ProviderConfigData
+from ray_on_golem.server.models import ProviderParametersData
 
 ROOT_PATH = Path(__file__).parents[3]
 
@@ -43,6 +43,5 @@ def test_node_provider_defaults(disable_webserver, patch_path, cluster_config):
     resolved_config = GolemNodeProvider.bootstrap_config(cluster_config)
 
     provider_params = resolved_config["provider"]["parameters"]
-    provider_params = GolemNodeProvider._map_ssh_config(provider_params)
 
-    ProviderConfigData(**provider_params)
+    ProviderParametersData(**provider_params)

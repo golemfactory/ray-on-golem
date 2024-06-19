@@ -2,4 +2,8 @@ provider:
   parameters:
     node_config:
       subnet_tag: "public"
-      priority_head_subnet_tag: "sdk"
+
+available_node_types:
+  ray.head.default:
+    node_config:
+      priority_subnet_tag: "sdk"

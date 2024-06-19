@@ -1,11 +1,13 @@
 # This is Ray on Golem Mini yaml - the smallest config for testnet cluster of up to 10 nodes
 
-
 # Ray on Golem cluster name
-cluster_name: golem-cluster
+cluster_name: "golem-cluster"
 
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10
+
+# The number of minutes that need to pass before an idle worker node is removed by the Autoscaler
+idle_timeout_minutes: 5
 
 # The cloud provider-specific configuration properties.
 provider:
@@ -16,7 +18,7 @@ provider:
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
-        image_tag: "golem/ray-on-golem:0.10.0-py3.10.13-ray2.9.3"
+        image_tag: "golem/ray-on-golem:0.11.1-py3.10.13-ray2.9.3"
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -64,6 +66,5 @@ worker_start_ray_commands: [
 
 # Satisfy checks to disable warning about legacy fields at `ray up`.
 # This will be removed by ray-on-golem on the fly.
-head_node: True
-worker_nodes: True
-
+head_node: true
+worker_nodes: true

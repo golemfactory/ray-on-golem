@@ -104,9 +104,8 @@ def create_application(
     )
 
     app["ray_service"] = RayService(
-        ray_on_golem_port=port,
+        webserver_port=port,
         golem_service=app["golem_service"],
-        yagna_service=app["yagna_service"],
         datadir=datadir,
     )
 
@@ -153,7 +152,7 @@ async def golem_service_ctx(app: web.Application) -> None:
 
     yield
 
-    await golem_service.shutdown()
+    await golem_service.stop()
 
 
 async def ray_service_ctx(app: web.Application) -> None:
@@ -161,7 +160,7 @@ async def ray_service_ctx(app: web.Application) -> None:
 
     yield
 
-    await ray_service.shutdown()
+    await ray_service.stop()
 
 
 async def reputation_service_ctx(app: web.Application) -> None:
@@ -322,12 +321,14 @@ def status(port, datadir):
 
     print(colorful.cyan(f"Ray On Golem webserver {server_status.version}"))
     print(
-        "   Listening on:   {url}\n"
-        "   Status:         {status}\n"
-        "   Data directory: {datadir}\n".format(
+        "   Listening on:    {url}\n"
+        "   Status:          {status}\n"
+        "   Data directory:  {datadir}\n"
+        "   Server warnings:\n\t{warnings}\n".format(
             url=client.base_url,
             status="Shutting down" if server_status.shutting_down else "Running",
             datadir=server_status.datadir,
+            warnings=colorful.orange("\n\t".join(server_status.server_warnings)),
         )
     )
 

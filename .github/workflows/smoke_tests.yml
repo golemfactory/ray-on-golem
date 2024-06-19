@@ -25,8 +25,10 @@ jobs:
         run: poetry install --no-ansi
 
       - name: Prepare `golem-cluster.tests.yaml`
+        run: |
+          poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.1-source-files.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override.4-subnet.yaml
+          cat golem-cluster.tests.yaml
 
-        run: poetry run python -m utils.apply_overrides -o golem-cluster.tests.yaml golem-cluster.override.2-image.yaml golem-cluster.override.3-disable-stats.yaml golem-cluster.override.4-subnet.yaml
       - name: Call `ray up`
         env:
           PYTHONUNBUFFERED: 1
@@ -36,6 +38,9 @@ jobs:
       - name: Run `examples/calculate.pi`
         run: poetry run ray submit golem-cluster.tests.yaml examples/calculate_pi.py
 
+      - name: Check `pip install and Pillow`
+        run: poetry run ray exec golem-cluster.tests.yaml "pip install endplay"
+
       - name: Call `ray down`
         run: poetry run ray down golem-cluster.tests.yaml -y
 
@@ -43,8 +48,7 @@ jobs:
         run: poetry run ray-on-golem stop
 
       - name: Check node creation in logs
-        continue-on-error: true
-        run: poetry run python tests/smoke.py ~/.local/share/ray_on_golem/webserver_debug.log
+        run: poetry run python tests/webserver_logs_test.py ~/.local/share/ray_on_golem/webserver.log 2
 
       - name: Collects logs
         if: always()

@@ -31,13 +31,24 @@ RAY_ON_GOLEM_SHUTDOWN_TIMEOUT = timedelta(seconds=60)
 # how long we wait for the webserver process to exit
 RAY_ON_GOLEM_STOP_TIMEOUT = timedelta(minutes=3)
 
+# how long we wait to remove the cluster from memory after its became empty
+RAY_ON_GOLEM_EMPTY_CLUSTER_REMOVE_TIMEOUT = timedelta(seconds=30)
+
+# How long ClusterNode should try to get agreement from "priority_subnet_tag"
+# before failing back to "subnet_tag"
+RAY_ON_GOLEM_PRIORITY_AGREEMENT_TIMEOUT = timedelta(seconds=30)
+
 RAY_ON_GOLEM_PID_FILENAME = "ray_on_golem.pid"
 
 SSH_SERVER_ALIVE_INTERVAL = 300
 SSH_SERVER_ALIVE_COUNT_MAX = 3
 
+CLUSTER_MONITOR_CHECK_INTERVAL = timedelta(minutes=1)
+CLUSTER_MONITOR_RETRY_INTERVAL = timedelta(seconds=5)
+CLUSTER_MONITOR_RETRY_COUNT = 3
+
 URL_STATUS = "/"
-URL_BOOTSTRAP_CLUSTER = "/bootstrap_cluster"
+URL_GET_WALLET_STATUS = "/get_wallet_status"
 URL_NON_TERMINATED_NODES = "/non_terminated_nodes"
 URL_IS_RUNNING = "/is_running"
 URL_IS_TERMINATED = "/is_terminated"

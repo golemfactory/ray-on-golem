@@ -9,7 +9,7 @@ from yarl import URL
 
 from ray_on_golem.client.exceptions import RayOnGolemClientError, RayOnGolemClientValidationError
 from ray_on_golem.server import models, settings
-from ray_on_golem.server.models import BootstrapClusterResponseData
+from ray_on_golem.server.models import GetWalletStatusResponseData
 
 TResponseModel = TypeVar("TResponseModel")
 
@@ -19,30 +19,39 @@ logger = logging.getLogger(__name__)
 class RayOnGolemClient:
     def __init__(self, port: int) -> None:
         self.port = port
+
         self.base_url = URL("http://127.0.0.1").with_port(self.port)
+
         self._session = requests.Session()
 
-    def bootstrap_cluster(
+    def get_wallet_status(
         self,
-        provider_config: Dict[str, Any],
-        cluster_name: str,
-    ) -> BootstrapClusterResponseData:
+        payment_network: str,
+        payment_driver: str,
+    ) -> GetWalletStatusResponseData:
         return self._make_request(
-            url=settings.URL_BOOTSTRAP_CLUSTER,
-            request_data=models.BootstrapClusterRequestData(
-                provider_config=provider_config,
-                cluster_name=cluster_name,
+            url=settings.URL_GET_WALLET_STATUS,
+            request_data=models.GetWalletStatusRequestData(
+                payment_network=payment_network,
+                payment_driver=payment_driver,
             ),
-            response_model=models.BootstrapClusterResponseData,
-            error_message="Couldn't bootstrap cluster",
+            response_model=models.GetWalletStatusResponseData,
+            error_message="Couldn't get wallet status",
         )
 
     def request_nodes(
-        self, node_config: Dict[str, Any], count: int, tags: models.Tags
+        self,
+        cluster_name: str,
+        provider_parameters: Dict[str, Any],
+        node_config: Dict[str, Any],
+        count: int,
+        tags: models.Tags,
     ) -> List[models.NodeId]:
         response = self._make_request(
             url=settings.URL_REQUEST_NODES,
             request_data=models.RequestNodesRequestData(
+                cluster_name=cluster_name,
+                provider_parameters=provider_parameters,
                 node_config=node_config,
                 count=count,
                 tags=tags,
@@ -53,12 +62,15 @@ class RayOnGolemClient:
 
         return response.requested_nodes
 
-    def terminate_node(self, node_id: models.NodeId) -> Dict[models.NodeId, Dict]:
+    def terminate_node(
+        self, cluster_name: str, node_id: models.NodeId
+    ) -> Dict[models.NodeId, Dict]:
         logger.info(f"Terminating node %s", node_id)
         try:
             response = self._make_request(
                 url=settings.URL_TERMINATE_NODE,
                 request_data=models.SingleNodeRequestData(
+                    cluster_name=cluster_name,
                     node_id=node_id,
                 ),
                 response_model=models.TerminateNodeResponseData,
@@ -73,20 +85,25 @@ class RayOnGolemClient:
 
         return response.terminated_nodes
 
-    def get_cluster_state(self) -> Dict[models.NodeId, models.NodeData]:
+    def get_cluster_state(self, cluster_name: str) -> Dict[models.NodeId, models.NodeData]:
         response = self._make_request(
             url=settings.URL_GET_CLUSTER_DATA,
-            request_data=models.GetClusterDataRequestData(),
+            request_data=models.GetClusterDataRequestData(
+                cluster_name=cluster_name,
+            ),
             response_model=models.GetClusterDataResponseData,
             error_message="Couldn't get cluster data",
         )
 
         return response.cluster_data
 
-    def non_terminated_nodes(self, tag_filters: models.Tags) -> List[models.NodeId]:
+    def non_terminated_nodes(
+        self, cluster_name: str, tag_filters: models.Tags
+    ) -> List[models.NodeId]:
         response = self._make_request(
             url=settings.URL_NON_TERMINATED_NODES,
             request_data=models.NonTerminatedNodesRequestData(
+                cluster_name=cluster_name,
                 tags=tag_filters,
             ),
             response_model=models.NonTerminatedNodesResponseData,
@@ -94,10 +111,11 @@ class RayOnGolemClient:
         )
         return response.nodes_ids
 
-    def is_running(self, node_id: models.NodeId) -> bool:
+    def is_running(self, cluster_name: str, node_id: models.NodeId) -> bool:
         response = self._make_request(
             url=settings.URL_IS_RUNNING,
             request_data=models.SingleNodeRequestData(
+                cluster_name=cluster_name,
                 node_id=node_id,
             ),
             response_model=models.IsRunningResponseData,
@@ -106,10 +124,11 @@ class RayOnGolemClient:
 
         return response.is_running
 
-    def is_terminated(self, node_id: models.NodeId) -> bool:
+    def is_terminated(self, cluster_name: str, node_id: models.NodeId) -> bool:
         response = self._make_request(
             url=settings.URL_IS_TERMINATED,
             request_data=models.SingleNodeRequestData(
+                cluster_name=cluster_name,
                 node_id=node_id,
             ),
             response_model=models.IsTerminatedResponseData,
@@ -118,10 +137,11 @@ class RayOnGolemClient:
 
         return response.is_terminated
 
-    def get_node_tags(self, node_id: models.NodeId) -> models.Tags:
+    def get_node_tags(self, cluster_name: str, node_id: models.NodeId) -> models.Tags:
         response = self._make_request(
             url=settings.URL_NODE_TAGS,
             request_data=models.SingleNodeRequestData(
+                cluster_name=cluster_name,
                 node_id=node_id,
             ),
             response_model=models.GetNodeTagsResponseData,
@@ -130,10 +150,11 @@ class RayOnGolemClient:
 
         return response.tags
 
-    def get_node_internal_ip(self, node_id: models.NodeId) -> str:
+    def get_node_internal_ip(self, cluster_name: str, node_id: models.NodeId) -> str:
         response = self._make_request(
             url=settings.URL_INTERNAL_IP,
             request_data=models.SingleNodeRequestData(
+                cluster_name=cluster_name,
                 node_id=node_id,
             ),
             response_model=models.GetNodeIpAddressResponseData,
@@ -142,10 +163,11 @@ class RayOnGolemClient:
 
         return response.ip_address
 
-    def set_node_tags(self, node_id: models.NodeId, tags: models.Tags) -> None:
+    def set_node_tags(self, cluster_name: str, node_id: models.NodeId, tags: models.Tags) -> None:
         self._make_request(
             url=settings.URL_SET_NODE_TAGS,
             request_data=models.SetNodeTagsRequestData(
+                cluster_name=cluster_name,
                 node_id=node_id,
                 tags=tags,
             ),
@@ -153,10 +175,11 @@ class RayOnGolemClient:
             error_message="Couldn't set tags for node",
         )
 
-    def get_ssh_proxy_command(self, node_id: str) -> str:
+    def get_ssh_proxy_command(self, cluster_name: str, node_id: str) -> str:
         response = self._make_request(
             url=settings.URL_GET_SSH_PROXY_COMMAND,
             request_data=models.SingleNodeRequestData(
+                cluster_name=cluster_name,
                 node_id=node_id,
             ),
             response_model=models.GetSshProxyCommandResponseData,

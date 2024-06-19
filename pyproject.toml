@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ray-on-golem"
-version = "0.10.0"
+version = "0.11.1"
 description = "Golem Network integration with Ray"
 authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
@@ -13,7 +13,7 @@ ray = {version = "~2.9.3", extras = ["default"]}
 #golem-core = {path = "../golem-core-python", develop = true}
 # golem-core = {git = "https://github.com/golemfactory/golem-core-python.git", branch = "main"}
 # golem-core = {version = "^0.7.0", source = "test-pypi"}
-golem-core = "^0.7.1"
+golem-core = "^0.7.3"
 aiohttp = "^3"
 requests = "^2"
 click = "^8"

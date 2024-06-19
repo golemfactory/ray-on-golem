@@ -1,9 +1,11 @@
 # This is Ray on Golem Full yaml 
 # - the example config for testnet cluster, 
-# - with all the properties potentially changable by the user
+# - with all the properties potentially changeable by the user
 
 # Ray on Golem cluster name
-cluster_name: golem-cluster
+# This value identifies a given cluster within the ray-on-golem webserver.
+# Therefore, it must be unique if you ever wish to run more than one cluster on the same ray-on-golem instance.
+cluster_name: "golem-cluster"
 
 # The maximum number of workers the cluster will have at any given time
 max_workers: 10
@@ -20,6 +22,11 @@ provider:
     # Port of golem webserver that has connection with golem network
     webserver_port: 4578
 
+    # Port under which Ray's GCS will be exposed on the local machine
+    # Needs to be changed while running multiple clusters on a single machine
+    # Can be null to disable exposure
+    ray_gcs_expose_port: 6379
+
     # Blockchain used for payments.
     # `holesky` means running free nodes on testnet,
     # `polygon` is for mainnet operations.
@@ -34,7 +41,7 @@ provider:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.10.0-py3.10.13-ray2.9.3"
+        image_tag: "golem/ray-on-golem:0.11.1-py3.10.13-ray2.9.3"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
@@ -74,7 +81,7 @@ provider:
         max_env_per_hour_price: 0.5
 
         # If not provided payment will be sent only after cluster is stopped. 
-        # Required for long running clusters
+        # Required for long-running clusters
         payment_interval_hours:
           minimal: 12
 
@@ -87,7 +94,7 @@ available_node_types:
     # The maximum number of worker nodes of this type to launch
     max_workers: 0
 
-    # The node type's CPU and GPU resources - leave it empty for autodetection
+    # The node type's CPU and GPU resources - leave it empty for auto-detection
     resources: {}
 
     # Additional parameters specific for this node type added on top of node_config from provider.parameters.node_config
@@ -103,7 +110,7 @@ available_node_types:
     node_config: {}
 
 # Specify the node type of the head node (as configured above).
-head_node_type: ray.head.default
+head_node_type: "ray.head.default"
 
 # The files or directories to copy to the head and worker nodes
 # Remote workdir is /root/
@@ -144,6 +151,5 @@ worker_start_ray_commands: [
 
 # Satisfy checks to disable warning about legacy fields at `ray up`.
 # This will be removed by ray-on-golem on the fly.
-head_node: True
-worker_nodes: True
-
+head_node: true
+worker_nodes: true
