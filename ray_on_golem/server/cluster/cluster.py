@@ -251,7 +251,7 @@ class Cluster(WarningMessagesMixin):
         node_config: NodeConfigData,
         subnet_tag: str,
     ) -> ManagerStack:
-        stack_hash = node_config.get_hash()
+        stack_hash = node_config.get_hash(subnet_tag)
 
         async with self._manager_stacks_locks[stack_hash]:
             stack = self._manager_stacks.get(stack_hash)

@@ -87,8 +87,8 @@ class NodeConfigData(BaseModel):
     class Config:
         extra = "forbid"
 
-    def get_hash(self) -> str:
-        return hashlib.md5(self.json().encode()).hexdigest()
+    def get_hash(self, subnet_tag: str) -> str:
+        return hashlib.md5(self.json().encode()).hexdigest() + "-" + subnet_tag
 
 
 class ProviderParametersData(BaseModel):
