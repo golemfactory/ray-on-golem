@@ -25,14 +25,14 @@ provider:
     #payment_network: "polygon"
 
     # Maximum amount of GLMs that's going to be spent for the whole cluster
-    total_budget: 1
+    total_budget: 5
 
     # Common parameters for all node types. Can be overridden in available_node_types
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
         # Check available versions at https://registry.golem.network/explore/golem/ray-on-golem
-        image_tag: "golem/ray-on-golem:0.10.0-py3.10.13-ray2.9.3"
+        image_tag: "golem/ray-on-golem:0.11.1-py3.10.13-ray2.9.3"
 
         # List of urls which will be added to the Computation Manifest
         # Requires protocol to be defined in all URLs
@@ -137,4 +137,3 @@ worker_start_ray_commands: [
 # This will be removed by ray-on-golem on the fly.
 head_node: true
 worker_nodes: true
-

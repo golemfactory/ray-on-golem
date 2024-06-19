@@ -18,7 +18,7 @@ provider:
     node_config:
       # Parameters for golem demands (same for head and workers)
       demand:
-        image_tag: "golem/ray-on-golem:0.10.0-py3.10.13-ray2.9.3"
+        image_tag: "golem/ray-on-golem:0.11.1-py3.10.13-ray2.9.3"
 
 # Tells the autoscaler the allowed node types and the resources they provide
 available_node_types:
@@ -68,4 +68,3 @@ worker_start_ray_commands: [
 # This will be removed by ray-on-golem on the fly.
 head_node: true
 worker_nodes: true
-

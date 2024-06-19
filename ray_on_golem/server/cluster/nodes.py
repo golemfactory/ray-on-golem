@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Collection, List, Optional, Sequence, Tuple
+from typing import Callable, Collection, List, Optional, Sequence, Tuple
 
 from golem.exceptions import GolemException
 from golem.managers.base import ManagerException, WorkContext
@@ -31,9 +31,6 @@ from ray_on_golem.server.settings import (
 from ray_on_golem.server.utils import get_provider_desc
 from ray_on_golem.utils import get_ssh_command, get_ssh_command_args, run_subprocess_output
 
-if TYPE_CHECKING:
-    from ray_on_golem.server.cluster import Cluster
-
 RAY_GCS_PORT = 6379
 RAY_DASHBOARD_PORT = 8265
 
@@ -48,7 +45,6 @@ class ClusterNode(WarningMessagesMixin, NodeData):
     ssh_public_key_path: Path
     ssh_user: str
 
-    _cluster: "Cluster"
     _golem_service: GolemService
     _manager_stack: ManagerStack
 
@@ -64,7 +60,6 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
     def __init__(
         self,
-        cluster: "Cluster",
         golem_service: GolemService,
         manager_stack: ManagerStack,
         priority_agreement_timeout: timedelta,
@@ -74,7 +69,6 @@ class ClusterNode(WarningMessagesMixin, NodeData):
     ) -> None:
         super().__init__(**kwargs)
 
-        self._cluster = cluster
         self._golem_service = golem_service
         self._manager_stack = manager_stack
         self._priority_manager_stack = priority_manager_stack
@@ -211,7 +205,10 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         self.ssh_proxy_command = None
 
         if self._on_stop and call_events:
-            await resolve_maybe_awaitable(self._on_stop(self))
+            create_task_with_logging(
+                resolve_maybe_awaitable(self._on_stop(self)),
+                trace_id=get_trace_id_name(self, "on-stop"),
+            )
 
         logger.info("Stopping `%s` node done", self)
 
@@ -336,7 +333,6 @@ class ClusterNode(WarningMessagesMixin, NodeData):
         await self._run_command(
             context, f"echo 'export PATH=$PATH:/root/.local/bin' >> /root/.bashrc"
         )
-        await self._run_command(context, f"echo 'source /root/venv/bin/activate' >> /root/.bashrc")
 
         await self._run_command(context, "mkdir -p /root/.ssh")
         await self._run_command(
@@ -450,6 +446,16 @@ class ClusterNode(WarningMessagesMixin, NodeData):
 
         logger.info("Stopping `%s` node sidecars done", self)
 
+    async def _on_monitor_check_failed(self, monitor: MonitorClusterNodeSidecar) -> None:
+        provider_desc = await get_provider_desc(self.activity)
+
+        message = f"Terminating node `%s` %s {monitor.name} is no longer accessible"
+
+        logger.warning(message, self.node_id, provider_desc)
+        self.add_warning_message(message, self.node_id, provider_desc)
+
+        await self.stop()
+
 
 class WorkerClusterNode(ClusterNode):
     """Self-contained element that represents explicitly a Ray worker node."""
@@ -469,20 +475,6 @@ class WorkerClusterNode(ClusterNode):
                 max_fail_count=CLUSTER_MONITOR_RETRY_COUNT,
             ),
         )
-
-    async def _on_monitor_check_failed(
-        self, monitor: MonitorClusterNodeSidecar, node: ClusterNode
-    ) -> bool:
-        provider_desc = await get_provider_desc(self.activity)
-
-        message = f"Terminating node as worker `%s` %s {monitor.name} is no longer accessible"
-
-        logger.warning(message, self.node_id, provider_desc)
-        self.add_warning_message(message, self.node_id, provider_desc)
-
-        create_task_with_logging(self.stop())
-
-        return True
 
 
 class HeadClusterNode(WorkerClusterNode):
@@ -517,17 +509,3 @@ class HeadClusterNode(WorkerClusterNode):
             )
 
         return sidecars
-
-    async def _on_monitor_check_failed(
-        self, monitor: MonitorClusterNodeSidecar, node: ClusterNode
-    ) -> bool:
-        provider_desc = await get_provider_desc(self.activity)
-
-        message = f"Terminating cluster as head `%s` %s {monitor.name} is no longer accessible"
-
-        logger.warning(message, self.node_id, provider_desc)
-        self.add_warning_message(message, self.node_id, provider_desc)
-
-        create_task_with_logging(self._cluster.stop(clear=False))
-
-        return True

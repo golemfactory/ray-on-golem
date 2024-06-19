@@ -94,7 +94,6 @@ jobs:
         run: |
           poetry run ray exec golem-cluster.tests.yaml 'free -h'
           poetry run ray exec golem-cluster.tests.yaml 'ps -Heo size,command --sort -size'
-          poetry run ray rsync-down golem-cluster.tests.yaml /root/mem_usage.log mem_usage.log
           poetry run ray exec golem-cluster.tests.yaml 'ray cluster-dump --local --debug-state --processes-verbose -o ray_cluster_dump.tar.gz'
           poetry run ray rsync-down golem-cluster.tests.yaml ray_cluster_dump.tar.gz ray_cluster_dump.tar.gz
 
@@ -126,4 +125,3 @@ jobs:
             /root/.local/share/ray_on_golem/yagna.log
             /tmp/goth-tests
             ray_cluster_dump.tar.gz
-            mem_usage.log

@@ -2,11 +2,24 @@ import asyncio
 import logging
 from collections import defaultdict
 from functools import partial
-from typing import DefaultDict, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type
+from typing import (
+    Callable,
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+)
 
 from golem.managers import PaymentManager
 from golem.utils.asyncio import create_task_with_logging
+from golem.utils.asyncio.tasks import resolve_maybe_awaitable
 from golem.utils.logging import get_trace_id_name
+from golem.utils.typing import MaybeAwaitable
 from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_NODE_KIND, TAG_RAY_USER_NODE_TYPE
 
 from ray_on_golem.server import utils
@@ -41,6 +54,7 @@ class Cluster(WarningMessagesMixin):
         webserver_port: int,
         name: str,
         provider_parameters: ProviderParametersData,
+        on_stop: Optional[Callable[["Cluster"], MaybeAwaitable[None]]] = None,
     ) -> None:
         super().__init__()
 
@@ -48,6 +62,7 @@ class Cluster(WarningMessagesMixin):
         self._name = name
         self._provider_parameters = provider_parameters
         self._webserver_port = webserver_port
+        self._on_stop = on_stop
 
         self._manager_stacks: Dict[StackHash, ManagerStack] = {}
         self._manager_stacks_locks: DefaultDict[StackHash, asyncio.Semaphore] = defaultdict(
@@ -63,6 +78,9 @@ class Cluster(WarningMessagesMixin):
         )
 
         self._state: NodeState = NodeState.terminated
+
+    def __str__(self) -> str:
+        return self._name
 
     @property
     def nodes(self) -> Mapping[str, ClusterNode]:
@@ -85,10 +103,10 @@ class Cluster(WarningMessagesMixin):
         """Start the cluster and its internal state."""
 
         if self._state in (NodeState.pending, NodeState.running):
-            logger.info("Not starting `%s` cluster as it's already running or starting", self._name)
+            logger.info("Not starting `%s` cluster as it's already running or starting", self)
             return
 
-        logger.info("Starting `%s` cluster...", self._name)
+        logger.info("Starting `%s` cluster...", self)
 
         self._state = NodeState.pending
 
@@ -96,16 +114,16 @@ class Cluster(WarningMessagesMixin):
 
         self._state = NodeState.running
 
-        logger.info("Starting `%s` cluster done", self._name)
+        logger.info("Starting `%s` cluster done", self)
 
-    async def stop(self, clear: bool = True) -> None:
+    async def stop(self, call_events: bool = True) -> None:
         """Stop the cluster."""
 
         if self._state in (NodeState.terminating, NodeState.terminated):
-            logger.info("Not stopping `%s` cluster as it's already stopped or stopping", self._name)
+            logger.info("Not stopping `%s` cluster as it's already stopped or stopping", self)
             return
 
-        logger.info("Stopping `%s` cluster...", self._name)
+        logger.info("Stopping `%s` cluster...", self)
 
         self._state = NodeState.terminating
 
@@ -116,23 +134,21 @@ class Cluster(WarningMessagesMixin):
         await self._payment_manager.stop()
 
         self._state = NodeState.terminated
-
-        if clear:
-            self.clear()
-
-        logger.info("Stopping `%s` cluster done", self._name)
-
-    def clear(self) -> None:
-        """Clear the internal state of the cluster."""
-
-        if self._state != NodeState.terminated:
-            logger.info("Not clearing `%s` cluster as it's not stopped", self._name)
-            return
-
         self._nodes.clear()
         self._nodes_id_counter = 0
         self._manager_stacks.clear()
         self._manager_stacks_locks.clear()
+
+        if self._on_stop and call_events:
+            create_task_with_logging(
+                resolve_maybe_awaitable(self._on_stop(self)),
+                trace_id=get_trace_id_name(self, "on-stop"),
+            )
+
+        logger.info("Stopping `%s` cluster done", self)
+
+    def is_running(self) -> bool:
+        return self._state != NodeState.terminated
 
     def get_non_terminated_nodes(self) -> Sequence["ClusterNode"]:
         """Return cluster nodes that are running on the cluster."""
@@ -235,7 +251,7 @@ class Cluster(WarningMessagesMixin):
         node_config: NodeConfigData,
         subnet_tag: str,
     ) -> ManagerStack:
-        stack_hash = node_config.get_hash()
+        stack_hash = node_config.get_hash(subnet_tag)
 
         async with self._manager_stacks_locks[stack_hash]:
             stack = self._manager_stacks.get(stack_hash)
@@ -258,7 +274,7 @@ class Cluster(WarningMessagesMixin):
             return stack
 
     async def _remove_manager_stack(self, stack_hash: StackHash) -> None:
-        logger.info(f"Removing stack `%s`...", stack_hash)
+        logger.info("Removing stack `%s`...", stack_hash)
 
         async with self._manager_stacks_locks[stack_hash]:
             await self._manager_stacks[stack_hash].stop()
@@ -269,38 +285,41 @@ class Cluster(WarningMessagesMixin):
         if not self._manager_stacks_locks[stack_hash].locked():
             del self._manager_stacks_locks[stack_hash]
 
-        logger.info(f"Removing stack `%s` done", stack_hash)
+        logger.info("Removing stack `%s` done", stack_hash)
 
-    def _on_node_stop(self, node: ClusterNode) -> None:
+    async def _on_node_stop(self, node: ClusterNode) -> None:
         non_terminated_nodes = self.get_non_terminated_nodes()
         if not non_terminated_nodes:
-            logger.debug("No more nodes running on the cluster, scheduling cluster stop")
+            logger.debug("No more nodes running on the cluster, cluster will stop")
 
-            create_task_with_logging(
-                self.stop(),
-                trace_id=get_trace_id_name(self, "on-node-stop-cluster-stop"),
-            )
+            await self.stop()
 
-        any_manager_stopped = False
+            return
 
+        if isinstance(node, HeadClusterNode):
+            logger.debug("Head node is not running, cluster will stop")
+
+            await self.stop()
+
+            return
+
+        manager_stack_stop_coros = []
+
+        # TODO: Consider moving this logic directly to manager stack with more event-based approach
         for manager_stack in node.manager_stacks:
             if any(manager_stack in n.manager_stacks for n in self.get_non_terminated_nodes()):
                 continue
 
             logger.debug(
-                "No more nodes running on the `%s` manager stack, scheduling manager stack stop",
+                "No more nodes running on the `%s` manager stack, manager stack will stop",
                 manager_stack,
             )
 
-            any_manager_stopped = True
-            stack_hash = node.node_config.get_hash()
+            manager_stack_stop_coros.append(manager_stack.stop())
 
-            create_task_with_logging(
-                self._manager_stacks[stack_hash].stop(),
-                trace_id=get_trace_id_name(self, "on-node-stop-manager-stack-stop"),
-            )
-
-        if not any_manager_stopped:
+        if manager_stack_stop_coros:
+            await asyncio.gather(*manager_stack_stop_coros)
+        else:
             logger.debug(
-                "Cluster and manager stack have some nodes still running, nothing to stop."
+                "Cluster and its manager stacks have some nodes still running, nothing to stop"
             )
