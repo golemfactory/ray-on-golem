@@ -56,6 +56,11 @@ provider:
         # Maximal values of parameters offered by Golem provider
         max_cpu_threads: null
 
+        # Signed node descriptors that allows Requestors provide identification data,
+        # enables Providers to restrict access to certain features based on identification
+        # https://github.com/golemfactory/golem-architecture/blob/master/gaps/gap-31_node_descriptor/gap-31_node_descriptor.md
+        # node_descriptor: {"$schema":"https://schemas.golem.network/v1/node-descriptor.schema.json","nodeDescriptor":...
+
       budget_control:
         per_cpu_expected_usage:
           # Per cpu expected cost is calculated as a sum of:

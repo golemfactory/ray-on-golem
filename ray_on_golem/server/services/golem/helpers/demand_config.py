@@ -5,7 +5,14 @@ from dataclasses import dataclass
 from typing import List, Tuple
 
 import aiohttp
-from golem.payload import ManifestVmPayload, Payload, RepositoryVmPayload, constraint, defaults
+from golem.payload import (
+    ManifestVmPayload,
+    Payload,
+    RepositoryVmPayload,
+    constraint,
+    defaults,
+    prop,
+)
 from yarl import URL
 
 from ray_on_golem.server.exceptions import RayOnGolemServerError, RegistryRequestError
@@ -20,6 +27,11 @@ class MaxCpuThreadsPayload(Payload):
     max_cpu_threads: int = constraint(defaults.PROP_INF_CPU_THREADS, "<=", default=None)
 
 
+@dataclass
+class NodeDescriptorPayload(Payload):
+    node_descriptor: str = prop("golem.!exp.gap-31.v0.node.descriptor", default=None)
+
+
 class DemandConfigHelper:
     def __init__(self, registry_stats: bool):
         self._registry_stats = registry_stats
@@ -27,30 +39,37 @@ class DemandConfigHelper:
     async def get_payloads_from_demand_config(
         self, demand_config: DemandConfigData
     ) -> List[Payload]:
+        payloads = []
         image_url, image_hash = await self._get_image_url_and_hash(demand_config)
-        max_cpu_payload = MaxCpuThreadsPayload(
-            max_cpu_threads=demand_config.max_cpu_threads,
-        )
+        payloads.append(MaxCpuThreadsPayload(max_cpu_threads=demand_config.max_cpu_threads))
+
+        if demand_config.node_descriptor is not None:
+            payloads.append(NodeDescriptorPayload(node_descriptor=demand_config.node_descriptor))
 
         if not demand_config.outbound_urls:
-            return [
-                max_cpu_payload,
-                await self._get_repository_payload(demand_config, image_url, image_hash),
-            ]
+            payloads.append(
+                await self._get_repository_payload(demand_config, image_url, image_hash)
+            )
+            return payloads
 
         if "manifest-support" not in demand_config.capabilities:
             demand_config.capabilities.append("manifest-support")
 
-        return [
-            max_cpu_payload,
-            await self._get_manifest_payload(demand_config, image_url, image_hash),
-        ]
+        payloads.append(await self._get_manifest_payload(demand_config, image_url, image_hash))
+        return payloads
 
     async def _get_repository_payload(
         self, demand_config: DemandConfigData, image_url: URL, image_hash: str
     ) -> Payload:
         params = demand_config.dict(
-            exclude={"image_hash", "image_tag", "outbound_urls", "subnet_tag", "max_cpu_threads"}
+            exclude={
+                "image_hash",
+                "image_tag",
+                "outbound_urls",
+                "subnet_tag",
+                "max_cpu_threads",
+                "node_descriptor",
+            }
         )
         params["image_hash"] = image_hash
         params["image_url"] = image_url
@@ -69,7 +88,14 @@ class DemandConfigHelper:
         manifest = base64.b64encode(json.dumps(manifest).encode("utf-8")).decode("utf-8")
 
         params = demand_config.dict(
-            exclude={"image_hash", "image_tag", "outbound_urls", "subnet_tag", "max_cpu_threads"}
+            exclude={
+                "image_hash",
+                "image_tag",
+                "outbound_urls",
+                "subnet_tag",
+                "max_cpu_threads",
+                "node_descriptor",
+            }
         )
         params["manifest"] = manifest
         return ManifestVmPayload(**params)

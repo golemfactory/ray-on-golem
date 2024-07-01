@@ -1,4 +1,5 @@
 import hashlib
+import json
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
@@ -64,6 +65,7 @@ class BudgetControlData(BaseModel):
 
 
 class DemandConfigData(BaseModel):
+    node_descriptor: Optional[Dict] = None
     image_hash: Optional[str] = None
     image_tag: Optional[str] = None
     capabilities: List[str] = ["vpn", "inet"]
@@ -73,6 +75,14 @@ class DemandConfigData(BaseModel):
     min_storage_gib: float = 0.0
     max_cpu_threads: Optional[int] = None
     runtime: str = "vm"
+
+    @validator("node_descriptor")
+    def validate_node_descriptor_is_json(cls, value):
+        try:
+            json.dumps(value)
+            return value
+        except (TypeError, OverflowError) as err:
+            raise ValueError("Given node_descriptor is not a JSON serializable") from err
 
     class Config:
         extra = "forbid"
