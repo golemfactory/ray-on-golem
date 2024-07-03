@@ -51,7 +51,7 @@ jobs:
 
       - name: Start Goth
         env:
-          GOTH_VERSION: 0.16.0
+          GOTH_VERSION: 0.18.1
           GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: ./.github/workflows/start-goth.sh
