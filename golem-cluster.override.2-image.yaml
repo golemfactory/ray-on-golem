@@ -2,4 +2,4 @@ provider:
   parameters:
     node_config:
       demand:
-        image_tag: "blueshade/ray-on-golem:0.11.1-py3.10.13-ray2.9.3"
+        image_tag: "blueshade/ray-on-golem:0.12.0a0-py3.10.13-ray2.9.3"
