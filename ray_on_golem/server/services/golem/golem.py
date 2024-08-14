@@ -60,7 +60,9 @@ class DriverListAllocationPaymentManager(DefaultPaymentManager):
     async def get_allocation(self) -> Allocation:
         async with self._lock:
             if not self._allocation:
-                self._allocation = await self._create_allocation(self._budget, self._network, self._driver)
+                self._allocation = await self._create_allocation(
+                    self._budget, self._network, self._driver
+                )
 
         return self._allocation  # type: ignore[return-value]
 
