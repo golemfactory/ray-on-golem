@@ -56,6 +56,14 @@ class DriverListAllocationPaymentManager(DefaultPaymentManager):
 
         return await Allocation.create(self._golem, data)
 
+    @trace_span("Getting allocation", show_results=True, log_level=logging.INFO)
+    async def get_allocation(self) -> Allocation:
+        async with self._lock:
+            if not self._allocation:
+                self._allocation = await self._create_allocation(self._budget, self._network, self._driver)
+
+        return self._allocation  # type: ignore[return-value]
+
 
 class GolemService:
     def __init__(self, websocat_path: Path, registry_stats: bool):
