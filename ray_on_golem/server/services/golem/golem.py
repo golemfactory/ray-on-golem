@@ -27,23 +27,23 @@ class NoMatchingPlatform(AllocationException):
 #  as until then there is no api call available to get driver lists and golem-core is api-only
 class DriverListAllocationPaymentManager(DefaultPaymentManager):
     @trace_span(show_arguments=True, show_results=True)
-    async def _create_allocation(self, budget: Decimal, network: str, driver: str) -> Allocation:
+    async def _create_allocation(self) -> Allocation:
         output = json.loads(
             await run_subprocess_output(YAGNA_PATH, "payment", "driver", "list", "--json")
         )
 
         try:
-            network_output = output[driver]["networks"][network]
+            network_output = output[self._driver]["networks"][self._network]
             platform = network_output["tokens"][network_output["default_token"]]
         except KeyError:
-            raise NoMatchingPlatform(network, driver)
+            raise NoMatchingPlatform(self._network, self._driver)
 
         timestamp = datetime.now(timezone.utc)
         timeout = timestamp + timedelta(days=365 * 10)
 
         data = models.Allocation(
             payment_platform=platform,
-            total_amount=str(budget),
+            total_amount=str(Decimal(self._budget)),
             timestamp=timestamp,
             timeout=timeout,
             # This will probably be removed one day (consent-related thing)
@@ -55,16 +55,6 @@ class DriverListAllocationPaymentManager(DefaultPaymentManager):
         )
 
         return await Allocation.create(self._golem, data)
-
-    @trace_span("Getting allocation", show_results=True, log_level=logging.INFO)
-    async def get_allocation(self) -> Allocation:
-        async with self._lock:
-            if not self._allocation:
-                self._allocation = await self._create_allocation(
-                    self._budget, self._network, self._driver
-                )
-
-        return self._allocation  # type: ignore[return-value]
 
 
 class GolemService:
