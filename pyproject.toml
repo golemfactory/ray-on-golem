@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ray-on-golem"
-version = "0.13.0a1"
+version = "0.13.0a2"
 description = "Golem Network integration with Ray"
 authors = ["Golem Factory <contact@golem.network>"]
 readme = "README.md"
@@ -31,7 +31,7 @@ websocat = "^1.13.0"
 #golem-node = {version = "^0.16.0a2", source = "test-pypi"}
 golem-node = "^0.16.0"
 
-setuptools = "^72.2.0"
+setuptools = "^69.5.1"
 
 [tool.poetry.group.ray.dependencies]
 python = "^3.8.1"
@@ -43,6 +43,8 @@ pydantic = "<2"
 toml = "^0.10.2"
 dpath = "^2.1.6"
 appdirs = "^1.4.4"
+
+setuptools = "^69.5.1"
 
 [tool.poetry.scripts]
 ray-on-golem = "ray_on_golem.main:main"
